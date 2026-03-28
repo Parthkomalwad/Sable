@@ -47,6 +47,17 @@ CREATE TABLE IF NOT EXISTS session_memory (
 )
 """
 
+_CREATE_SNIPPETS = """
+CREATE TABLE IF NOT EXISTS snippets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    command    TEXT NOT NULL,
+    note       TEXT DEFAULT '',
+    tags       TEXT DEFAULT '',
+    use_count  INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+)
+"""
+
 
 class Database:
     """Manages the SQLite session database."""
@@ -59,6 +70,7 @@ class Database:
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute(_CREATE_TOKEN_EVENTS)
         self._conn.execute(_CREATE_SESSION_MEMORY)
+        self._conn.execute(_CREATE_SNIPPETS)
         self._conn.commit()
 
     def write_event(self, event: TokenEvent) -> None:
@@ -221,6 +233,54 @@ class Database:
             (f"{today}%",),
         ).fetchone()
         return {"calls": row[0], "tokens": row[1], "cost": row[2]}
+
+    def add_snippet(self, command: str, note: str = "", tags: str = "") -> int:
+        """Insert a snippet, return its new id."""
+        from datetime import datetime, timezone
+        cur = self._conn.execute(
+            "INSERT INTO snippets (command, note, tags, use_count, created_at) VALUES (?, ?, ?, 0, ?)",
+            (command, note, tags, datetime.now(timezone.utc).isoformat()),
+        )
+        self._conn.commit()
+        return cur.lastrowid
+
+    def list_snippets(self, tag: str = "") -> list[dict]:
+        """Return all snippets ordered by use_count DESC, created_at DESC.
+
+        If tag is given, filter to snippets whose tags field contains that tag.
+        """
+        if tag:
+            rows = self._conn.execute(
+                """SELECT id, command, note, tags, use_count, created_at
+                   FROM snippets
+                   WHERE ',' || tags || ',' LIKE ?
+                   ORDER BY use_count DESC, created_at DESC""",
+                (f"%,{tag},%",),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                """SELECT id, command, note, tags, use_count, created_at
+                   FROM snippets
+                   ORDER BY use_count DESC, created_at DESC""",
+            ).fetchall()
+        return [
+            {"id": r[0], "command": r[1], "note": r[2],
+             "tags": r[3], "use_count": r[4], "created_at": r[5]}
+            for r in rows
+        ]
+
+    def delete_snippet(self, snippet_id: int) -> bool:
+        """Delete snippet by id. Return True if a row was deleted."""
+        cur = self._conn.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def increment_use(self, snippet_id: int) -> None:
+        """Increment use_count for a snippet."""
+        self._conn.execute(
+            "UPDATE snippets SET use_count = use_count + 1 WHERE id = ?", (snippet_id,)
+        )
+        self._conn.commit()
 
     def close(self) -> None:
         """Close the database connection."""
