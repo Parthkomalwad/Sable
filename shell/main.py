@@ -58,15 +58,17 @@ def main() -> None:
 
     # --- Session resume: load compressed context if available ---
     username = os.environ.get("USER", os.environ.get("USERNAME", "user"))
-    try:
-        from shell.memory.store import load_session_context
-        ctx = load_session_context(username)
-        if ctx:
-            preview = ctx[:300] + ("..." if len(ctx) > 300 else "")
-            sys.stdout.write(f"session resumed ({len(ctx)} chars)\n{preview}\n")
-            sys.stdout.flush()
-    except Exception:
-        pass  # Session resume is best-effort
+    ctx = ""
+    if not os.environ.get("AGENTIC_NEW_SESSION"):
+        try:
+            from shell.memory.store import load_session_context
+            ctx = load_session_context(username) or ""
+            if ctx:
+                preview = ctx[:300] + ("..." if len(ctx) > 300 else "")
+                sys.stdout.write(f"session resumed ({len(ctx)} chars)\n{preview}\n")
+                sys.stdout.flush()
+        except Exception:
+            pass  # Session resume is best-effort
 
     # --- Launch tmux session with sidebar (no-op if already in tmux or tmux unavailable) ---
     if False:  # tmux handled by wrapper script
@@ -85,7 +87,7 @@ def main() -> None:
     sys.stdout.flush()
 
     try:
-        loop.start(config, session_id, session_context=ctx if ctx else "")
+        loop.start(config, session_id, session_context=ctx)
     except KeyboardInterrupt:
         sys.exit(0)
 
