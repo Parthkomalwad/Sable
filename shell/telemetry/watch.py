@@ -125,12 +125,17 @@ def _top_procs():
             capture_output=True, text=True, timeout=2
         ).stdout.strip().splitlines()
         rows = []
-        for line in out[1:6]:
+        for line in out[1:10]:
             parts = line.split(None, 10)
             if len(parts) >= 11:
                 name = parts[10].split("/")[-1][:16]
+                # Skip the ps process itself and python/shell processes
+                if name.startswith("ps") or parts[1] == str(os.getpid()):
+                    continue
                 rows.append((parts[1], parts[2], parts[3], name))
-        return rows[:4]
+            if len(rows) >= 4:
+                break
+        return rows
     except: return []
 
 def _network_ip():

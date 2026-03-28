@@ -625,7 +625,7 @@ def _start_new_session() -> None:
     try:
         # Create session sized to current terminal
         import shutil as _shutil
-        _ts = os.get_terminal_size(_shutil.get_terminal_size((220, 50)))
+        _ts = _shutil.get_terminal_size((220, 50))
         subprocess.run(["tmux", "new-session", "-d", "-s", new_name,
                         "-x", str(_ts.columns), "-y", str(_ts.lines)], check=True)
 
@@ -640,7 +640,7 @@ def _start_new_session() -> None:
 
         # Shell in pane 0 (left after swap)
         subprocess.run(["tmux", "send-keys", "-t", f"{new_name}:0.0",
-            f"trap '' INT; while true; do clear; PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 {venv_python} -m shell.main; echo '[shell exited — restarting in 2s]'; sleep 2; done",
+            f"trap '' INT; EXIT_FLAG=$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"$EXIT_FLAG\"; clear; PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 {venv_python} -m shell.main; if [ -f \"$EXIT_FLAG\" ]; then rm -f \"$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done",
             "Enter"], check=True)
 
         subprocess.run(["tmux", "select-pane", "-t", f"{new_name}:0.0"], check=True)
