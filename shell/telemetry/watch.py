@@ -88,7 +88,7 @@ def _get_config_model():
     except: return "unknown"
 
 def _git_status():
-    """Return (branch, changes_summary) or None if not a git repo."""
+    """Return (branch, staged, modified, untracked, ahead, behind) or None if not a git repo."""
     try:
         cwd = _current_dir().replace("~", os.path.expanduser("~"))
         branch = subprocess.run(
@@ -101,10 +101,20 @@ def _git_status():
             ["git", "-C", cwd, "status", "--porcelain"],
             capture_output=True, text=True, timeout=1
         ).stdout.strip()
-        modified = sum(1 for l in status.splitlines() if l and l[1] in "MD ")
-        staged   = sum(1 for l in status.splitlines() if l and l[0] in "MADR")
-        untracked= sum(1 for l in status.splitlines() if l.startswith("??"))
-        return branch, staged, modified, untracked
+        modified  = sum(1 for l in status.splitlines() if l and l[1] in "MD ")
+        staged    = sum(1 for l in status.splitlines() if l and l[0] in "MADR")
+        untracked = sum(1 for l in status.splitlines() if l.startswith("??"))
+        # Ahead/behind vs remote
+        ahead, behind = 0, 0
+        ab = subprocess.run(
+            ["git", "-C", cwd, "rev-list", "--left-right", "--count", f"HEAD...@{{u}}"],
+            capture_output=True, text=True, timeout=1
+        ).stdout.strip()
+        if ab:
+            parts = ab.split()
+            if len(parts) == 2:
+                ahead, behind = int(parts[0]), int(parts[1])
+        return branch, staged, modified, untracked, ahead, behind
     except: return None
 
 def _top_procs():
@@ -148,11 +158,17 @@ def _disk_usage():
 # ── panel builders ────────────────────────────────────────
 
 def _panel_session(db, model):
+    try:
+        today = db.get_today_stats()
+        cost_str = f"${today['cost']:.4f}  ({today['calls']} calls)"
+        cost_style = "color(203)" if today['cost'] > 0.10 else "color(221)" if today['cost'] > 0.01 else "color(114)"
+    except Exception:
+        cost_str, cost_style = "—", "color(238)"
     t = Text()
     t.append("Model  ", style="color(238)"); t.append(model + "\n", style="color(141) bold")
     t.append("Uptime ", style="color(238)"); t.append(_uptime() + "\n", style="color(153)")
     t.append("CWD    ", style="color(238)"); t.append(_current_dir() + "\n", style="color(153)")
-    t.append("Last   ", style="color(238)"); t.append(_last_command(db) + "\n", style="color(250)")
+    t.append("Today  ", style="color(238)"); t.append(cost_str + "\n", style=cost_style)
     return Panel(t, title="[color(141) bold]✦ session[/color(141) bold]", border_style="color(55)", padding=(0, 1))
 
 def _panel_system():
@@ -173,7 +189,7 @@ def _panel_git():
     if result is None:
         t.append("not a git repo\n", style="color(238)")
     else:
-        branch, staged, modified, untracked = result
+        branch, staged, modified, untracked, ahead, behind = result
         t.append("Branch  ", style="color(238)"); t.append(branch + "\n", style="color(141) bold")
         staged_color   = "color(114)" if staged == 0 else "color(221)"
         modified_color = "color(114)" if modified == 0 else "color(203)"
@@ -181,17 +197,35 @@ def _panel_git():
         t.append("Staged  ", style="color(238)"); t.append(f"{staged} file(s)\n", style=staged_color)
         t.append("Changed ", style="color(238)"); t.append(f"{modified} file(s)\n", style=modified_color)
         t.append("New     ", style="color(238)"); t.append(f"{untracked} file(s)\n", style=untracked_color)
+        if ahead or behind:
+            sync = ""
+            if ahead:  sync += f"↑{ahead} "
+            if behind: sync += f"↓{behind}"
+            sync_color = "color(221)" if behind else "color(114)"
+            t.append("Sync    ", style="color(238)"); t.append(sync.strip() + "\n", style=sync_color)
     return Panel(t, title="[color(141) bold] git[/color(141) bold]", border_style="color(55)", padding=(0, 1))
+
+def _cpu_bar(pct_str: str, width: int = 10) -> tuple[str, str]:
+    """Return (bar_string, color) for a CPU percentage string like '42.3'."""
+    try:
+        pct = float(pct_str)
+    except (ValueError, TypeError):
+        return "?" * width, "color(238)"
+    filled = int(pct / 100 * width)
+    bar = "█" * filled + "░" * (width - filled)
+    color = "color(203)" if pct > 50 else "color(221)" if pct > 20 else "color(114)"
+    return bar, color
+
 
 def _panel_processes():
     procs = _top_procs()
     t = Text()
-    t.append(f"{'NAME':<16} {'CPU':>4} {'MEM':>4}\n", style="color(141)")
+    t.append(f"{'NAME':<14} {'CPU BAR':>10} {'%':>5}\n", style="color(238)")
     for pid, cpu, mem, name in procs:
-        cpu_color = "color(203)" if float(cpu) > 50 else "color(221)" if float(cpu) > 20 else "color(114)"
-        t.append(f"{name:<16} ", style="color(250)")
-        t.append(f"{cpu:>4}", style=cpu_color)
-        t.append(f" {mem:>4}\n", style="color(153)")
+        bar, bar_color = _cpu_bar(cpu)
+        t.append(f"{name:<14} ", style="color(250)")
+        t.append(f"{bar}", style=bar_color)
+        t.append(f" {float(cpu):>4.1f}%\n", style=bar_color)
     return Panel(t, title="[color(141) bold]⚙ processes[/color(141) bold]", border_style="color(55)", padding=(0, 1))
 
 def _panel_tokens(db):
@@ -218,19 +252,34 @@ def _panel_tokens(db):
 
 def _panel_shortcuts():
     t = Text()
-    shortcuts = [
-        ("/help",    "show all commands"),
-        ("/new",     "new tmux session"),
-        ("/config",  "edit settings"),
-        ("/model",   "show model"),
-        ("/stats",   "token usage"),
+    # Commands group
+    t.append("── commands ──────────────────\n", style="color(55)")
+    commands = [
+        ("/help",    "all commands"),
+        ("/history", "cmd history + costs"),
+        ("/stats",   "7-day token table"),
         ("/memory",  "session context"),
-        ("Ctrl+B",   "force bash mode"),
-        ("Ctrl+T",   "toggle sidebar"),
+        ("/model",   "current model"),
+        ("/mode",    "auto ↔ prefix routing"),
+        ("/config",  "edit settings"),
+        ("/new",     "new tmux session"),
         ("/exit",    "quit shell"),
     ]
-    for key, desc in shortcuts:
+    for key, desc in commands:
         t.append(f"{key:<10}", style="color(141)")
+        t.append(f" {desc}\n", style="color(238)")
+    # Keys group
+    t.append("── keys ──────────────────────\n", style="color(55)")
+    keys = [
+        ("Ctrl+R",   "search history"),
+        ("Ctrl+B",   "next cmd → bash"),
+        ("Ctrl+T",   "toggle sidebar"),
+        ("Tab",      "complete path/cmd"),
+        ("→",        "accept suggestion"),
+        (">>",       "force AI prefix"),
+    ]
+    for key, desc in keys:
+        t.append(f"{key:<10}", style="color(141) bold")
         t.append(f" {desc}\n", style="color(238)")
     return Panel(t, title="[color(141) bold]? shortcuts[/color(141) bold]", border_style="color(55)", padding=(0, 1))
 
