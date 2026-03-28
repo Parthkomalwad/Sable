@@ -329,7 +329,7 @@ def run():
                 model = _get_config_model()
 
             frame = _render_all(db, model)
-            sys.stdout.write("\033[H")
+            sys.stdout.write("\033[2J\033[H")
             sys.stdout.write(frame)
             sys.stdout.flush()
             time.sleep(5)
