@@ -399,6 +399,7 @@ _HELP_TEXT = (
     "  /model         Show current LLM model\n"
     "  /stats         Last 7 days token usage\n"
     "  /history       recent commands with AI costs\n"
+    "  /clip           Snippet clipboard (add/run/del)\n"
     "  /budget reset  Clear hard-stop budget flag\n"
     "  /memory        View/clear session context\n"
     "\n"
@@ -466,6 +467,15 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
 
     if cmd in ("/history", "/hist"):
         _show_history(db)
+        return True
+
+    if cmd == "/clip" or cmd.startswith("/clip "):
+        from shell.clipboard.manager import run_clip_command, open_picker
+        remainder = cmd[len("/clip"):].strip()
+        if not remainder:
+            open_picker(db)
+        else:
+            run_clip_command(remainder, db)
         return True
 
     if cmd == "shell stats --csv":
