@@ -29,6 +29,9 @@ _VIEW_RE = re.compile(r'^(cat|head|tail)\s+(-n\s*\d+\s+)?([^\s|&;<>]+)$')
 # -R (recursive) and --color are intentionally excluded — fall through to pty.
 _LS_RE = re.compile(r'^ls(\s+(-[lahAFs1]+))?\s*([^\s|&;<>]*)$')
 
+# Track previous directory for 'cd -' command
+_prev_cwd: str = ""
+
 
 def _rich_cat(filepath: str, command: str) -> tuple[int, str]:
     """Render a file with syntax highlighting inside a panel."""
@@ -189,16 +192,26 @@ def execute_bash(command: str, cwd: str) -> tuple[int, str]:
 
     # cd interception — MUST use os.chdir, never subprocess
     if stripped.startswith("cd"):
+        global _prev_cwd
         rest = stripped[2:].strip()
+
         if rest == "-":
-            return 0, ""
-        target = rest or os.path.expanduser("~")
-        target = os.path.expandvars(os.path.expanduser(target))
+            target = _prev_cwd or os.path.expanduser("~")
+        else:
+            target = rest or os.path.expanduser("~")
+            target = os.path.expandvars(os.path.expanduser(target))
+
+        old_cwd = os.getcwd()
         try:
             os.chdir(target)
+            _prev_cwd = old_cwd
             return 0, ""
         except FileNotFoundError:
             sys.stdout.write(f"cd: {target}: No such file or directory\n")
+            sys.stdout.flush()
+            return 1, ""
+        except NotADirectoryError:
+            sys.stdout.write(f"cd: {target}: Not a directory\n")
             sys.stdout.flush()
             return 1, ""
 
