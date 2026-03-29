@@ -1,4 +1,4 @@
-# AgenticOS — Architecture Overview
+# AgenticOS - Architecture Overview
 
 > A Python login shell that replaces `/bin/bash` on any Linux server. SSH in. Your server understands plain English.
 
@@ -6,7 +6,7 @@ This document describes the full system architecture across three layers: the co
 
 ---
 
-## Diagram 1 — Core shell flow
+## Diagram 1 - Core shell flow
 
 ![Core shell flow](Core.png)
 
@@ -24,7 +24,7 @@ This diagram covers everything from SSH connection to command execution. It show
 
 ---
 
-## Diagram 2 — Intelligence and telemetry layer
+## Diagram 2 - Intelligence and telemetry layer
 
 ![Intelligence and telemetry layer](Architecture.png)
 
@@ -44,7 +44,7 @@ This diagram covers the LLM backends, safety guard, multi-step planner, telemetr
 
 ---
 
-## Diagram 3 — Sidebar, tmux layout, and clipboard
+## Diagram 3 - Sidebar, tmux layout, and clipboard
 
 ![Sidebar, tmux layout, and clipboard](tmux-layout.png)
 
@@ -92,7 +92,7 @@ This diagram covers the tmux session structure, the sidebar watch process and it
 
 ---
 
-## Data flow — end to end
+## Data flow - end to end
 
 ```
 SSH login
@@ -143,11 +143,11 @@ Sidebar (separate process, pane 1)
 
 | Decision | Reason |
 |---|---|
-| All commands in `PtyProcessUnicode` | Interactive programs (vim, htop, ncurses) need a real TTY — detecting which commands need one is fragile |
+| All commands in `PtyProcessUnicode` | Interactive programs (vim, htop, ncurses) need a real TTY - detecting which commands need one is fragile |
 | `cd` via `os.chdir()` | Subprocess `cd` changes directory only in the child process, not the Python parent |
-| SQLite WAL mode | Sidebar process reads while shell process writes simultaneously — WAL allows concurrent readers without lock contention |
+| SQLite WAL mode | Sidebar process reads while shell process writes simultaneously - WAL allows concurrent readers without lock contention |
 | Sidebar as a separate process | Sidebar refresh must never block the shell REPL |
-| Direct `httpx` — no LiteLLM | Full control over headers, streaming, and timeouts; eliminates supply chain dependency |
+| Direct `httpx` - no LiteLLM | Full control over headers, streaming, and timeouts; eliminates supply chain dependency |
 | Fixed `SIDEBAR_WIDTH = 44` | Dynamic terminal size queries (`CPR`) freeze inside tmux |
 | `PROMPT_TOOLKIT_NO_CPR=1` | Prevents prompt_toolkit from querying cursor position, which freezes inside tmux |
 | Exit flag file for `/exit` | Shell runs in a `while true` restart loop; flag signals the loop to exec bash instead of restart |

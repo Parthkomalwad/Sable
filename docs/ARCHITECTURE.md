@@ -1,4 +1,4 @@
-# AgenticOS — Full Architecture Document
+# AgenticOS - Full Architecture Document
 
 > This document is intended for generating system diagrams. It describes every component, data flow, and integration point in the system.
 
@@ -21,10 +21,10 @@ User types → Router classifies → Bash OR LLM
 
 ---
 
-## 2. Entry Point — `shell/main.py`
+## 2. Entry Point - `shell/main.py`
 
 ### Responsibilities
-- SSH bypass (first executable line — non-negotiable)
+- SSH bypass (first executable line - non-negotiable)
 - Load config from `~/.config/agentic-shell/config.json`
 - Run first-run wizard if config missing
 - Load session context from SQLite
@@ -39,23 +39,23 @@ SSH_ORIGINAL_COMMAND set? ──yes──→ os.execvp("/bin/bash", command)
         ↓ no
 Normal shell startup
 ```
-This ensures scp, rsync, and git push over SSH always work — the agentic shell is never in their path.
+This ensures scp, rsync, and git push over SSH always work - the agentic shell is never in their path.
 
 ### Session Resume
 On every startup (except `/new` sessions), the shell loads compressed context from the `session_memory` SQLite table for the current user. This is shown as "session resumed (N chars)" and passed to the LLM as prior context.
 
 ---
 
-## 3. REPL Loop — `shell/loop.py`
+## 3. REPL Loop - `shell/loop.py`
 
 The main interactive loop. Built on `prompt_toolkit.PromptSession`.
 
 ### Prompt
 Powerline-style with three segments:
-- **Path** — blue background, current working directory (~ substituted)
-- **Git branch** — purple background, current branch (silent fail if not a git repo)
-- **Time** — dark grey background, HH:MM
-- **Cursor** — white normally, red if last exit code was non-zero
+- **Path** - blue background, current working directory (~ substituted)
+- **Git branch** - purple background, current branch (silent fail if not a git repo)
+- **Time** - dark grey background, HH:MM
+- **Cursor** - white normally, red if last exit code was non-zero
 
 ### Input Processing Pipeline
 ```
@@ -95,10 +95,10 @@ AGENTIC path:
 ```
 
 ### Key Bindings
-- `Ctrl+B` — set `_bypass_next = True` (one-shot bash mode)
-- `Ctrl+T` — call `toggle_sidebar()` via libtmux
-- `Ctrl+X` — insert `/config` into buffer and execute
-- `Ctrl+R` — reverse history search (from emacs bindings)
+- `Ctrl+B` - set `_bypass_next = True` (one-shot bash mode)
+- `Ctrl+T` - call `toggle_sidebar()` via libtmux
+- `Ctrl+X` - insert `/config` into buffer and execute
+- `Ctrl+R` - reverse history search (from emacs bindings)
 
 ### Builtins (`_handle_builtin`)
 Every line starting with `/` is checked here before routing.
@@ -120,14 +120,14 @@ Every line starting with `/` is checked here before routing.
 
 ### New Session (`/new`)
 Creates a new tmux session with:
-- Pane 0 (left) — shell process with exit-flag-aware restart loop
-- Pane 1 (right) — sidebar watch process
+- Pane 0 (left) - shell process with exit-flag-aware restart loop
+- Pane 1 (right) - sidebar watch process
 Switches client to new session. Old session stays alive (SSH client is attached to it).
 Sets `AGENTIC_NEW_SESSION=1` so the new shell does not load previous session context.
 
 ---
 
-## 4. Router — `shell/router.py`
+## 4. Router - `shell/router.py`
 
 Classifies each line as `BASH`, `AGENTIC`, or `AMBIGUOUS`.
 
@@ -140,21 +140,21 @@ Classifies each line as `BASH`, `AGENTIC`, or `AMBIGUOUS`.
 
 ---
 
-## 5. Executor — `shell/executor.py`
+## 5. Executor - `shell/executor.py`
 
 All command execution goes through here.
 
 ### Special Cases (intercepted before pty)
-- **`cd`** — calls `os.chdir()` directly (subprocess cd has no effect on parent process). Handles `cd -` with `_prev_cwd` module-level state.
-- **`ls [flags] [path]`** — rendered with Rich Columns (short) or Rich Table (long `-l`). Colors: dirs=blue+"/", executables=green+"*", symlinks=purple, files=white.
-- **`cat/head/tail <file>`** — rendered with Rich Syntax (monokai theme, line numbers). Language auto-detected from extension.
+- **`cd`** - calls `os.chdir()` directly (subprocess cd has no effect on parent process). Handles `cd -` with `_prev_cwd` module-level state.
+- **`ls [flags] [path]`** - rendered with Rich Columns (short) or Rich Table (long `-l`). Colors: dirs=blue+"/", executables=green+"*", symlinks=purple, files=white.
+- **`cat/head/tail <file>`** - rendered with Rich Syntax (monokai theme, line numbers). Language auto-detected from extension.
 
 ### PTY Execution
-Everything else runs in `PtyProcessUnicode` — a real PTY so interactive programs (vim, htop, ssh, ncurses) work correctly. Output streams directly to stdout.
+Everything else runs in `PtyProcessUnicode` - a real PTY so interactive programs (vim, htop, ssh, ncurses) work correctly. Output streams directly to stdout.
 
 ---
 
-## 6. Safety — `shell/safety.py`
+## 6. Safety - `shell/safety.py`
 
 ### Destructive Pattern Blocklist
 13 regex patterns checked before every command execution (both bash and agentic paths):
@@ -189,19 +189,19 @@ When `privacy_mode = true`, text is scanned before sending to LLM:
 
 ---
 
-## 7. LLM Layer — `shell/llm/`
+## 7. LLM Layer - `shell/llm/`
 
 ### Base (`base.py`)
 - `LLMBackend` abstract class with `complete(messages, system) -> LLMResponse`
 - `LLMResponse` dataclass: `command`, `explanation`, `safe`, `plan`, `prompt_tokens`, `completion_tokens`, `cost_usd`, `model`
-- `build_system_prompt(cwd, user, os_info)` — includes CWD, username, OS, marks file contents as UNTRUSTED DATA
+- `build_system_prompt(cwd, user, os_info)` - includes CWD, username, OS, marks file contents as UNTRUSTED DATA
 - JSON parse with fallback chain: strip markdown fences → `json.loads()` → re-ask model → show raw text
 
 ### JSON Contract (all backends must return)
 ```json
 {
-  "command": "string — the shell command to run",
-  "explanation": "string — one sentence for the user",
+  "command": "string - the shell command to run",
+  "explanation": "string - one sentence for the user",
   "safe": true,
   "plan": null
 }
@@ -219,7 +219,7 @@ All backends use `httpx.Timeout(30.0)` explicitly. Cost calculated from `pricing
 
 ---
 
-## 8. Planner — `shell/planner.py`
+## 8. Planner - `shell/planner.py`
 
 When the LLM returns a `plan` array, this module executes it.
 
@@ -241,31 +241,31 @@ Show completion Rule
 
 ---
 
-## 9. Telemetry Database — `shell/telemetry/db.py`
+## 9. Telemetry Database - `shell/telemetry/db.py`
 
 Single SQLite file: `~/.local/share/agentic-shell/sessions.db`
 Always opened with `PRAGMA journal_mode=WAL` and `PRAGMA synchronous=NORMAL`.
 
 ### Tables
 
-**`token_events`** — one row per LLM call
+**`token_events`** - one row per LLM call
 ```
 id, timestamp, session_id, action_type, nl_input, command,
 prompt_tokens, completion_tokens, total_tokens, cost_usd, model, exit_code
 ```
 
-**`session_memory`** — compressed context snapshots
+**`session_memory`** - compressed context snapshots
 ```
 id, session_id, username, compressed, raw_turns, token_count, created_at
 ```
 
-**`snippets`** — saved commands (clipboard)
+**`snippets`** - saved commands (clipboard)
 ```
 id, command, note, tags, use_count, created_at
 ```
 
 ### Key Methods
-- `write_event(TokenEvent)` — insert telemetry row
+- `write_event(TokenEvent)` - insert telemetry row
 - `get_today_stats()` → `{calls, tokens, cost}`
 - `get_stats(days=7)` → per-day aggregates
 - `check_budget(config, session_id)` → `"OK"` / `"WARNING"` / `"HARD_STOP"`
@@ -277,19 +277,19 @@ id, command, note, tags, use_count, created_at
 
 ---
 
-## 10. Sidebar — `shell/telemetry/watch.py`
+## 10. Sidebar - `shell/telemetry/watch.py`
 
 A separate Python process running in tmux pane 1 (right side). Polls every 5 seconds (1 second after a key press). Renders all panels using Rich to a `StringIO` buffer, then writes `\033[2J\033[H` (clear) + frame to stdout.
 
 ### Panels (top to bottom)
 ```
-✦ session   — model, uptime, CWD, today cost+calls
-⬡ system    — CPU%, RAM MB/total (%), disk used/total (%), IP
-⎇ git       — branch, staged/changed/new counts, ↑ahead ↓behind
-⚙ processes — top 4 CPU procs with ████░░ bars
-◈ tokens    — today cost/tokens/calls, 7-day table
-◈ clipboard — scrollable snippet list with ▶ selection marker
-? shortcuts — commands + keybindings reference
+✦ session   - model, uptime, CWD, today cost+calls
+⬡ system    - CPU%, RAM MB/total (%), disk used/total (%), IP
+⎇ git       - branch, staged/changed/new counts, ↑ahead ↓behind
+⚙ processes - top 4 CPU procs with ████░░ bars
+◈ tokens    - today cost/tokens/calls, 7-day table
+◈ clipboard - scrollable snippet list with ▶ selection marker
+? shortcuts - commands + keybindings reference
 ```
 
 ### Clipboard Scroll State
@@ -313,14 +313,14 @@ Called once at sidebar startup. Binds Up/Down/Enter session-wide with `if-shell`
 
 ---
 
-## 11. Session Memory — `shell/memory/`
+## 11. Session Memory - `shell/memory/`
 
 ### Compressor (`compressor.py`)
 Uses `token-reducer` library to compress conversation turns. Always preserves last 2 turns verbatim. Compressed text stored in SQLite `session_memory` table.
 
 ### Store (`store.py`)
-- `load_session_context(username)` — reads latest compressed context from DB
-- `save_session_context(session_id, compressed, turns, token_count)` — writes to DB
+- `load_session_context(username)` - reads latest compressed context from DB
+- `save_session_context(session_id, compressed, turns, token_count)` - writes to DB
 
 ### Context Flow
 ```
@@ -341,7 +341,7 @@ Passed to LLM as prior context messages
 
 ---
 
-## 12. Clipboard / Snippets — `shell/clipboard/manager.py`
+## 12. Clipboard / Snippets - `shell/clipboard/manager.py`
 
 ### CLI Interface (from `shell/loop.py` builtin)
 ```
@@ -354,12 +354,12 @@ Passed to LLM as prior context messages
 
 ### TUI Picker (`open_picker`)
 Full-screen `prompt_toolkit.Application` with:
-- Live filter (`/` key) — filters by note, tags, or command text
+- Live filter (`/` key) - filters by note, tags, or command text
 - `↑↓` navigation
-- `a` — inline add form (command → note → tags sequentially)
-- `d` — delete selected (immediate, with message)
-- `Enter` — send selected command to main tmux pane + increment use_count + exit
-- `q` / `Escape` — quit without running
+- `a` - inline add form (command → note → tags sequentially)
+- `d` - delete selected (immediate, with message)
+- `Enter` - send selected command to main tmux pane + increment use_count + exit
+- `q` / `Escape` - quit without running
 
 ### Run Flow (from sidebar or TUI)
 ```
@@ -376,7 +376,7 @@ Command appears and runs in main pane
 
 ---
 
-## 13. Configuration — `shell/config/`
+## 13. Configuration - `shell/config/`
 
 ### Schema (`schema.py`)
 `ShellConfig` dataclass with: `backend`, `model`, `api_base`, `routing_mode`, `daily_token_budget`, `session_token_budget`, `privacy_mode`, `setup_complete`.
@@ -389,14 +389,14 @@ First-run interactive setup. Prompts for backend, model, API key, routing mode. 
 
 ---
 
-## 14. tmux Layout — `shell/tui/layout.py`
+## 14. tmux Layout - `shell/tui/layout.py`
 
 ### Session Structure
 ```
 tmux session "agentic-NNNN"
 ├── Window 0
-│   ├── Pane 0 (left, ~80% width)  — shell REPL
-│   └── Pane 1 (right, 48 cols)    — sidebar watch process
+│   ├── Pane 0 (left, ~80% width)  - shell REPL
+│   └── Pane 1 (right, 48 cols)    - sidebar watch process
 ```
 
 ### Sidebar Toggle (`toggle_sidebar`)
@@ -444,19 +444,19 @@ Sidebar (separate process, every 5s)
 
 ```
 ~/.config/agentic-shell/
-  config.json              — user config (chmod 600)
+  config.json              - user config (chmod 600)
 
 ~/.local/share/agentic-shell/
-  sessions.db              — SQLite WAL database
-  venv/                    — Python virtualenv
-  history                  — prompt_toolkit readline history
-  exit_requested           — flag file for /exit to drop to bash
-  clip_key                 — sidebar key-press state file (UP/DOWN/ENTER)
+  sessions.db              - SQLite WAL database
+  venv/                    - Python virtualenv
+  history                  - prompt_toolkit readline history
+  exit_requested           - flag file for /exit to drop to bash
+  clip_key                 - sidebar key-press state file (UP/DOWN/ENTER)
 
-/usr/local/bin/agentic-shell  — installed launcher script
-/etc/shells                   — agentic-shell registered here
+/usr/local/bin/agentic-shell  - installed launcher script
+/etc/shells                   - agentic-shell registered here
 /var/log/agentic-shell/
-  audit.log                — all commands: timestamp, user, action, exit code
+  audit.log                - all commands: timestamp, user, action, exit code
 ```
 
 ---
@@ -467,9 +467,9 @@ Sidebar (separate process, every 5s)
 |----------|--------|
 | All commands run in ptyprocess, not subprocess | Interactive programs (vim, htop, ssh) need a real TTY |
 | `cd` intercepted via `os.chdir()` | Subprocess `cd` changes directory only in child process |
-| SQLite WAL mode | Sidebar process reads while shell process writes — no lock contention |
+| SQLite WAL mode | Sidebar process reads while shell process writes - no lock contention |
 | Sidebar is a separate process | Sidebar refresh must not block the shell REPL |
-| No LiteLLM / LangChain | Direct httpx calls — no hidden abstractions, full control over headers and streaming |
+| No LiteLLM / LangChain | Direct httpx calls - no hidden abstractions, full control over headers and streaming |
 | Static `SIDEBAR_WIDTH = 44` | Dynamic terminal size queries (`CPR`) freeze inside tmux |
 | `PROMPT_TOOLKIT_NO_CPR=1` | Prevents prompt_toolkit from querying cursor position (freezes in tmux) |
 | Exit flag file for `/exit` | Shell runs inside a `while true` restart loop; flag tells loop to exec bash instead of restart |
