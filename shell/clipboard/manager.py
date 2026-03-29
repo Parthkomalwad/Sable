@@ -164,3 +164,169 @@ def _cmd_run(args: list[str], db: "Database") -> None:
     _send_to_main_pane(match["command"], session)
     sys.stdout.write(f"  {GREEN}✓ sent: {match['command']}{RESET}\n\n")
     sys.stdout.flush()
+
+
+def _interactive_add(db: "Database") -> None:
+    """Prompt for command, note, tags sequentially then save."""
+    sys.stdout.write(f"\n{PURPLE}  Add Snippet{RESET}\n")
+    sys.stdout.write(f"  {DIM}{'─' * 40}{RESET}\n")
+
+    sys.stdout.write(f"  {DIM}Command: {RESET}")
+    sys.stdout.flush()
+    try:
+        command = input("").strip()
+    except (EOFError, KeyboardInterrupt):
+        return
+    if not command:
+        return
+
+    sys.stdout.write(f"  {DIM}Note (Enter to skip): {RESET}")
+    sys.stdout.flush()
+    try:
+        note = input("").strip()
+    except (EOFError, KeyboardInterrupt):
+        note = ""
+
+    sys.stdout.write(f"  {DIM}Tags comma-separated (Enter to skip): {RESET}")
+    sys.stdout.flush()
+    try:
+        tags = input("").strip()
+    except (EOFError, KeyboardInterrupt):
+        tags = ""
+
+    snippet_id = db.add_snippet(command, note, tags)
+    sys.stdout.write(f"  {GREEN}✓ snippet #{snippet_id} saved{RESET}\n\n")
+    sys.stdout.flush()
+
+
+def open_picker(db: "Database") -> None:
+    """Full-screen interactive snippet picker using prompt_toolkit."""
+    from prompt_toolkit import Application
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Layout
+    from prompt_toolkit.layout.containers import HSplit, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+    from prompt_toolkit.formatted_text import ANSI
+
+    snippets = db.list_snippets()
+    selected = [0]
+    filter_text = [""]
+    mode = ["nav"]   # "nav" or "filter"
+    message = [""]
+
+    def _filtered():
+        f = filter_text[0].lower()
+        if not f:
+            return list(snippets)
+        return [s for s in snippets if f in s["note"].lower() or f in s["tags"].lower() or f in s["command"].lower()]
+
+    def _render():
+        visible = _filtered()
+        lines = []
+        lines.append(f"{PURPLE}  ◈ Clipboard{RESET}  {DIM}({len(visible)} snippets){RESET}\n")
+        lines.append(f"  {DIM}Filter: [{filter_text[0]:<30}]{RESET}\n")
+        lines.append(f"  {DIM}{'─' * 55}{RESET}\n")
+        if not visible:
+            lines.append(f"  {DIM}  no snippets match{RESET}\n")
+        for i, s in enumerate(visible):
+            marker = f"{PURPLE}▶{RESET}" if i == selected[0] else " "
+            tag_str = f"{DIM}[{s['tags']}]{RESET}" if s['tags'] else ""
+            note_str = (s['note'] or s['command'])[:38]
+            lines.append(f"  {marker} {DIM}{s['id']:>3}{RESET}  {note_str:<38}  {tag_str}\n")
+            lines.append(f"       {DIM}{s['command'][:55]}{RESET}\n")
+        lines.append(f"\n  {DIM}Enter=run  a=add  d=del  /=filter  q=quit{RESET}\n")
+        if message[0]:
+            lines.append(f"\n  {GREEN}{message[0]}{RESET}\n")
+        return ANSI("".join(lines))
+
+    kb = KeyBindings()
+
+    @kb.add("q")
+    @kb.add("escape")
+    def _quit(event):
+        event.app.exit()
+
+    @kb.add("up")
+    def _up(event):
+        if mode[0] == "nav":
+            if selected[0] > 0:
+                selected[0] -= 1
+
+    @kb.add("down")
+    def _down(event):
+        if mode[0] == "nav":
+            visible = _filtered()
+            if selected[0] < len(visible) - 1:
+                selected[0] += 1
+
+    @kb.add("/")
+    def _filter_mode(event):
+        mode[0] = "filter"
+        filter_text[0] = ""
+        selected[0] = 0
+
+    @kb.add("backspace")
+    def _backspace(event):
+        if mode[0] == "filter" and filter_text[0]:
+            filter_text[0] = filter_text[0][:-1]
+            selected[0] = 0
+
+    @kb.add("enter")
+    def _enter(event):
+        if mode[0] == "filter":
+            mode[0] = "nav"
+            return
+        visible = _filtered()
+        if not visible:
+            return
+        s = visible[selected[0]]
+        session = _get_tmux_session()
+        if not session:
+            message[0] = "not in tmux — cannot send to pane"
+            return
+        db.increment_use(s["id"])
+        _send_to_main_pane(s["command"], session)
+        event.app.exit()
+
+    @kb.add("d")
+    def _delete(event):
+        if mode[0] != "nav":
+            return
+        visible = _filtered()
+        if not visible:
+            return
+        s = visible[selected[0]]
+        db.delete_snippet(s["id"])
+        snippets[:] = db.list_snippets()
+        if selected[0] >= len(_filtered()):
+            selected[0] = max(0, len(_filtered()) - 1)
+        message[0] = f"deleted #{s['id']}"
+
+    # Printable chars in filter mode append to filter_text
+    for ch in "bcefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.":
+        @kb.add(ch)
+        def _char(event, c=ch):
+            if mode[0] == "filter":
+                filter_text[0] += c
+                selected[0] = 0
+
+    @kb.add("a")
+    def _add(event):
+        if mode[0] == "filter":
+            filter_text[0] += "a"
+            return
+        event.app.exit(result="add")
+
+    layout = Layout(
+        HSplit([
+            Window(content=FormattedTextControl(text=_render, focusable=False)),
+        ])
+    )
+
+    app = Application(layout=layout, key_bindings=kb, full_screen=True)
+    result = app.run()
+
+    if result == "add":
+        _interactive_add(db)
+        snippets[:] = db.list_snippets()
+        open_picker(db)
