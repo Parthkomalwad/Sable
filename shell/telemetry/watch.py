@@ -9,8 +9,13 @@ from rich.table import Table
 from rich.text import Text
 from rich.columns import Columns
 
+from pathlib import Path
+
 _start_time = datetime.now()
 SIDEBAR_WIDTH = 44
+
+_clip_selected: int = 0
+_CLIP_KEY_FILE = str(Path.home() / ".local" / "share" / "agentic-shell" / "clip_key")
 
 # ── helpers ──────────────────────────────────────────────
 
@@ -262,6 +267,7 @@ def _panel_shortcuts():
     commands = [
         ("/help",    "all commands"),
         ("/history", "cmd history + costs"),
+        ("/clip",    "snippet clipboard"),
         ("/stats",   "7-day token table"),
         ("/memory",  "session context"),
         ("/model",   "current model"),
@@ -299,6 +305,7 @@ def _render_all(db, model) -> str:
     bc.print(_panel_git())
     bc.print(_panel_processes())
     bc.print(_panel_tokens(db))
+    bc.print(_panel_clipboard(db))
     bc.print(_panel_shortcuts())
     return buf.getvalue()
 
@@ -316,11 +323,119 @@ def _diff_write(prev_lines: List[str], new_lines: List[str]) -> None:
         sys.stdout.flush()
 
 
+def _read_clip_key() -> str | None:
+    """Read and delete the clip_key file. Returns 'UP', 'DOWN', 'ENTER', or None."""
+    try:
+        p = Path(_CLIP_KEY_FILE)
+        if p.exists():
+            val = p.read_text().strip()
+            p.unlink()
+            return val if val in ("UP", "DOWN", "ENTER") else None
+    except Exception:
+        pass
+    return None
+
+
+def _handle_clip_key(key: str, db) -> None:
+    """Mutate _clip_selected or run snippet based on key."""
+    global _clip_selected
+    try:
+        snippets = db.list_snippets()
+    except Exception:
+        return
+    if not snippets:
+        return
+
+    if key == "UP":
+        _clip_selected = max(0, _clip_selected - 1)
+    elif key == "DOWN":
+        _clip_selected = min(len(snippets) - 1, _clip_selected + 1)
+    elif key == "ENTER":
+        s = snippets[_clip_selected]
+        try:
+            result = subprocess.run(
+                ["tmux", "display-message", "-p", "#S"],
+                capture_output=True, text=True, timeout=1
+            )
+            session = result.stdout.strip()
+            if session:
+                db.increment_use(s["id"])
+                subprocess.run(
+                    ["tmux", "send-keys", "-t", f"{session}:0.0", s["command"], "Enter"],
+                    capture_output=True
+                )
+        except Exception:
+            pass
+
+
+def _setup_tmux_clip_keys() -> None:
+    """Bind Up/Down/Enter in tmux sidebar pane to write to clip_key file."""
+    if not os.environ.get("TMUX"):
+        return
+    try:
+        bindings = [
+            ("Up",    "UP"),
+            ("Down",  "DOWN"),
+            ("Enter", "ENTER"),
+        ]
+        for tmux_key, val in bindings:
+            condition = 'test "#{pane_index}" = "1"'
+            action = f'run-shell "echo {val} > {_CLIP_KEY_FILE}"'
+            fallback = f'send-keys {tmux_key}'
+            subprocess.run(
+                ["tmux", "bind-key", "-n", tmux_key,
+                 "if-shell", condition, action, fallback],
+                capture_output=True, timeout=2
+            )
+    except Exception:
+        pass
+
+
+def _panel_clipboard(db) -> Panel:
+    global _clip_selected
+    try:
+        snippets = db.list_snippets()
+    except Exception:
+        snippets = []
+
+    t = Text()
+    if not snippets:
+        t.append("no snippets yet\n", style="color(238)")
+        t.append("/clip add \"cmd\"", style="color(141)")
+        t.append(" to save one\n", style="color(238)")
+    else:
+        visible_count = 3
+        total = len(snippets)
+        _clip_selected = max(0, min(_clip_selected, total - 1))
+        start = max(0, min(_clip_selected - 1, total - visible_count))
+        start = max(0, start)
+        visible = snippets[start:start + visible_count]
+
+        for i, s in enumerate(visible):
+            actual_idx = start + i
+            is_selected = actual_idx == _clip_selected
+            marker = "▶ " if is_selected else "  "
+            marker_style = "color(141) bold" if is_selected else "color(238)"
+            note_str = (s["note"] or s["command"])[:24]
+            tag_str = f"[{s['tags'].split(',')[0]}]" if s["tags"] else ""
+            t.append(marker, style=marker_style)
+            t.append(f"{note_str:<24}", style="color(253)" if is_selected else "color(238)")
+            t.append(f" {tag_str}\n", style="color(55)")
+            cmd_preview = s["command"][:32]
+            t.append(f"   {cmd_preview}\n", style="color(238)")
+
+        if total > visible_count:
+            t.append(f"\n  ↑↓ scroll  {_clip_selected+1}/{total}", style="color(55)")
+
+    return Panel(t, title="[color(141) bold]◈ clipboard[/color(141) bold]", border_style="color(55)", padding=(0, 1))
+
+
 def run():
     from shell.telemetry.db import Database
     db = Database()
     model = "unknown"
     try:
+        _setup_tmux_clip_keys()
         while True:
             m = db.get_last_model()
             if m != "unknown":
@@ -328,11 +443,16 @@ def run():
             elif model == "unknown":
                 model = _get_config_model()
 
+            key = _read_clip_key()
+            if key:
+                _handle_clip_key(key, db)
+
             frame = _render_all(db, model)
             sys.stdout.write("\033[2J\033[H")
             sys.stdout.write(frame)
             sys.stdout.flush()
-            time.sleep(5)
+
+            time.sleep(1 if key else 5)
     except KeyboardInterrupt:
         pass
     finally:
