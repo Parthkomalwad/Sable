@@ -75,9 +75,9 @@ Four new tables appended after existing definitions — no existing tables alter
 
 `audit.log` at `~/.local/share/agentic-shell/audit.log` — append-only, one line per executed command.
 
-Format: `<ISO timestamp>\t<session_id>\t<command>`
+Format: `<ISO timestamp>\t<session_id>\t<cwd>\t<command>`
 
-Wired into `loop.py` at the point where a command is confirmed and sent to the executor. This is the source PatternWatcher reads in Phase 5.
+The path constant and format are defined here in Phase 1. The actual write call is wired into `loop.py` in Phase 4 (where commands reach the executor). `cwd` is included so PatternWatcher can infer the repository path without re-parsing commands.
 
 ### Config addition (schema.py)
 
@@ -85,6 +85,8 @@ One new field on `ShellConfig`:
 ```python
 tasks_base_dir: str = "~/tasks"
 ```
+
+Both `from_dict()` and `to_dict()` must be updated to handle this field — `from_dict()` reads it with `data.get("tasks_base_dir", "~/tasks")`, `to_dict()` includes `"tasks_base_dir": self.tasks_base_dir`.
 
 ---
 
@@ -128,6 +130,8 @@ Detects bwrap at runtime. If available: wraps commands with full bwrap invocatio
 
 ### tasks/agent.py — TaskAgent
 
+`agent.py` must include an `if __name__ == "__main__"` block with argparse accepting `--task <name>` and `--goal "<text>"`. This is how `TaskManager.spawn()` and the acceptance criterion test both launch it.
+
 Autonomous REPL. Per-turn sequence:
 1. Build context: system prompt + pinned goal + compressed history + matched skills list
 2. `backend.complete()` — same LLMBackend as loop.py
@@ -146,8 +150,8 @@ Autonomous REPL. Per-turn sequence:
 ### tasks/manager.py — TaskManager
 
 Lifecycle operations called from `/task` builtins:
-- `spawn`: mkdir, write tasks row (starting), new tmux window, launch agent
-- `pause/resume`: SIGTSTP/SIGCONT on ptyprocess, update status
+- `spawn`: mkdir, write tasks row (starting), open new tmux window, launch agent via `tmux send-keys "python3 -m shell.tasks.agent --task <name> --goal '<goal>'"`. Goal is passed as a CLI argument — not via environment variable.
+- `pause/resume`: send SIGTSTP/SIGCONT to the **child process group** via `os.killpg(os.getpgid(pid), signal.SIGTSTP)` — not to the ptyprocess Python wrapper, which would not reliably propagate the signal. Update status in SQLite.
 - `kill`: close tmux window, set completed + ended_at
 - `attach`: libtmux `select_window`
 - `inspect`: open plain bash in task folder (agent not running)
@@ -156,11 +160,15 @@ Lifecycle operations called from `/task` builtins:
 
 ### tasks/reconcile.py
 
-Called once from `main.py` after config loads. Reads all tasks with status in `(running, starting, paused)`, checks each `tmux_window_id` against live session, marks missing ones `lost`. Returns list of lost names for main.py to print.
+Called once from `main.py` after config loads. Reads all tasks with status in `(running, starting, paused)`, checks each `tmux_window_id` against the live tmux session, marks missing ones `lost`. Returns list of lost names for main.py to print.
+
+`reconcile()` resolves the tmux session internally via `libtmux.Server().find_where({"session_name": ...})` using the session name from the environment — it does **not** accept a session object as a parameter, since `main.py` does not hold one (the Python process is inside tmux via `os.execvp` by the time the REPL starts).
 
 ### tasks/skills.py — TaskSkillLoader
 
-Keyword-matches goal against skill filenames and first-line descriptions. Local skills (in `~/tasks/<name>/.agentic/skills/`) override global on name collision. Returns list with name, content, hash, source. In Phase 5, `load_relevant()` is updated to consult `SkillIndex.get_ranked()` instead of raw keyword matching.
+Keyword-matches goal against skill filenames and first-line descriptions. Local skills (in `~/tasks/<name>/.agentic/skills/`) override global on name collision. Returns list with name, content, hash, source.
+
+> **Note:** `load_relevant()` in Phase 3 is intentionally a keyword-only stub. It will be upgraded in Phase 5 to consult `SkillIndex.get_ranked()` for confidence-aware, use-count-aware ranking.
 
 ---
 
@@ -180,7 +188,7 @@ Audit log write wired here — one line appended to `audit.log` for every comman
 
 ```python
 from shell.tasks.reconcile import reconcile
-lost_tasks = reconcile(db_path, tmux_session)
+lost_tasks = reconcile(db_path)
 for name in lost_tasks:
     print(f"[warning] task '{name}' was lost while disconnected")
 ```
@@ -191,12 +199,16 @@ for name in lost_tasks:
 
 ### skills/pattern_watcher.py — PatternWatcher
 
-Called at `/exit`. Reads `audit.log` and `token_events` table. Groups commands by:
-- Same repository path (inferred from cwd in audit log)
-- Same intent keywords (top N non-stopword tokens from the goal/command sequence)
-- Same command sequence shape (command names without arguments)
+Called at `/exit`. Reads `audit.log` (using the `cwd` column added in Phase 1) and `token_events` table. Groups commands by:
+- Same repository path (the `cwd` field from audit.log, normalised with `os.path.realpath`)
+- Same intent keywords (top N non-stopword tokens from the command sequence — stopwords: `the, a, an, in, at, to, for, of, and, or, is, it`)
+- Same command sequence shape (command names without arguments, e.g. `git|pytest|docker`)
 
-Computes a stable `pattern_hash` = SHA256 of sorted frozenset of (repo_path, intent_keywords). Upserts into `skill_patterns`. Returns patterns that crossed threshold (occurrence_count >= 3, crystallised = 0).
+Computes a stable `pattern_hash`:
+```python
+SHA256("|".join(sorted([repo_path] + sorted(intent_keyword_list)))).hexdigest()
+```
+Upserts into `skill_patterns`. Returns patterns that crossed threshold (occurrence_count >= 3, crystallised = 0).
 
 ### skills/crystalliser.py — SkillCrystalliser
 
@@ -206,7 +218,9 @@ Pulls raw command history for a pattern cluster from `audit.log`. Sends to LLM w
 
 ### skills/index.py — SkillIndex
 
-Manages `skills_index.json`. Tracks: name, file, keywords, auto_generated flag, confidence (0.0–1.0), use_count, last_used, needs_update, created_at.
+Manages `skills_index.json`. `__init__` creates the file with an empty JSON array `[]` if it does not exist — no separate initialisation step required.
+
+Tracks per entry: name, file, keywords, auto_generated flag, confidence (0.0–1.0), use_count, last_used, needs_update, created_at.
 
 Confidence nudges: +0.05 on success (max 1.0), -0.1 on failure (min 0.0). Initial: 0.5 auto-generated, 1.0 manual.
 
@@ -220,10 +234,16 @@ Confidence nudges: +0.05 on success (max 1.0), -0.1 on failure (min 0.0). Initia
 |---|---|
 | Keyword-based pattern matching, not embeddings | No new deps; shell commands are structured enough that keywords cluster correctly |
 | Guidance input is non-blocking, prepended to next turn | Preserves autonomous nature; explicit `/task pause` exists for stopping |
-| Audit logging added in Phase 1 | PatternWatcher needs populated logs; wiring it early means real data by Phase 5 |
+| Audit log format includes `cwd` column | PatternWatcher needs repo path to cluster patterns; cwd is the cleanest source |
+| Audit log path/format defined in Phase 1, wired in Phase 4 | Keeps Phase 1 schema-only; wiring belongs in loop.py which is Phase 4 territory |
 | pane 2 uses `vertical=True` (not `vertical=False` as PRD states) | PRD has an error; `vertical=False` = side-by-side, `vertical=True` = horizontal bar |
 | Revert is context-only | Filesystem undo is git's job |
 | bwrap fallback uses path interception, not deny-all | Deny-all would break too many legitimate agent operations |
+| `reconcile()` resolves tmux session internally | `main.py` doesn't hold a session object — Python is already inside tmux via `os.execvp` |
+| `pause/resume` sends signal to child process group via `os.killpg` | SIGTSTP on the ptyprocess Python wrapper doesn't reliably propagate to the child bash |
+| Agent launched via `--task`/`--goal` CLI args | Explicit, testable, and matches the `if __name__ == "__main__"` entry point |
+| `SkillIndex.__init__` creates `skills_index.json` if missing | No separate init step — first use is transparent |
+| `pattern_hash` is `SHA256("\|".join(sorted([repo_path] + sorted(keywords))))` | Deterministic, reproducible across sessions, no dependency on frozenset ordering |
 
 ---
 
