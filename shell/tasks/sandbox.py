@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 import shutil
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ class Sandbox:
             f"--bind {self._task_dir} {self._task_dir} "
             f"--ro-bind / / "
             f"--unshare-pid "
-            f"-- /bin/bash -c {shutil.quote(command)}"
+            f"-- /bin/bash -c {shlex.quote(command)}"
         )
 
     def intercept_write(self, path: str) -> bool:
