@@ -14,6 +14,8 @@ import os
 import shutil
 import sys
 
+TASKS_PANEL_HEIGHT_PERCENT = 12
+
 
 def _get_terminal_width() -> int:
     """Return current terminal width."""
@@ -72,6 +74,18 @@ def create_session(username: str) -> None:
             # Start telemetry watcher in sidebar
             python_bin = sys.executable
             sidebar_pane.send_keys(f"{python_bin} -m shell.telemetry.watch", enter=True)
+
+        # Create tasks panel — horizontal strip at bottom (vertical=True splits horizontally)
+        tasks_pane = window.split_window(
+            vertical=True,
+            percent=TASKS_PANEL_HEIGHT_PERCENT,
+            start_directory=str(os.path.expanduser("~")),
+        )
+        python_bin = sys.executable
+        tasks_pane.send_keys(
+            f"PROMPT_TOOLKIT_NO_CPR=1 {python_bin} -m shell.tasks.panel",
+            enter=True,
+        )
 
         # Start the REPL in main pane
         python_bin = sys.executable
