@@ -46,7 +46,22 @@ def reconcile(db_path: str) -> list[str]:
 
     session = None
     if session_name:
-        session = server.find_where({"session_name": session_name})
+        try:
+            for s in server.sessions:
+                if s.session_name == session_name:
+                    session = s
+                    break
+        except Exception:
+            pass
+
+    def _window_alive(session, window_id: str) -> bool:
+        try:
+            for w in session.windows:
+                if w.window_id == window_id:
+                    return True
+        except Exception:
+            pass
+        return False
 
     lost: list[str] = []
     for name, window_id in rows:
@@ -55,7 +70,7 @@ def reconcile(db_path: str) -> list[str]:
             continue
         alive = False
         if session:
-            alive = session.find_where({"window_id": window_id}) is not None
+            alive = _window_alive(session, window_id)
         if not alive:
             conn.execute("UPDATE tasks SET status='lost' WHERE name=?", (name,))
             lost.append(name)

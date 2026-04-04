@@ -32,6 +32,16 @@ class TaskManager:
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
 
+    def _find_window(self, session, window_id: str):
+        """Find a tmux window by ID — compatible with libtmux >=0.28."""
+        try:
+            for w in session.windows:
+                if w.window_id == window_id:
+                    return w
+        except Exception:
+            pass
+        return None
+
     def spawn(self, name: str, goal: str) -> None:
         task_dir = self._tasks_base / name
         task_dir.mkdir(parents=True, exist_ok=True)
@@ -49,7 +59,7 @@ class TaskManager:
             raise RuntimeError("Not inside a tmux session")
 
         window = session.new_window(window_name=f"task:{name}", attach=False)
-        window_id = window.id
+        window_id = window.window_id
 
         self._db._conn.execute(
             "UPDATE tasks SET tmux_window_id=? WHERE name=?",
@@ -99,7 +109,7 @@ class TaskManager:
                 "SELECT tmux_window_id FROM tasks WHERE name=?", (name,)
             ).fetchone()
             if row and row[0]:
-                window = session.find_where({"window_id": row[0]})
+                window = self._find_window(session, row[0])
                 if window:
                     window.kill_window()
         self._db._conn.execute(
@@ -116,7 +126,7 @@ class TaskManager:
             "SELECT tmux_window_id FROM tasks WHERE name=?", (name,)
         ).fetchone()
         if row and row[0]:
-            window = session.find_where({"window_id": row[0]})
+            window = self._find_window(session, row[0])
             if window:
                 window.select_window()
 

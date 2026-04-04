@@ -68,7 +68,9 @@ class SkillCrystalliser:
         messages = [{"role": "user", "content": prompt}]
         try:
             response = asyncio.run(backend.complete(messages, _SKILL_SYSTEM_PROMPT))
-            content = response.content if hasattr(response, "content") else str(response)
+            # LLMResponse has no .content — the markdown skill text comes back
+            # in .explanation (backends put free-form text there when no JSON found)
+            content = response.explanation or response.command or str(response)
         except Exception as exc:
             content = f"# auto-skill\n\n<!-- generation failed: {exc} -->\n"
 

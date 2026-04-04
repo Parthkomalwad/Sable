@@ -116,8 +116,17 @@ class TaskAgent:
         return asyncio.run(backend.complete(messages, _SYSTEM_PROMPT))
 
     def _parse_response(self, response) -> dict:
-        raw = response.content if hasattr(response, "content") else str(response)
-        raw = raw.strip()
+        # LLMResponse backends parse JSON into .command/.explanation/.safe
+        # The agent system prompt asks for {"command":..., "explanation":..., "done":...}
+        # Backends may not parse "done" — reconstruct from the fields we have.
+        if hasattr(response, "command") and hasattr(response, "explanation"):
+            return {
+                "command": response.command or "",
+                "explanation": response.explanation or "",
+                "done": getattr(response, "plan", None) == "done",
+            }
+        # Fallback: raw string response
+        raw = str(response).strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -178,12 +187,12 @@ class TaskAgent:
             command = parsed.get("command", "")
 
             if command:
-                from shell.safety import is_safe
-                if not is_safe(command):
-                    logger.warning("Blocked unsafe command: %s", command)
+                from shell.safety import is_destructive
+                if is_destructive(command):
+                    logger.warning("Blocked destructive command: %s", command)
                     self._memory.add_turns([
                         {"role": "assistant", "content": f"[blocked] {command}"},
-                        {"role": "user", "content": "That command was blocked by safety rules. Try another approach."},
+                        {"role": "user", "content": "That command was blocked as destructive. Try a safer approach."},
                     ])
                     continue
 
