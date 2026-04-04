@@ -117,7 +117,7 @@ class TaskManager:
             if row and row[0]:
                 window = self._find_window(session, row[0])
                 if window:
-                    window.kill_window()
+                    window.kill()
         self._db._conn.execute(
             "UPDATE tasks SET status='completed', ended_at=? WHERE name=?",
             (self._now(), name),
@@ -134,7 +134,7 @@ class TaskManager:
         if row and row[0]:
             window = self._find_window(session, row[0])
             if window:
-                window.select_window()
+                window.select()
 
     def inspect(self, name: str) -> None:
         task_dir = self._tasks_base / name
