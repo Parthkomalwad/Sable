@@ -159,21 +159,32 @@ class TaskAgent:
             return {"command": "", "explanation": raw, "done": False}
 
     def _run_command(self, command: str) -> str:
+        import tempfile
         wrapped = self._sandbox.wrap_command(command)
+        # Write to a temp script file so multi-line guard scripts work correctly
         try:
-            proc = PtyProcessUnicode.spawn(
-                ["/bin/bash", "-c", wrapped],
-                cwd=self._workspace,
-            )
-            output_parts = []
-            while True:
+            fd, script_path = tempfile.mkstemp(suffix=".sh", prefix="agent_")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    f.write(wrapped)
+                proc = PtyProcessUnicode.spawn(
+                    ["/bin/bash", script_path],
+                    cwd=self._workspace,
+                )
+                output_parts = []
+                while True:
+                    try:
+                        chunk = proc.read(1024)
+                        output_parts.append(chunk)
+                    except EOFError:
+                        break
+                proc.wait()
+                return "".join(output_parts)
+            finally:
                 try:
-                    chunk = proc.read(1024)
-                    output_parts.append(chunk)
-                except EOFError:
-                    break
-            proc.wait()
-            return "".join(output_parts)
+                    os.unlink(script_path)
+                except OSError:
+                    pass
         except Exception as exc:
             return f"[error: {exc}]"
 
