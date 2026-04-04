@@ -138,6 +138,15 @@ bind -n WheelUpPane   if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" 
 bind -n WheelDownPane if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" "send-keys -M" "send-keys -M"
 TMUX_EOF
 
+echo "==> Enabling unprivileged user namespaces (required for bwrap sandbox)"
+SYSCTL_CONF="/etc/sysctl.d/99-agentic-shell.conf"
+if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" != "1" ]; then
+    sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+fi
+if ! grep -q "unprivileged_userns_clone" "$SYSCTL_CONF" 2>/dev/null; then
+    echo "kernel.unprivileged_userns_clone=1" | sudo tee "$SYSCTL_CONF" > /dev/null
+fi
+
 echo "==> Creating audit log directory"
 sudo mkdir -p "$AUDIT_LOG_DIR"
 sudo chmod 1777 "$AUDIT_LOG_DIR"
