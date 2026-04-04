@@ -58,20 +58,23 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     tmux set-option -t "\$SESSION" mouse on
     tmux set-option -t "\$SESSION" history-limit 50000
 
-    # Split right: telemetry sidebar (48 cols wide)
-    tmux split-window -h -t "\$SESSION":0.0 -l 48
-    tmux swap-pane -s "\$SESSION":0.0 -t "\$SESSION":0.1
-
-    # Split bottom of left pane: tasks panel (30% of height)
+    # Step 1: split bottom 30% off pane 0 → tasks panel becomes pane 0.1
     tmux split-window -v -t "\$SESSION":0.0 -p 30
+    # Step 2: split pane 0.0 right for telemetry sidebar (48 cols) → becomes 0.2
+    tmux split-window -h -t "\$SESSION":0.0 -l 48
 
-    # Telemetry sidebar (right pane — 0.1 after swap)
-    tmux send-keys -t "\$SESSION":0.1 "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
+    # Layout is now:
+    #  0.0 = top-left  → main shell
+    #  0.1 = bottom    → tasks panel
+    #  0.2 = right     → telemetry sidebar
 
-    # Tasks panel (bottom-left pane — 0.2)
-    tmux send-keys -t "\$SESSION":0.2 "trap '' INT; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
+    # Telemetry sidebar (right pane 0.2)
+    tmux send-keys -t "\$SESSION":0.2 "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
 
-    # Main shell (top-left pane — 0.0)
+    # Tasks panel (bottom pane 0.1)
+    tmux send-keys -t "\$SESSION":0.1 "trap '' INT; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
+
+    # Main shell (top-left pane 0.0)
     tmux send-keys -t "\$SESSION":0.0 "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done" Enter
 
     tmux select-pane -t "\$SESSION":0.0
