@@ -113,7 +113,17 @@ class TaskAgent:
         from shell.loop import _build_backend
         import asyncio
         backend = _build_backend(self._config)
-        return asyncio.run(backend.complete(messages, _SYSTEM_PROMPT))
+        print("[agent] calling LLM...", flush=True)
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(
+                asyncio.wait_for(backend.complete(messages, _SYSTEM_PROMPT), timeout=60.0)
+            )
+            loop.close()
+            return result
+        except asyncio.TimeoutError:
+            raise RuntimeError("LLM call timed out after 60s")
 
     def _parse_response(self, response) -> dict:
         # LLMResponse backends parse JSON into .command/.explanation/.safe
@@ -156,6 +166,8 @@ class TaskAgent:
         t = threading.Thread(target=self._stdin_reader, daemon=True)
         t.start()
 
+        print(f"[agent] starting task '{self._name}'", flush=True)
+        print(f"[agent] goal: {self._goal}", flush=True)
         self._update_task_status("running")
 
         while self._running:
@@ -198,7 +210,9 @@ class TaskAgent:
 
             output = ""
             if command:
+                print(f"[agent] running: {command}", flush=True)
                 output = self._run_command(command)
+                print(f"[agent] output: {output[:200]}", flush=True)
 
             self._update_task_status("running", output)
             self._write_task_event(
