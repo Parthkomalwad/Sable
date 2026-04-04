@@ -56,6 +56,17 @@ def main() -> None:
         except Exception:
             config = ShellConfig.defaults()
 
+    # Reconcile: mark tasks whose tmux window is gone as lost
+    try:
+        from shell.tasks.reconcile import reconcile
+        from shell.telemetry.db import DB_PATH
+        lost_tasks = reconcile(str(DB_PATH))
+        for task_name in lost_tasks:
+            sys.stdout.write(f"[warning] task '{task_name}' was lost while disconnected\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
     # --- Session resume: load compressed context if available ---
     username = os.environ.get("USER", os.environ.get("USERNAME", "user"))
     ctx = ""

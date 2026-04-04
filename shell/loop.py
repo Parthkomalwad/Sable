@@ -346,6 +346,19 @@ def _audit_log(action: str, command: str, exit_code: int | None = None) -> None:
         pass
 
 
+def _write_audit_log(session_id: str, cwd: str, command: str) -> None:
+    """Append one line to audit.log. Format: ISO\tsession_id\tcwd\tcommand"""
+    from shell.telemetry.db import AUDIT_LOG_PATH
+    from datetime import datetime, timezone
+    AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    line = f"{datetime.now(timezone.utc).isoformat()}\t{session_id}\t{cwd}\t{command}\n"
+    try:
+        with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(line)
+    except (PermissionError, OSError):
+        pass
+
+
 def _log_event(db, session_id: str, response, command: str, exit_code: int, nl_input: str) -> None:
     try:
         from datetime import datetime, timezone
@@ -400,6 +413,8 @@ _HELP_TEXT = (
     "  /stats         Last 7 days token usage\n"
     "  /history       recent commands with AI costs\n"
     "  /clip           Snippet clipboard (add/run/del)\n"
+    "  /task           Manage background agents\n"
+    "  /skill          Manage skill files\n"
     "  /budget reset  Clear hard-stop budget flag\n"
     "  /memory        View/clear session context\n"
     "\n"
@@ -407,6 +422,104 @@ _HELP_TEXT = (
     "  Ctrl+B         Next command runs as raw bash\n"
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
+
+
+def _handle_task_builtin(parts: list[str], config, db) -> bool:
+    """Handle /task subcommands. Return True if handled."""
+    from shell.tasks.manager import TaskManager
+    manager = TaskManager(config=config, db=db)
+
+    if not parts:
+        _out("usage: /task <new|list|attach|pause|resume|kill|inspect|stats|history|checkpoint|revert>")
+        return True
+
+    sub = parts[0]
+
+    if sub == "list":
+        tasks = manager.list_tasks()
+        if not tasks:
+            _out("no tasks")
+        for t in tasks:
+            _out(f"  [{t['status']}] {t['name']} — {t['goal'][:60]}")
+        return True
+
+    if sub == "new" and len(parts) >= 3:
+        name = parts[1]
+        goal = " ".join(parts[2:])
+        try:
+            manager.spawn(name, goal)
+            _out(f"task '{name}' spawned")
+        except Exception as exc:
+            _out(f"[error] {exc}")
+        return True
+
+    if len(parts) >= 2:
+        name = parts[1]
+        if sub == "attach":
+            manager.attach(name)
+        elif sub == "pause":
+            manager.pause(name)
+            _out(f"task '{name}' paused")
+        elif sub == "resume":
+            manager.resume(name)
+            _out(f"task '{name}' resumed")
+        elif sub in ("kill", "done"):
+            manager.kill(name)
+            _out(f"task '{name}' killed")
+        elif sub == "inspect":
+            manager.inspect(name)
+        elif sub == "stats":
+            s = manager.stats(name)
+            _out(f"  tokens: {s['prompt_tokens']}p / {s['completion_tokens']}c  cost: ${s['cost_usd']:.4f}")
+        elif sub == "history":
+            for row in manager.history(name):
+                _out(f"  {row['timestamp']}  {row['model']}  ${row['cost_usd']:.4f}")
+        elif sub == "checkpoint":
+            v = manager.checkpoint(name)
+            _out(f"checkpoint v{v} saved")
+        elif sub == "revert" and len(parts) >= 3:
+            version = int(parts[2].lstrip("v"))
+            manager.revert(name, version)
+            _out(f"context reverted to v{version}")
+        else:
+            _out(f"unknown /task subcommand: {sub}")
+        return True
+
+    _out(f"usage: /task {sub} <name>")
+    return True
+
+
+def _handle_skill_builtin(parts: list[str]) -> bool:
+    """Handle /skill subcommands. Return True if handled."""
+    import subprocess
+    from pathlib import Path
+    skills_dir = Path.home() / "skills" / "instructions"
+    skills_dir.mkdir(parents=True, exist_ok=True)
+
+    if not parts or parts[0] == "list":
+        files = list(skills_dir.glob("*.md"))
+        if not files:
+            _out("no skills found")
+        for f in files:
+            _out(f"  {f.stem}")
+        return True
+
+    if parts[0] == "new" and len(parts) >= 2:
+        name = parts[1]
+        path = skills_dir / f"{name}.md"
+        path.write_text(f"# {name}\n\n<!-- describe when to use this skill -->\n")
+        _out(f"created {path}")
+        return True
+
+    if parts[0] == "edit" and len(parts) >= 2:
+        name = parts[1]
+        path = skills_dir / f"{name}.md"
+        editor = os.environ.get("EDITOR", "nano")
+        subprocess.run([editor, str(path)])
+        return True
+
+    _out("usage: /skill <list|new <name>|edit <name>>")
+    return True
 
 
 def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool:
@@ -425,6 +538,19 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
     if cmd in ("/exit", "/quit"):
         import pathlib
         pathlib.Path.home().joinpath(".local", "share", "agentic-shell", "exit_requested").touch()
+        # Run pattern watcher at exit
+        try:
+            from shell.skills.pattern_watcher import PatternWatcher
+            from shell.skills.crystalliser import SkillCrystalliser
+            watcher = PatternWatcher()
+            patterns = watcher.observe()
+            if patterns:
+                crystalliser = SkillCrystalliser(config=config)
+                for p in patterns:
+                    path = crystalliser.crystallise(p)
+                    _out(f"[skill] auto-generated: {path.name}")
+        except Exception:
+            pass
         raise SystemExit(0)
 
     if cmd == "/model":
@@ -468,6 +594,14 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
     if cmd in ("/history", "/hist"):
         _show_history(db)
         return True
+
+    if cmd == "/task" or cmd.startswith("/task "):
+        parts = cmd[len("/task"):].strip().split()
+        return _handle_task_builtin(parts, config, db)
+
+    if cmd == "/skill" or cmd.startswith("/skill "):
+        parts = cmd[len("/skill"):].strip().split()
+        return _handle_skill_builtin(parts)
 
     if cmd == "/clip" or cmd.startswith("/clip "):
         from shell.clipboard.manager import run_clip_command, open_picker
@@ -761,6 +895,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 exit_code, _ = execute_bash(line, cwd)
                 _last_exit = exit_code
                 _audit_log("bash", line, exit_code)
+                _write_audit_log(session_id, cwd, line)
                 if exit_code != 0:
                     _out(f"exit {exit_code}")
                 continue
@@ -817,6 +952,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
 
             _log_event(db, session_id, response, command, exit_code, line)
             _audit_log("agentic", command, exit_code)
+            _write_audit_log(session_id, cwd, command)
 
             # Track turn for session continuity
             turns.append({"role": "user", "content": line})
