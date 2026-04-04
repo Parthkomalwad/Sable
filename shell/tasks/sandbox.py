@@ -19,14 +19,34 @@ _bwrap_warned = False
 class Sandbox:
     def __init__(self, task_dir: str) -> None:
         self._task_dir = os.path.realpath(task_dir)
-        self.use_bwrap = shutil.which("bwrap") is not None
-        if not self.use_bwrap:
-            global _bwrap_warned
+        self.use_bwrap = self._probe_bwrap()
+
+    def _probe_bwrap(self) -> bool:
+        """Return True only if bwrap is present AND user namespaces work."""
+        global _bwrap_warned
+        if shutil.which("bwrap") is None:
             if not _bwrap_warned:
-                logger.warning(
-                    "bwrap not found — using Python-layer write interception as fallback"
-                )
+                logger.warning("bwrap not found — using Python-layer write interception as fallback")
                 _bwrap_warned = True
+            return False
+        # Quick smoke-test: try to run true inside bwrap
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["bwrap", "--ro-bind", "/", "/", "--unshare-pid", "--", "true"],
+                capture_output=True, timeout=5,
+            )
+            if result.returncode == 0:
+                return True
+        except Exception:
+            pass
+        if not _bwrap_warned:
+            logger.warning(
+                "bwrap present but user namespaces unavailable (uid map error) — "
+                "falling back to Python-layer write interception"
+            )
+            _bwrap_warned = True
+        return False
 
     def wrap_command(self, command: str) -> str:
         """Return the command wrapped in bwrap, or the original if bwrap unavailable."""
