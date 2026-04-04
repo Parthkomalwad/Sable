@@ -17,6 +17,8 @@ from pathlib import Path
 from shell.telemetry.events import TokenEvent
 
 DB_PATH = Path.home() / ".local" / "share" / "agentic-shell" / "sessions.db"
+AUDIT_LOG_PATH = Path.home() / ".local" / "share" / "agentic-shell" / "audit.log"
+# Format: <ISO timestamp>\t<session_id>\t<cwd>\t<command>
 
 _CREATE_TOKEN_EVENTS = """
 CREATE TABLE IF NOT EXISTS token_events (
@@ -60,61 +62,53 @@ CREATE TABLE IF NOT EXISTS snippets (
 
 _CREATE_TASKS = """
 CREATE TABLE IF NOT EXISTS tasks (
-    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name                 TEXT NOT NULL UNIQUE,
-    goal                 TEXT NOT NULL,
-    status               TEXT NOT NULL,
-    tmux_window_id       TEXT,
-    folder_path          TEXT NOT NULL,
-    started_at           TEXT NOT NULL,
-    ended_at             TEXT,
-    last_output          TEXT,
-    step_count           INTEGER DEFAULT 0,
-    current_step         TEXT,
-    snapshot_count       INTEGER DEFAULT 0,
-    last_checkpoint_label TEXT
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL UNIQUE,
+    goal         TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'starting',
+    tmux_window_id TEXT,
+    pid          INTEGER,
+    step_count   INTEGER NOT NULL DEFAULT 0,
+    last_output  TEXT,
+    created_at   TEXT NOT NULL,
+    ended_at     TEXT
 )
 """
 
 _CREATE_TASK_EVENTS = """
 CREATE TABLE IF NOT EXISTS task_events (
-    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_name            TEXT NOT NULL,
-    timestamp            TEXT NOT NULL,
-    step                 TEXT,
-    prompt_tokens        INTEGER DEFAULT 0,
-    completion_tokens    INTEGER DEFAULT 0,
-    cost_usd             REAL DEFAULT 0.0,
-    compression_ratio    REAL,
-    snapshot_version     TEXT,
-    model                TEXT
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_name        TEXT NOT NULL,
+    timestamp        TEXT NOT NULL,
+    prompt_tokens    INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd         REAL NOT NULL DEFAULT 0.0,
+    model            TEXT,
+    compression_ratio REAL
 )
 """
 
 _CREATE_TASK_MEMORY = """
 CREATE TABLE IF NOT EXISTS task_memory (
-    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_name            TEXT NOT NULL,
-    version              TEXT NOT NULL,
-    label                TEXT NOT NULL,
-    compressed           TEXT NOT NULL,
-    raw_last_turns       TEXT NOT NULL,
-    turn_count           INTEGER NOT NULL,
-    token_count          INTEGER NOT NULL,
-    created_at           TEXT NOT NULL
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_name   TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    path        TEXT NOT NULL,
+    token_count INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL
 )
 """
 
 _CREATE_SKILL_PATTERNS = """
 CREATE TABLE IF NOT EXISTS skill_patterns (
-    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    pattern_hash         TEXT NOT NULL UNIQUE,
-    goal_cluster         TEXT NOT NULL,
-    occurrence_count     INTEGER DEFAULT 1,
-    first_seen           TEXT NOT NULL,
-    last_seen            TEXT NOT NULL,
-    crystallised         INTEGER DEFAULT 0,
-    skill_name           TEXT
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern_hash     TEXT NOT NULL UNIQUE,
+    repo_path        TEXT NOT NULL,
+    command_sequence TEXT NOT NULL,
+    intent_keywords  TEXT NOT NULL,
+    occurrence_count INTEGER NOT NULL DEFAULT 1,
+    crystallised     INTEGER NOT NULL DEFAULT 0,
+    last_seen        TEXT NOT NULL
 )
 """
 
