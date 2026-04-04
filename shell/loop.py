@@ -430,10 +430,14 @@ def _handle_task_builtin(parts: list[str], config, db) -> bool:
     manager = TaskManager(config=config, db=db)
 
     if not parts:
-        _out("usage: /task <new|list|attach|pause|resume|kill|inspect|stats|history|checkpoint|revert>")
+        _out("usage: /task <new|list|attach|back|pause|resume|kill|inspect|stats|history|checkpoint|revert>")
         return True
 
     sub = parts[0]
+
+    if sub == "back":
+        manager.back()
+        return True
 
     if sub == "list":
         tasks = manager.list_tasks()

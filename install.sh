@@ -62,8 +62,8 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     tmux split-window -h -t "\$SESSION":0.0 -l 48
     tmux swap-pane -s "\$SESSION":0.0 -t "\$SESSION":0.1
 
-    # Split bottom of left pane: tasks panel (4 lines tall)
-    tmux split-window -v -t "\$SESSION":0.0 -l 4
+    # Split bottom of left pane: tasks panel (30% of height)
+    tmux split-window -v -t "\$SESSION":0.0 -p 30
 
     # Telemetry sidebar (right pane — 0.1 after swap)
     tmux send-keys -t "\$SESSION":0.1 "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
@@ -82,12 +82,41 @@ fi
 EOF
 sudo chmod +x "$WRAPPER"
 
-echo "==> Writing ~/.tmux.conf (mouse scroll + large history)"
+echo "==> Writing ~/.tmux.conf (mouse, keybindings, status bar)"
 sudo -u "$REAL_USER" bash -c "cat > $REAL_HOME/.tmux.conf" <<'TMUX_EOF'
+# ── General ───────────────────────────────────────────────────────────────────
 set -g mouse on
 set -g history-limit 50000
 set -g default-terminal "xterm-256color"
-# Scroll with mouse wheel; click to select pane
+
+# ── Prefix: Ctrl+A (easier than Ctrl+B) ───────────────────────────────────────
+unbind C-b
+set -g prefix C-a
+bind C-a send-prefix
+
+# ── Status bar at TOP ─────────────────────────────────────────────────────────
+set -g status-position top
+set -g status-bg colour235
+set -g status-fg colour250
+set -g status-left  "[#S] "
+set -g status-right " %H:%M "
+set -g window-status-current-style "fg=colour81,bold"
+
+# ── Window switching: Alt+Number jumps directly ───────────────────────────────
+bind -n M-1 select-window -t :1
+bind -n M-2 select-window -t :2
+bind -n M-3 select-window -t :3
+bind -n M-4 select-window -t :4
+bind -n M-5 select-window -t :5
+
+# ── Alt+Left / Alt+Right to cycle windows ─────────────────────────────────────
+bind -n M-Left  previous-window
+bind -n M-Right next-window
+
+# ── Alt+T = last used window (quick toggle between main and task) ─────────────
+bind -n M-t last-window
+
+# ── Mouse scroll ──────────────────────────────────────────────────────────────
 bind -n WheelUpPane   if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" "send-keys -M" "copy-mode -e; send-keys -M"
 bind -n WheelDownPane if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" "send-keys -M" "send-keys -M"
 TMUX_EOF

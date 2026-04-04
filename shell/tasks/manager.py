@@ -64,7 +64,7 @@ class TaskManager:
         if session is None:
             raise RuntimeError("Not inside a tmux session")
 
-        window = session.new_window(window_name=f"task:{name}", attach=False)
+        window = session.new_window(window_name=f"task:{name}", attach=True)
         window_id = window.window_id
 
         self._db._conn.execute(
@@ -140,6 +140,16 @@ class TaskManager:
             window = self._find_window(session, row[0])
             if window:
                 window.select()
+
+    def back(self) -> None:
+        """Switch back to the main agentic-shell window (window index 0)."""
+        session = self._session()
+        if not session:
+            return
+        try:
+            session.windows[0].select()
+        except (IndexError, Exception):
+            pass
 
     def inspect(self, name: str) -> None:
         task_dir = self._tasks_base / name

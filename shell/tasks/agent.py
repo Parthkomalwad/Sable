@@ -29,13 +29,18 @@ from ptyprocess import PtyProcessUnicode
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """You are an autonomous task agent. Complete the goal step by step.
+_SYSTEM_PROMPT_TEMPLATE = """You are an autonomous task agent. Complete the goal step by step.
+You are running inside a sandboxed workspace folder: {workspace}
+All your commands run with this as the current directory.
+You have full read/write access inside this folder. You can read (but NOT write) files outside it.
+Always use relative paths or paths inside the workspace.
+
 For each turn, respond with JSON only:
-{
-  "command": "<bash command to run>",
+{{
+  "command": "<bash command to run, or empty string if done>",
   "explanation": "<what this does>",
   "done": false
-}
+}}
 When the goal is fully achieved, set "done": true and omit "command".
 """
 
@@ -53,11 +58,14 @@ class TaskAgent:
 
         tasks_base = str(Path(config.tasks_base_dir).expanduser())
         task_dir = os.path.join(tasks_base, task_name)
-        os.makedirs(task_dir, exist_ok=True)
+        # workspace: agent's private R/W sandbox — all commands run from here
+        workspace = os.path.join(task_dir, "workspace")
+        os.makedirs(workspace, exist_ok=True)
+        self._workspace = workspace
 
         self._memory = TaskMemory(task_name, tasks_base, db=self._open_db())
         self._memory.set_goal(goal)
-        self._sandbox = Sandbox(task_dir=task_dir)
+        self._sandbox = Sandbox(task_dir=workspace)
         self._skill_loader = TaskSkillLoader(task_name, tasks_base)
         self._guidance_q: queue.Queue = queue.Queue()
         self._running = True
@@ -117,8 +125,9 @@ class TaskAgent:
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace)
             result = loop.run_until_complete(
-                asyncio.wait_for(backend.complete(messages, _SYSTEM_PROMPT), timeout=60.0)
+                asyncio.wait_for(backend.complete(messages, system_prompt), timeout=60.0)
             )
             loop.close()
             return result
@@ -152,7 +161,10 @@ class TaskAgent:
     def _run_command(self, command: str) -> str:
         wrapped = self._sandbox.wrap_command(command)
         try:
-            proc = PtyProcessUnicode.spawn(["/bin/bash", "-c", wrapped])
+            proc = PtyProcessUnicode.spawn(
+                ["/bin/bash", "-c", wrapped],
+                cwd=self._workspace,
+            )
             output_parts = []
             while True:
                 try:
@@ -171,6 +183,8 @@ class TaskAgent:
 
         print(f"[agent] starting task '{self._name}'", flush=True)
         print(f"[agent] goal: {self._goal}", flush=True)
+        print(f"[agent] workspace: {self._workspace}", flush=True)
+        print(f"[agent] sandbox: {'bwrap' if self._sandbox.use_bwrap else 'intercept_write (R/W workspace only)'}", flush=True)
         self._update_task_status("running")
 
         while self._running:
