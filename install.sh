@@ -49,7 +49,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
         exec tmux attach-session -t "\$SESSION"
     fi
 
-    # No existing session — create fresh with 2 panes
+    # No existing session — create fresh with 3 panes
     echo "\$CURRENT_STAMP" > "\$STAMP_FILE"
     _COLS=\$(tput cols 2>/dev/null || echo 220)
     _ROWS=\$(tput lines 2>/dev/null || echo 50)
@@ -57,13 +57,21 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     # Enable mouse scrolling + large scrollback buffer
     tmux set-option -t "\$SESSION" mouse on
     tmux set-option -t "\$SESSION" history-limit 50000
+
+    # Split right: telemetry sidebar (48 cols wide)
     tmux split-window -h -t "\$SESSION":0.0 -l 48
     tmux swap-pane -s "\$SESSION":0.0 -t "\$SESSION":0.1
 
-    # Telemetry sidebar (right pane)
+    # Split bottom of left pane: tasks panel (4 lines tall)
+    tmux split-window -v -t "\$SESSION":0.0 -l 4
+
+    # Telemetry sidebar (right pane — 0.1 after swap)
     tmux send-keys -t "\$SESSION":0.1 "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
 
-    # Main shell (left pane)
+    # Tasks panel (bottom-left pane — 0.2)
+    tmux send-keys -t "\$SESSION":0.2 "trap '' INT; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
+
+    # Main shell (top-left pane — 0.0)
     tmux send-keys -t "\$SESSION":0.0 "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done" Enter
 
     tmux select-pane -t "\$SESSION":0.0
