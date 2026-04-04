@@ -129,6 +129,10 @@ class TaskAgent:
             result = loop.run_until_complete(
                 asyncio.wait_for(backend.complete(messages, system_prompt), timeout=60.0)
             )
+            # Drain pending tasks before closing to avoid "Task destroyed" warnings
+            pending = asyncio.all_tasks(loop)
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
             loop.close()
             return result
         except asyncio.TimeoutError:
@@ -195,7 +199,7 @@ class TaskAgent:
         print(f"[agent] starting task '{self._name}'", flush=True)
         print(f"[agent] goal: {self._goal}", flush=True)
         print(f"[agent] workspace: {self._workspace}", flush=True)
-        print(f"[agent] sandbox: {'bwrap' if self._sandbox.use_bwrap else 'intercept_write (R/W workspace only)'}", flush=True)
+        print(f"[agent] sandbox: {'bwrap (kernel namespace)' if self._sandbox.use_bwrap else 'bash-wrapper (writes blocked outside workspace)'}", flush=True)
         self._update_task_status("running")
 
         while self._running:
