@@ -27,7 +27,13 @@ class TaskManager:
             capture_output=True, text=True,
         )
         name = result.stdout.strip()
-        return self._server.find_where({"session_name": name})
+        try:
+            for s in self._server.sessions:
+                if s.session_name == name:
+                    return s
+        except Exception:
+            pass
+        return None
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
