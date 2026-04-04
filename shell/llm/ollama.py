@@ -107,4 +107,5 @@ class OllamaBackend(LLMBackend):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             cost_usd=cost,
+            done=bool(parsed.get("done", False)),
         )

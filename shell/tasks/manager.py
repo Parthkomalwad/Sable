@@ -74,9 +74,14 @@ class TaskManager:
         self._db._conn.commit()
 
         python_bin = sys.executable
+        # Preserve PYTHONPATH so shell.* imports work in the new tmux window
+        import os as _os
+        project_root = str(Path(__file__).resolve().parents[2])
+        existing_pp = _os.environ.get("PYTHONPATH", "")
+        pythonpath = f"{project_root}:{existing_pp}" if existing_pp else project_root
         safe_goal = goal.replace("'", "'\\''")
         window.active_pane.send_keys(
-            f"{python_bin} -m shell.tasks.agent --task {name} --goal '{safe_goal}'",
+            f"PYTHONPATH={pythonpath} {python_bin} -m shell.tasks.agent --task {name} --goal '{safe_goal}'",
             enter=True,
         )
 

@@ -126,14 +126,12 @@ class TaskAgent:
             raise RuntimeError("LLM call timed out after 60s")
 
     def _parse_response(self, response) -> dict:
-        # LLMResponse backends parse JSON into .command/.explanation/.safe
-        # The agent system prompt asks for {"command":..., "explanation":..., "done":...}
-        # Backends may not parse "done" — reconstruct from the fields we have.
+        # LLMResponse now carries a done field populated by the backend from the parsed JSON.
         if hasattr(response, "command") and hasattr(response, "explanation"):
             return {
                 "command": response.command or "",
                 "explanation": response.explanation or "",
-                "done": getattr(response, "plan", None) == "done",
+                "done": bool(getattr(response, "done", False)),
             }
         # Fallback: raw string response
         raw = str(response).strip()
@@ -142,7 +140,12 @@ class TaskAgent:
             if raw.startswith("json"):
                 raw = raw[4:]
         try:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            return {
+                "command": parsed.get("command", ""),
+                "explanation": parsed.get("explanation", ""),
+                "done": bool(parsed.get("done", False)),
+            }
         except json.JSONDecodeError:
             return {"command": "", "explanation": raw, "done": False}
 

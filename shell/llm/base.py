@@ -21,6 +21,7 @@ class LLMResponse:
     completion_tokens: int
     cost_usd: float
     model: str | None = None
+    done: bool = False           # set by task agent backends when LLM returns "done": true
 
 
 class LLMBackend(ABC):

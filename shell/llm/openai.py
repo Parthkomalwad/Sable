@@ -122,4 +122,5 @@ class OpenAIBackend(LLMBackend):
             completion_tokens=completion_tokens,
             cost_usd=cost,
             model=self.model,
+            done=bool(parsed.get("done", False)),
         )
