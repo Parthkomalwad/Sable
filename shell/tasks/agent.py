@@ -1,0 +1,243 @@
+"""TaskAgent — autonomous goal-directed REPL for background task execution.
+
+Entry point: python3 -m shell.tasks.agent --task <name> --goal "<text>"
+
+Per-turn sequence:
+1. Build context (pinned goal + compressed history + matched skills)
+2. backend.complete()
+3. safety.py blocklist check
+4. sandbox.wrap_command() + PtyProcessUnicode
+5. Update tasks row
+6. Write task_events row
+7. Compress if token threshold exceeded
+8. Check for {"done": true} in LLM response
+9. Drain non-blocking guidance queue (stdin daemon thread)
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import queue
+import sqlite3
+import sys
+import threading
+from datetime import datetime, timezone
+from pathlib import Path
+
+from ptyprocess import PtyProcessUnicode
+
+logger = logging.getLogger(__name__)
+
+_SYSTEM_PROMPT = """You are an autonomous task agent. Complete the goal step by step.
+For each turn, respond with JSON only:
+{
+  "command": "<bash command to run>",
+  "explanation": "<what this does>",
+  "done": false
+}
+When the goal is fully achieved, set "done": true and omit "command".
+"""
+
+
+class TaskAgent:
+    def __init__(self, task_name: str, goal: str, config, db_path: str) -> None:
+        from shell.tasks.memory import TaskMemory
+        from shell.tasks.sandbox import Sandbox
+        from shell.tasks.skills import TaskSkillLoader
+
+        self._name = task_name
+        self._goal = goal
+        self._config = config
+        self._db_path = db_path
+
+        tasks_base = str(Path(config.tasks_base_dir).expanduser())
+        task_dir = os.path.join(tasks_base, task_name)
+        os.makedirs(task_dir, exist_ok=True)
+
+        self._memory = TaskMemory(task_name, tasks_base, db=self._open_db())
+        self._memory.set_goal(goal)
+        self._sandbox = Sandbox(task_dir=task_dir)
+        self._skill_loader = TaskSkillLoader(task_name, tasks_base)
+        self._guidance_q: queue.Queue = queue.Queue()
+        self._running = True
+
+    def _open_db(self):
+        class _DB:
+            def __init__(self, path):
+                self._conn = sqlite3.connect(path, check_same_thread=False)
+                self._conn.execute("PRAGMA journal_mode=WAL")
+        return _DB(self._db_path)
+
+    def _stdin_reader(self) -> None:
+        for line in sys.stdin:
+            self._guidance_q.put(line.rstrip())
+
+    def _drain_guidance(self) -> str:
+        lines = []
+        while True:
+            try:
+                lines.append(self._guidance_q.get_nowait())
+            except queue.Empty:
+                break
+        return "\n".join(lines)
+
+    def _db_conn(self):
+        return sqlite3.connect(self._db_path, check_same_thread=False)
+
+    def _update_task_status(self, status: str, last_output: str = "") -> None:
+        conn = self._db_conn()
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            "UPDATE tasks SET status=?, last_output=?, step_count=step_count+1 WHERE name=?",
+            (status, last_output[:500], self._name),
+        )
+        conn.commit()
+        conn.close()
+
+    def _write_task_event(self, prompt_tokens: int, completion_tokens: int,
+                          cost_usd: float, model: str) -> None:
+        conn = self._db_conn()
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            """INSERT INTO task_events
+               (task_name, timestamp, prompt_tokens, completion_tokens, cost_usd, model)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (self._name, datetime.now(timezone.utc).isoformat(),
+             prompt_tokens, completion_tokens, cost_usd, model),
+        )
+        conn.commit()
+        conn.close()
+
+    def _call_llm(self, messages: list[dict]):
+        from shell.loop import _build_backend
+        import asyncio
+        backend = _build_backend(self._config)
+        return asyncio.run(backend.complete(messages, _SYSTEM_PROMPT))
+
+    def _parse_response(self, response) -> dict:
+        raw = response.content if hasattr(response, "content") else str(response)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {"command": "", "explanation": raw, "done": False}
+
+    def _run_command(self, command: str) -> str:
+        wrapped = self._sandbox.wrap_command(command)
+        try:
+            proc = PtyProcessUnicode.spawn(["/bin/bash", "-c", wrapped])
+            output_parts = []
+            while True:
+                try:
+                    chunk = proc.read(1024)
+                    output_parts.append(chunk)
+                except EOFError:
+                    break
+            proc.wait()
+            return "".join(output_parts)
+        except Exception as exc:
+            return f"[error: {exc}]"
+
+    def run(self) -> None:
+        t = threading.Thread(target=self._stdin_reader, daemon=True)
+        t.start()
+
+        self._update_task_status("running")
+
+        while self._running:
+            guidance = self._drain_guidance()
+            skills = self._skill_loader.load_relevant(self._goal)
+            messages = self._memory.build_context()
+
+            if guidance:
+                messages.append({"role": "user", "content": f"[guidance] {guidance}"})
+
+            if skills:
+                skill_text = "\n\n".join(
+                    f"# skill: {s['name']}\n{s['content']}" for s in skills
+                    if not self._memory.is_skill_seen(s["hash"])
+                )
+                if skill_text:
+                    messages.insert(1, {"role": "user", "content": skill_text})
+                for s in skills:
+                    self._memory.register_skill_hash(s["name"], s["content"])
+
+            try:
+                response = self._call_llm(messages)
+            except Exception as exc:
+                logger.error("LLM call failed: %s", exc)
+                self._update_task_status("lost")
+                break
+
+            parsed = self._parse_response(response)
+            command = parsed.get("command", "")
+
+            if command:
+                from shell.safety import is_safe
+                if not is_safe(command):
+                    logger.warning("Blocked unsafe command: %s", command)
+                    self._memory.add_turns([
+                        {"role": "assistant", "content": f"[blocked] {command}"},
+                        {"role": "user", "content": "That command was blocked by safety rules. Try another approach."},
+                    ])
+                    continue
+
+            output = ""
+            if command:
+                output = self._run_command(command)
+
+            self._update_task_status("running", output)
+            self._write_task_event(
+                prompt_tokens=getattr(response, "prompt_tokens", 0),
+                completion_tokens=getattr(response, "completion_tokens", 0),
+                cost_usd=getattr(response, "cost_usd", 0.0),
+                model=getattr(response, "model", self._config.model),
+            )
+
+            self._memory.add_turns([
+                {"role": "assistant", "content": json.dumps(parsed)},
+                {"role": "user", "content": output or "(no output)"},
+            ])
+            self._memory.save_snapshot()
+
+            if parsed.get("done"):
+                self._update_task_status("completed")
+                print(f"\n[task '{self._name}'] Goal achieved. Window kept open for review.")
+                break
+
+        self._running = False
+
+
+if __name__ == "__main__":
+    import argparse
+    import json as _json
+    from pathlib import Path as _Path
+
+    parser = argparse.ArgumentParser(description="TaskAgent runner")
+    parser.add_argument("--task", required=True, help="Task name")
+    parser.add_argument("--goal", required=True, help="Goal text")
+    args = parser.parse_args()
+
+    from shell.telemetry.db import DB_PATH
+    config_path = _Path.home() / ".config" / "agentic-shell" / "config.json"
+
+    try:
+        raw = _json.loads(config_path.read_text())
+        from shell.config.schema import ShellConfig
+        config = ShellConfig.from_dict(raw)
+    except Exception:
+        from shell.config.schema import ShellConfig
+        config = ShellConfig.defaults()
+
+    agent = TaskAgent(
+        task_name=args.task,
+        goal=args.goal,
+        config=config,
+        db_path=str(DB_PATH),
+    )
+    agent.run()
