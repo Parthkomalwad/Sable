@@ -102,12 +102,13 @@ set -g status-left  "[#S] "
 set -g status-right " %H:%M "
 set -g window-status-current-style "fg=colour81,bold"
 
-# ── Window switching: Alt+Number jumps directly ───────────────────────────────
-bind -n M-1 select-window -t :1
-bind -n M-2 select-window -t :2
-bind -n M-3 select-window -t :3
-bind -n M-4 select-window -t :4
-bind -n M-5 select-window -t :5
+# ── Window switching: Alt+Number jumps directly (0-indexed) ──────────────────
+# Alt+1 = main shell (window 0), Alt+2 = first task (window 1), etc.
+bind -n M-1 select-window -t :0
+bind -n M-2 select-window -t :1
+bind -n M-3 select-window -t :2
+bind -n M-4 select-window -t :3
+bind -n M-5 select-window -t :4
 
 # ── Alt+Left / Alt+Right to cycle windows ─────────────────────────────────────
 bind -n M-Left  previous-window
