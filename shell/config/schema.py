@@ -22,6 +22,7 @@ class ShellConfig:
     session_token_budget: int | None
     privacy_mode: bool                  # strip secrets before sending to model
     setup_complete: bool
+    tasks_base_dir: str = "~/tasks"
 
     @staticmethod
     def defaults() -> "ShellConfig":
@@ -35,6 +36,7 @@ class ShellConfig:
             session_token_budget=None,
             privacy_mode=False,
             setup_complete=False,
+            tasks_base_dir="~/tasks",
         )
 
     @staticmethod
@@ -69,6 +71,7 @@ class ShellConfig:
             session_token_budget=session_budget,
             privacy_mode=bool(data.get("privacy_mode", False)),
             setup_complete=bool(data.get("setup_complete", False)),
+            tasks_base_dir=data.get("tasks_base_dir", "~/tasks"),
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -85,5 +88,6 @@ class ShellConfig:
             "session_token_budget": self.session_token_budget,
             "privacy_mode": self.privacy_mode,
             "setup_complete": self.setup_complete,
+            "tasks_base_dir": self.tasks_base_dir,
             "api_key": getattr(self, "api_key", ""),
         }

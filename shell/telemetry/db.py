@@ -58,6 +58,66 @@ CREATE TABLE IF NOT EXISTS snippets (
 )
 """
 
+_CREATE_TASKS = """
+CREATE TABLE IF NOT EXISTS tasks (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                 TEXT NOT NULL UNIQUE,
+    goal                 TEXT NOT NULL,
+    status               TEXT NOT NULL,
+    tmux_window_id       TEXT,
+    folder_path          TEXT NOT NULL,
+    started_at           TEXT NOT NULL,
+    ended_at             TEXT,
+    last_output          TEXT,
+    step_count           INTEGER DEFAULT 0,
+    current_step         TEXT,
+    snapshot_count       INTEGER DEFAULT 0,
+    last_checkpoint_label TEXT
+)
+"""
+
+_CREATE_TASK_EVENTS = """
+CREATE TABLE IF NOT EXISTS task_events (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_name            TEXT NOT NULL,
+    timestamp            TEXT NOT NULL,
+    step                 TEXT,
+    prompt_tokens        INTEGER DEFAULT 0,
+    completion_tokens    INTEGER DEFAULT 0,
+    cost_usd             REAL DEFAULT 0.0,
+    compression_ratio    REAL,
+    snapshot_version     TEXT,
+    model                TEXT
+)
+"""
+
+_CREATE_TASK_MEMORY = """
+CREATE TABLE IF NOT EXISTS task_memory (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_name            TEXT NOT NULL,
+    version              TEXT NOT NULL,
+    label                TEXT NOT NULL,
+    compressed           TEXT NOT NULL,
+    raw_last_turns       TEXT NOT NULL,
+    turn_count           INTEGER NOT NULL,
+    token_count          INTEGER NOT NULL,
+    created_at           TEXT NOT NULL
+)
+"""
+
+_CREATE_SKILL_PATTERNS = """
+CREATE TABLE IF NOT EXISTS skill_patterns (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern_hash         TEXT NOT NULL UNIQUE,
+    goal_cluster         TEXT NOT NULL,
+    occurrence_count     INTEGER DEFAULT 1,
+    first_seen           TEXT NOT NULL,
+    last_seen            TEXT NOT NULL,
+    crystallised         INTEGER DEFAULT 0,
+    skill_name           TEXT
+)
+"""
+
 
 class Database:
     """Manages the SQLite session database."""
@@ -71,6 +131,10 @@ class Database:
         self._conn.execute(_CREATE_TOKEN_EVENTS)
         self._conn.execute(_CREATE_SESSION_MEMORY)
         self._conn.execute(_CREATE_SNIPPETS)
+        self._conn.execute(_CREATE_TASKS)
+        self._conn.execute(_CREATE_TASK_EVENTS)
+        self._conn.execute(_CREATE_TASK_MEMORY)
+        self._conn.execute(_CREATE_SKILL_PATTERNS)
         self._conn.commit()
 
     def write_event(self, event: TokenEvent) -> None:
