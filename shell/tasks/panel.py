@@ -15,7 +15,9 @@ os.environ["PROMPT_TOOLKIT_NO_CPR"] = "1"
 from rich.console import Console
 from rich.table import Table
 from rich.live import Live
-from rich.text import Text
+from rich.panel import Panel
+from rich.box import SIMPLE_HEAVY, HORIZONTALS
+from rich import box as rich_box
 
 from shell.telemetry.db import DB_PATH
 
@@ -23,27 +25,29 @@ console = Console()
 
 _STATUS_SYMBOLS = {
     "running":   ("●", "bright_green"),
-    "done":      ("✓", "green"),
-    "completed": ("✓", "green"),
+    "done":      ("✓", "bright_green"),
+    "completed": ("✓", "bright_green"),
     "paused":    ("⏸", "yellow"),
-    "lost":      ("✗", "red"),
-    "starting":  ("○", "dim white"),
+    "lost":      ("✗", "bright_red"),
+    "starting":  ("○", "cyan"),
 }
 
 
-def _build_table(conn: sqlite3.Connection) -> Table:
+def _build_table(conn: sqlite3.Connection) -> Panel:
     table = Table(
-        box=None,
+        box=rich_box.SIMPLE_HEAVY,
         show_header=True,
-        header_style="bold dim",
+        header_style="bold bright_white",
+        border_style="bright_black",
         padding=(0, 1),
         expand=True,
+        show_edge=True,
     )
-    table.add_column("", width=2, no_wrap=True)          # status symbol
-    table.add_column("task", min_width=10, no_wrap=True)
-    table.add_column("step", width=5, no_wrap=True, justify="right")
-    table.add_column("goal", ratio=1)
-    table.add_column("cost", width=8, no_wrap=True, justify="right")
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("TASK", min_width=12, no_wrap=True, style="bold cyan")
+    table.add_column("STEPS", width=6, no_wrap=True, justify="right", style="bright_yellow")
+    table.add_column("GOAL", ratio=1, style="white")
+    table.add_column("COST", width=9, no_wrap=True, justify="right", style="bright_magenta")
 
     try:
         rows = conn.execute(
@@ -53,29 +57,32 @@ def _build_table(conn: sqlite3.Connection) -> Table:
                LEFT JOIN task_events e ON e.task_name = t.name
                GROUP BY t.name
                ORDER BY t.id DESC
-               LIMIT 12"""
+               LIMIT 8"""
         ).fetchall()
     except sqlite3.OperationalError:
-        table.add_row("", "[dim]no tasks yet[/dim]", "", "", "")
-        return table
+        rows = []
 
     if not rows:
-        table.add_row("", "[dim]no tasks yet[/dim]", "", "", "")
-        return table
+        table.add_row("", "[dim]no tasks yet — use /task new <name> <goal>[/dim]", "", "", "")
+    else:
+        for name, status, step_count, goal, cost in rows:
+            sym, color = _STATUS_SYMBOLS.get(status, ("?", "white"))
+            goal_short = (goal or "")[:70] + ("…" if len(goal or "") > 70 else "")
+            cost_str = f"${cost:.4f}"
+            table.add_row(
+                f"[{color}]{sym}[/{color}]",
+                name,
+                str(step_count or 0),
+                goal_short,
+                cost_str,
+            )
 
-    for name, status, step_count, goal, cost in rows:
-        sym, color = _STATUS_SYMBOLS.get(status, ("?", "white"))
-        goal_short = (goal or "")[:60] + ("…" if len(goal or "") > 60 else "")
-        cost_str = f"${cost:.4f}" if cost else "$0.0000"
-        table.add_row(
-            f"[{color}]{sym}[/{color}]",
-            f"[bold]{name}[/bold]",
-            str(step_count or 0),
-            f"[dim]{goal_short}[/dim]",
-            f"[dim]{cost_str}[/dim]",
-        )
-
-    return table
+    return Panel(
+        table,
+        title="[bold bright_white] ◈ TASKS [/bold bright_white]",
+        border_style="bright_blue",
+        padding=(0, 0),
+    )
 
 
 def main() -> None:
