@@ -44,10 +44,10 @@ def _build_table(conn: sqlite3.Connection) -> Panel:
         show_edge=True,
     )
     table.add_column("", width=2, no_wrap=True)
-    table.add_column("TASK", min_width=12, no_wrap=True, style="bold cyan")
-    table.add_column("STEPS", width=6, no_wrap=True, justify="right", style="bright_yellow")
-    table.add_column("GOAL", ratio=1, style="white", no_wrap=False)
-    table.add_column("COST", width=9, no_wrap=True, justify="right", style="bright_magenta")
+    table.add_column("TASK", min_width=10, no_wrap=True, style="bold cyan")
+    table.add_column("ST", width=4, no_wrap=True, justify="right", style="bright_yellow")
+    table.add_column("GOAL", min_width=20, max_width=60, no_wrap=True, style="white")
+    table.add_column("COST", width=8, no_wrap=True, justify="right", style="bright_magenta")
 
     try:
         rows = conn.execute(
