@@ -191,8 +191,10 @@ class TaskAgent:
         except json.JSONDecodeError:
             return {"command": "", "explanation": raw, "done": False}
 
-    def _run_command(self, command: str) -> str:
+    def _run_command(self, command: str, timeout: int = 120) -> str:
         import tempfile
+        import select
+        import signal
         wrapped = self._sandbox.wrap_command(command)
         # Write to a temp script file so multi-line guard scripts work correctly
         try:
@@ -205,13 +207,33 @@ class TaskAgent:
                     cwd=self._workspace,
                 )
                 output_parts = []
+                import time
+                deadline = time.monotonic() + timeout
                 while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        print(f"[agent] command timed out after {timeout}s — killing", flush=True)
+                        try:
+                            proc.kill(signal.SIGKILL)
+                        except Exception:
+                            pass
+                        output_parts.append(f"\n[timeout: command exceeded {timeout}s limit]")
+                        break
                     try:
-                        chunk = proc.read(1024)
-                        output_parts.append(chunk)
+                        rlist, _, _ = select.select([proc.fd], [], [], min(remaining, 5.0))
+                        if rlist:
+                            chunk = proc.read(1024)
+                            output_parts.append(chunk)
+                        elif not proc.isalive():
+                            break
                     except EOFError:
                         break
-                proc.wait()
+                    except Exception:
+                        break
+                try:
+                    proc.wait()
+                except Exception:
+                    pass
                 return "".join(output_parts)
             finally:
                 try:
@@ -287,7 +309,9 @@ class TaskAgent:
             output = ""
             if command:
                 print(f"[agent] running: {command}", flush=True)
-                output = self._run_command(command)
+                # Give docker/npm/pip commands extra time — image pulls can take minutes
+                cmd_timeout = 300 if any(kw in command for kw in ("docker", "npm", "pip", "yarn", "git clone")) else 120
+                output = self._run_command(command, timeout=cmd_timeout)
                 print(f"[agent] output: {output[:200]}", flush=True)
 
             self._update_task_status("running", output)
