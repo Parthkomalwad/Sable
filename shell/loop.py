@@ -661,7 +661,7 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
 
     if cmd in ("/memory", "shell memory") or cmd.startswith("/memory "):
         subcmd = cmd[len("/memory"):].strip()
-        _handle_memory_builtin(subcmd, session_id, turns)
+        _handle_memory_builtin(subcmd, session_id, _active_turns)
         return True
 
     return False
