@@ -1001,7 +1001,13 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
     try:
         while True:
             try:
-                cwd = os.getcwd()
+                try:
+                    cwd = os.getcwd()
+                except FileNotFoundError:
+                    # cwd was deleted — fall back to home
+                    os.chdir(os.path.expanduser("~"))
+                    cwd = os.getcwd()
+                    _out("[cwd deleted — moved to home]")
                 user_input = session.prompt(
                     ANSI(_render_prompt(cwd, _last_exit)),
                     in_thread=True
