@@ -82,13 +82,36 @@ chown()   {{ _guard chown   "$@"; }}
 tee()     {{ _guard tee     "$@"; }}
 install() {{ _guard install "$@"; }}
 
-# Block package managers and network installers entirely (they write system-wide)
+# Block system-level package managers
 apt()     {{ echo "[sandbox] BLOCKED: apt is not allowed inside task agents" >&2; return 1; }}
 apt-get() {{ echo "[sandbox] BLOCKED: apt-get is not allowed inside task agents" >&2; return 1; }}
 dpkg()    {{ echo "[sandbox] BLOCKED: dpkg is not allowed inside task agents" >&2; return 1; }}
-pip()     {{ echo "[sandbox] BLOCKED: pip installs outside workspace — use pip install --target=$WORKSPACE/lib" >&2; return 1; }}
-npm()     {{ echo "[sandbox] BLOCKED: npm installs outside workspace" >&2; return 1; }}
-yarn()    {{ echo "[sandbox] BLOCKED: yarn installs outside workspace" >&2; return 1; }}
+
+# Allow npm/yarn/pip only when installing locally (no -g / --global flags)
+npm() {{
+    for arg in "$@"; do
+        if [[ "$arg" == "-g" || "$arg" == "--global" ]]; then
+            echo "[sandbox] BLOCKED: npm global installs not allowed" >&2; return 1
+        fi
+    done
+    command npm "$@"
+}}
+yarn() {{
+    for arg in "$@"; do
+        if [[ "$arg" == "global" ]]; then
+            echo "[sandbox] BLOCKED: yarn global installs not allowed" >&2; return 1
+        fi
+    done
+    command yarn "$@"
+}}
+pip() {{
+    for arg in "$@"; do
+        if [[ "$arg" == "--system" || "$arg" == "--user" ]]; then
+            echo "[sandbox] BLOCKED: pip system/user installs not allowed — use venv inside workspace" >&2; return 1
+        fi
+    done
+    command pip "$@"
+}}
 
 # Redirect redirections (>) — enforced via shell option + ERR trap is not enough,
 # so we wrap the user command in a subshell with WORKSPACE exported so scripts
