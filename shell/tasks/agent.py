@@ -156,7 +156,7 @@ class TaskAgent:
             asyncio.set_event_loop(loop)
             system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace)
             result = loop.run_until_complete(
-                asyncio.wait_for(backend.complete(messages, system_prompt), timeout=60.0)
+                asyncio.wait_for(backend.complete(messages, system_prompt), timeout=120.0)
             )
             # Drain pending tasks before closing to avoid "Task destroyed" warnings
             pending = asyncio.all_tasks(loop)

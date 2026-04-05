@@ -59,30 +59,48 @@ class AnthropicBackend(LLMBackend):
         prompt_tokens = 0
         completion_tokens = 0
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-            async with aconnect_sse(
-                client, "POST", ANTHROPIC_API_URL, json=payload, headers=headers
-            ) as event_source:
-                async for event in event_source.aiter_sse():
-                    try:
-                        data = json.loads(event.data)
-                    except json.JSONDecodeError:
+        import asyncio as _asyncio
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+                    async with aconnect_sse(
+                        client, "POST", ANTHROPIC_API_URL, json=payload, headers=headers
+                    ) as event_source:
+                        async for event in event_source.aiter_sse():
+                            try:
+                                data = json.loads(event.data)
+                            except json.JSONDecodeError:
+                                continue
+
+                            event_type = data.get("type", "")
+
+                            if event_type == "content_block_delta":
+                                delta = data.get("delta", {})
+                                if delta.get("type") == "text_delta":
+                                    full_text += delta.get("text", "")
+
+                            elif event_type == "message_delta":
+                                usage = data.get("usage", {})
+                                completion_tokens = usage.get("output_tokens", completion_tokens)
+
+                            elif event_type == "message_start":
+                                usage = data.get("message", {}).get("usage", {})
+                                prompt_tokens = usage.get("input_tokens", 0)
+                break  # success — exit retry loop
+            except Exception as exc:
+                err_str = str(exc)
+                # Non-streaming error response (rate limit, overload, etc.) — retry with backoff
+                if "text/event-stream" in err_str or "application/json" in err_str:
+                    if attempt < 2:
+                        wait = (attempt + 1) * 10
+                        import logging as _log
+                        _log.getLogger(__name__).warning(
+                            "Anthropic SSE error (attempt %d/3), retrying in %ds: %s",
+                            attempt + 1, wait, exc,
+                        )
+                        await _asyncio.sleep(wait)
                         continue
-
-                    event_type = data.get("type", "")
-
-                    if event_type == "content_block_delta":
-                        delta = data.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            full_text += delta.get("text", "")
-
-                    elif event_type == "message_delta":
-                        usage = data.get("usage", {})
-                        completion_tokens = usage.get("output_tokens", completion_tokens)
-
-                    elif event_type == "message_start":
-                        usage = data.get("message", {}).get("usage", {})
-                        prompt_tokens = usage.get("input_tokens", 0)
+                raise
 
         # Parse JSON from model response — fallback chain
         try:
