@@ -230,11 +230,26 @@ class TaskAgent:
         print(f"[agent] workspace: {self._workspace}", flush=True)
         print(f"[agent] sandbox: {'bwrap (kernel namespace)' if self._sandbox.use_bwrap else 'bash-wrapper (writes blocked outside workspace)'}", flush=True)
         self._update_task_status("running")
+        _MAX_STEPS = 25
+        _step = 0
 
         while self._running:
+            _step += 1
+            if _step > _MAX_STEPS:
+                print(f"[agent] step limit ({_MAX_STEPS}) reached — stopping", flush=True)
+                self._update_task_status("lost")
+                break
+
             guidance = self._drain_guidance()
             skills = self._skill_loader.load_relevant(self._goal)
             messages = self._memory.build_context()
+
+            # Remind the agent of its goal every 5 steps to prevent drift
+            if _step % 5 == 0:
+                messages.append({
+                    "role": "user",
+                    "content": f"[reminder] Your goal is: {self._goal}. Focus on completing it. Do not deviate."
+                })
 
             if guidance:
                 messages.append({"role": "user", "content": f"[guidance] {guidance}"})
@@ -276,7 +291,7 @@ class TaskAgent:
                 print(f"[agent] output: {output[:200]}", flush=True)
 
             self._update_task_status("running", output)
-            self._write_live_status(command, parsed.get("explanation", ""))
+            self._write_live_status(command, parsed.get("explanation", ""), step=_step)
             self._write_task_event(
                 prompt_tokens=getattr(response, "prompt_tokens", 0),
                 completion_tokens=getattr(response, "completion_tokens", 0),
@@ -298,7 +313,7 @@ class TaskAgent:
 
         self._running = False
 
-    def _write_live_status(self, command: str, explanation: str) -> None:
+    def _write_live_status(self, command: str, explanation: str, step: int = 0) -> None:
         """Write a live status file so orchestrator knows what agent is doing right now."""
         try:
             import subprocess
@@ -308,7 +323,6 @@ class TaskAgent:
             ).stdout.strip()
             status_path = Path(self._workspace).parent / ".agentic" / "status.md"
             status_path.parent.mkdir(parents=True, exist_ok=True)
-            step = getattr(self, "_step_count", 0)
             status_path.write_text(
                 f"# Agent: {self._name} (running — step {step})\n"
                 f"**Goal**: {self._goal}\n"
