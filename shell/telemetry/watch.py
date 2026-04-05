@@ -306,7 +306,6 @@ def _render_all(db, model) -> str:
     bc.print(_panel_processes())
     bc.print(_panel_tokens(db))
     bc.print(_panel_clipboard(db))
-    bc.print(_panel_shortcuts())
     return buf.getvalue()
 
 
