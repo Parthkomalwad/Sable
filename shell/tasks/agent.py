@@ -41,6 +41,11 @@ Rules:
 - apt/dpkg are blocked. Do not try to install system packages.
 - If a command fails, read the error and adapt — do not repeat the same command.
 - Before creating files, check if they exist first with ls or cat.
+- NEVER run interactive commands that wait for user input. Always use non-interactive flags:
+  - `npm create vite@latest myapp -- --template react-ts` then `echo y` pipe or use `yes | npm create ...`
+  - prefer `npm init -y` over `npm init`
+  - use `--yes` / `-y` / `--no-interaction` flags wherever available
+  - for vite: `echo y | npm create vite@latest myapp -- --template react-ts`
 
 For each turn, respond with JSON only — no markdown, no extra text:
 {{
