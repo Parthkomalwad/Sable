@@ -46,6 +46,8 @@ Rules:
   - prefer `npm init -y` over `npm init`
   - use `--yes` / `-y` / `--no-interaction` flags wherever available
   - for vite: `echo y | npm create vite@latest myapp -- --template react-ts`
+- ALWAYS use `docker compose up -d --build` (detached) — never without `-d` or it hangs forever
+- ALWAYS use `docker compose logs` separately to check output after starting
 
 For each turn, respond with JSON only — no markdown, no extra text:
 {{
