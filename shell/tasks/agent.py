@@ -269,6 +269,7 @@ class TaskAgent:
                 print(f"[agent] output: {output[:200]}", flush=True)
 
             self._update_task_status("running", output)
+            self._write_live_status(command, parsed.get("explanation", ""))
             self._write_task_event(
                 prompt_tokens=getattr(response, "prompt_tokens", 0),
                 completion_tokens=getattr(response, "completion_tokens", 0),
@@ -289,6 +290,27 @@ class TaskAgent:
                 break
 
         self._running = False
+
+    def _write_live_status(self, command: str, explanation: str) -> None:
+        """Write a live status file so orchestrator knows what agent is doing right now."""
+        try:
+            import subprocess
+            tree = subprocess.run(
+                ["find", ".", "-maxdepth", "3", "-not", "-path", "*/.agentic/*", "-not", "-name", ".*"],
+                capture_output=True, text=True, cwd=self._workspace, timeout=3,
+            ).stdout.strip()
+            status_path = Path(self._workspace).parent / ".agentic" / "status.md"
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            step = getattr(self, "_step_count", 0)
+            status_path.write_text(
+                f"# Agent: {self._name} (running — step {step})\n"
+                f"**Goal**: {self._goal}\n"
+                f"**Workspace**: {self._workspace}\n"
+                f"**Last action**: `{command}` — {explanation}\n\n"
+                f"## Current workspace files\n```\n{tree or '(empty)'}\n```\n"
+            )
+        except Exception:
+            pass
 
     def _write_result_summary(self) -> None:
         """Write a result.md summary so the orchestrator knows what was done."""

@@ -450,27 +450,36 @@ def _is_probe_command(command: str) -> bool:
 
 
 def _collect_pending_task_results(config) -> str:
-    """Check ~/tasks/*/  .agentic/result.md for unread results.
-
-    Reads and deletes each result.md so it's only injected once.
-    Returns a combined context string or empty string.
+    """Collect context from background agents:
+    - result.md: completed agent summary (read once, then deleted)
+    - status.md: live running agent status (read every time, never deleted)
     """
     from pathlib import Path as _P
     tasks_base = _P(getattr(config, "tasks_base_dir", "~/tasks")).expanduser()
     results = []
     try:
-        for result_path in sorted(tasks_base.glob("*/.agentic/result.md")):
+        # Completed results — consume once
+        for p in sorted(tasks_base.glob("*/.agentic/result.md")):
             try:
-                content = result_path.read_text()
-                results.append(content)
-                result_path.unlink()  # consume once
+                results.append(("completed", p.read_text()))
+                p.unlink()
+            except Exception:
+                pass
+        # Live status — always inject so orchestrator knows what's running
+        for p in sorted(tasks_base.glob("*/.agentic/status.md")):
+            try:
+                results.append(("running", p.read_text()))
             except Exception:
                 pass
     except Exception:
         pass
     if not results:
         return ""
-    return "[Background agent results]\n\n" + "\n\n---\n\n".join(results)
+    sections = []
+    for kind, content in results:
+        label = "Background agent result" if kind == "completed" else "Background agent status (live)"
+        sections.append(f"[{label}]\n{content}")
+    return "\n\n---\n\n".join(sections)
 
 
 def _get_recent_turns() -> list[dict]:
