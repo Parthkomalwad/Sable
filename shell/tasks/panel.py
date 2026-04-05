@@ -46,7 +46,7 @@ def _build_table(conn: sqlite3.Connection) -> Panel:
     table.add_column("", width=2, no_wrap=True)
     table.add_column("TASK", min_width=12, no_wrap=True, style="bold cyan")
     table.add_column("STEPS", width=6, no_wrap=True, justify="right", style="bright_yellow")
-    table.add_column("GOAL", ratio=1, style="white")
+    table.add_column("GOAL", ratio=1, style="white", no_wrap=False)
     table.add_column("COST", width=9, no_wrap=True, justify="right", style="bright_magenta")
 
     try:

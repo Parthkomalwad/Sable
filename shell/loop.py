@@ -777,16 +777,21 @@ def _start_new_session() -> None:
         subprocess.run(["tmux", "new-session", "-d", "-s", new_name,
                         "-x", str(_ts.columns), "-y", str(_ts.lines)], check=True)
 
-        # Pane 0 = shell (left), split right for telemetry (pane 1, 45 cols)
+        # Step 1: split bottom 30% → tasks panel (pane 0.1)
+        subprocess.run(["tmux", "split-window", "-v", "-t", f"{new_name}:0.0", "-p", "30"], check=True)
+        # Step 2: split top-left right → telemetry sidebar (pane 0.2, 48 cols)
         subprocess.run(["tmux", "split-window", "-h", "-t", f"{new_name}:0.0", "-l", "48"], check=True)
-        subprocess.run(["tmux", "swap-pane", "-s", f"{new_name}:0.0", "-t", f"{new_name}:0.1"], check=True)
 
-        # Telemetry in pane 1 (right after swap)
-        subprocess.run(["tmux", "send-keys", "-t", f"{new_name}:0.1",
-            f"trap '' INT; while true; do PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 {venv_python} -m shell.telemetry.watch; sleep 2; done",
+        # Layout: 0.0=main shell, 0.1=tasks panel, 0.2=telemetry
+        subprocess.run(["tmux", "send-keys", "-t", f"{new_name}:0.2",
+            f"trap '' INT; clear; while true; do PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 {venv_python} -m shell.telemetry.watch; sleep 2; done",
             "Enter"], check=True)
 
-        # Shell in pane 0 (left after swap) — AGENTIC_NEW_SESSION=1 skips session resume
+        subprocess.run(["tmux", "send-keys", "-t", f"{new_name}:0.1",
+            f"trap '' INT; while true; do PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 {venv_python} -m shell.tasks.panel; sleep 2; done",
+            "Enter"], check=True)
+
+        # Shell in pane 0.0 — AGENTIC_NEW_SESSION=1 skips session resume
         subprocess.run(["tmux", "send-keys", "-t", f"{new_name}:0.0",
             f"trap '' INT; EXIT_FLAG=$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"$EXIT_FLAG\"; clear; PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 AGENTIC_NEW_SESSION=1 {venv_python} -m shell.main; AGENTIC_NEW_SESSION=''; if [ -f \"$EXIT_FLAG\" ]; then rm -f \"$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done",
             "Enter"], check=True)

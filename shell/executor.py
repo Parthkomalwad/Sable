@@ -158,18 +158,60 @@ def _rich_ls(path: str, flags: str) -> tuple[int, str]:
 
 
 def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
-    """Run command in a pty, streaming output directly to stdout."""
+    """Run command in a pty, streaming output and forwarding stdin (Ctrl+C works)."""
+    import select
+    import termios
+    import tty
+
     proc = PtyProcessUnicode.spawn(["/bin/bash", "-c", command], cwd=cwd)
+
+    # Put stdin in raw mode so Ctrl+C, Ctrl+Z, arrow keys pass through to the pty
+    fd = sys.stdin.fileno()
+    old_settings = None
+    try:
+        old_settings = termios.tcgetattr(fd)
+        tty.setraw(fd)
+    except Exception:
+        pass  # Not a tty (e.g. piped input) — skip raw mode
+
     output = []
-    while True:
-        try:
-            chunk = proc.read(1024)
-            sys.stdout.write(chunk)
-            sys.stdout.flush()
-            output.append(chunk)
-        except EOFError:
-            break
+    try:
+        while proc.isalive():
+            try:
+                rlist, _, _ = select.select([proc.fd, fd], [], [], 0.05)
+            except (ValueError, OSError):
+                break
+
+            # Output from process → stdout
+            if proc.fd in rlist:
+                try:
+                    chunk = proc.read(4096)
+                    if old_settings:
+                        # In raw mode \n doesn't add \r — fix newlines
+                        chunk = chunk.replace("\n", "\r\n")
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+                    output.append(chunk)
+                except EOFError:
+                    break
+
+            # Input from user → process (Ctrl+C, Ctrl+Z, keystrokes)
+            if fd in rlist:
+                try:
+                    data = os.read(fd, 256).decode("utf-8", errors="replace")
+                    proc.write(data)
+                except OSError:
+                    break
+    finally:
+        if old_settings is not None:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            except Exception:
+                pass
+
     proc.wait()
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
     return proc.exitstatus or 0, "".join(output)
 
 
