@@ -43,10 +43,11 @@ Rules:
 - If a command fails, read the error and adapt — do not repeat the same command.
 - Before creating files, check if they exist first with ls or cat.
 - NEVER run interactive commands that wait for user input. Always use non-interactive flags:
-  - `npm create vite@latest myapp -- --template react-ts` then `echo y` pipe or use `yes | npm create ...`
   - prefer `npm init -y` over `npm init`
   - use `--yes` / `-y` / `--no-interaction` flags wherever available
-  - for vite: `echo y | npm create vite@latest myapp -- --template react-ts`
+  - for Create React App: `npx create-react-app myapp --yes`
+  - for Vite + React: `echo y | npm create vite@latest myapp -- --template react-ts`
+  - choose the scaffolder that matches the user's request — use CRA for "plain React", Vite only if explicitly requested
 - ALWAYS use `docker compose up -d --build` (detached) — never without `-d` or it hangs forever
 - ALWAYS use `docker compose logs` separately to check output after starting
 
