@@ -76,7 +76,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     #  TASK_PANE = bottom-left → tasks panel
 
     tmux send-keys -t "\$TELE_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
-    tmux send-keys -t "\$TASK_PANE" "trap '' INT; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
+    tmux send-keys -t "\$TASK_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
     tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done" Enter
 
     tmux select-pane -t "\$MAIN_PANE"
