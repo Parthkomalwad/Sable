@@ -520,13 +520,49 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
     manager = TaskManager(config=config, db=db)
 
     if not parts:
-        _out("usage: /task <new|list|attach|back|pause|resume|kill|inspect|stats|history|checkpoint|revert>")
+        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|checkpoint|revert>")
         return True
 
     sub = parts[0]
 
     if sub == "back":
         manager.back()
+        return True
+
+    if sub == "clean":
+        import shutil as _shutil
+        from pathlib import Path as _P
+        tasks_base = _P(getattr(config, "tasks_base_dir", "~/tasks")).expanduser()
+        if not tasks_base.exists():
+            _out("no tasks folder found")
+            return True
+        folders = [f for f in tasks_base.iterdir() if f.is_dir()]
+        if not folders:
+            _out("no task folders to delete")
+            return True
+        _out(f"  will delete {len(folders)} task folder(s):")
+        for f in folders:
+            _out(f"    {f.name}/")
+        try:
+            answer = input("  type YES to confirm: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return True
+        if answer != "YES":
+            _out("cancelled")
+            return True
+        for f in folders:
+            try:
+                _shutil.rmtree(f)
+                _out(f"  deleted {f.name}/")
+            except Exception as exc:
+                _out(f"  failed to delete {f.name}/: {exc}")
+        # Also clear tasks from DB
+        try:
+            db._conn.execute("DELETE FROM tasks")
+            db._conn.commit()
+        except Exception:
+            pass
+        _out("done — all task folders deleted")
         return True
 
     if sub == "list":
