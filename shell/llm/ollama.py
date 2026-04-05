@@ -108,4 +108,5 @@ class OllamaBackend(LLMBackend):
             completion_tokens=completion_tokens,
             cost_usd=cost,
             done=bool(parsed.get("done", False)),
+            spawn=parsed.get("spawn") or None,
         )

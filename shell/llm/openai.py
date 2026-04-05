@@ -123,4 +123,5 @@ class OpenAIBackend(LLMBackend):
             cost_usd=cost,
             model=self.model,
             done=bool(parsed.get("done", False)),
+            spawn=parsed.get("spawn") or None,
         )

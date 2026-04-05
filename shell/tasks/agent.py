@@ -65,6 +65,21 @@ class TaskAgent:
 
         self._memory = TaskMemory(task_name, tasks_base, db=self._open_db())
         self._memory.set_goal(goal)
+
+        # Load orchestrator context handoff if present
+        handoff_path = Path(task_dir) / ".agentic" / "handoff.txt"
+        if handoff_path.exists():
+            try:
+                handoff = handoff_path.read_text().strip()
+                if handoff:
+                    self._memory.add_turns([{
+                        "role": "system",
+                        "content": f"[orchestrator context]\n{handoff}",
+                    }])
+                    handoff_path.unlink()  # consume once
+            except Exception:
+                pass
+
         self._sandbox = Sandbox(task_dir=workspace)
         self._skill_loader = TaskSkillLoader(task_name, tasks_base)
         self._guidance_q: queue.Queue = queue.Queue()

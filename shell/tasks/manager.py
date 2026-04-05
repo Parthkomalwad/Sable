@@ -48,9 +48,22 @@ class TaskManager:
             pass
         return None
 
-    def spawn(self, name: str, goal: str) -> None:
+    def spawn(self, name: str, goal: str, context: str = "") -> None:
+        """Spawn a new task agent in a dedicated tmux window.
+
+        Args:
+            name: Task name (used as tmux window name and directory).
+            goal: Natural language goal for the agent.
+            context: Optional orchestrator context summary to seed the agent's memory.
+        """
         task_dir = self._tasks_base / name
         task_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write context to a handoff file so agent can load it on startup
+        if context:
+            handoff_path = task_dir / ".agentic" / "handoff.txt"
+            handoff_path.parent.mkdir(parents=True, exist_ok=True)
+            handoff_path.write_text(context)
 
         self._db._conn.execute(
             """INSERT OR REPLACE INTO tasks
@@ -74,7 +87,6 @@ class TaskManager:
         self._db._conn.commit()
 
         python_bin = sys.executable
-        # Preserve PYTHONPATH so shell.* imports work in the new tmux window
         import os as _os
         project_root = str(Path(__file__).resolve().parents[2])
         existing_pp = _os.environ.get("PYTHONPATH", "")

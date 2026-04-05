@@ -6,6 +6,7 @@ Used on login (resume) and after each compression cycle.
 from __future__ import annotations
 
 MAX_RESUME_TOKENS = 500
+MAX_REVERT_TOKENS = 4000  # allow larger snapshots for revert
 
 
 def load_session_context(username: str) -> str | None:
@@ -33,6 +34,64 @@ def load_session_context(username: str) -> str | None:
             return None
 
         return row["compressed"]
+    except Exception:
+        return None
+
+
+def list_versions(username: str) -> list[dict]:
+    """Return all saved context snapshots for this user, newest first.
+
+    Returns list of dicts with keys: id, session_id, token_count, created_at, compressed (preview).
+    """
+    try:
+        from shell.telemetry.db import Database
+        db = Database()
+        rows = db._conn.execute(
+            """SELECT id, session_id, token_count, created_at, compressed
+               FROM session_memory
+               WHERE username = ?
+               ORDER BY id DESC LIMIT 20""",
+            (username,),
+        ).fetchall()
+        db.close()
+        return [
+            {
+                "id": r[0],
+                "session_id": r[1],
+                "token_count": r[2],
+                "created_at": r[3],
+                "preview": (r[4] or "")[:120].replace("\n", " "),
+            }
+            for r in rows
+        ]
+    except Exception:
+        return []
+
+
+def load_version(version_id: int, username: str) -> dict | None:
+    """Load a specific snapshot by its DB id.
+
+    Returns dict with compressed (str) and raw_turns (list).
+    """
+    try:
+        from shell.telemetry.db import Database
+        import json
+        db = Database()
+        row = db._conn.execute(
+            """SELECT compressed, raw_turns FROM session_memory
+               WHERE id = ? AND username = ?""",
+            (version_id, username),
+        ).fetchone()
+        db.close()
+        if row is None:
+            return None
+        raw_turns = []
+        if row[1]:
+            try:
+                raw_turns = json.loads(row[1])
+            except Exception:
+                pass
+        return {"compressed": row[0] or "", "raw_turns": raw_turns}
     except Exception:
         return None
 

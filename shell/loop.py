@@ -416,7 +416,10 @@ _HELP_TEXT = (
     "  /task           Manage background agents\n"
     "  /skill          Manage skill files\n"
     "  /budget reset  Clear hard-stop budget flag\n"
-    "  /memory        View/clear session context\n"
+    "  /memory                  View current context\n"
+    "  /memory versions         List all saved snapshots\n"
+    "  /memory revert <id>      Restore a snapshot\n"
+    "  /memory clear            Clear active context\n"
     "\n"
     "  >> text        Force agentic (prefix mode)\n"
     "  Ctrl+B         Next command runs as raw bash\n"
@@ -424,7 +427,39 @@ _HELP_TEXT = (
 )
 
 
-def _handle_task_builtin(parts: list[str], config, db) -> bool:
+def _get_recent_turns() -> list[dict]:
+    """Return the current active turns list (module-level reference)."""
+    return _active_turns
+
+
+def _build_spawn_context(turns: list[dict], goal: str) -> str:
+    """Build a compressed context summary to hand off to a spawned agent.
+
+    Takes last 8 turns from the orchestrator session, compresses them,
+    and prepends a header explaining why this agent was spawned.
+    """
+    if not turns:
+        return ""
+    recent = turns[-8:]
+    try:
+        from shell.memory.compressor import compress
+        summary = compress(recent)
+    except Exception:
+        summary = "\n".join(
+            f"{t.get('role','user')}: {str(t.get('content',''))[:200]}"
+            for t in recent
+        )
+    return (
+        f"You were spawned by the orchestrator to: {goal}\n\n"
+        f"Recent orchestrator session history (compressed):\n{summary}"
+    )
+
+
+# Module-level reference updated by start() so builtins can access active turns
+_active_turns: list[dict] = []
+
+
+def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None = None) -> bool:
     """Handle /task subcommands. Return True if handled."""
     from shell.tasks.manager import TaskManager
     manager = TaskManager(config=config, db=db)
@@ -451,8 +486,12 @@ def _handle_task_builtin(parts: list[str], config, db) -> bool:
         name = parts[1]
         goal = " ".join(parts[2:])
         try:
-            manager.spawn(name, goal)
+            # Build context handoff from recent orchestrator turns
+            context = _build_spawn_context(turns=_get_recent_turns(), goal=goal)
+            manager.spawn(name, goal, context=context)
             _out(f"task '{name}' spawned")
+            if context:
+                _out(f"  context: {len(context)} chars of session history handed off")
         except Exception as exc:
             _out(f"[error] {exc}")
         return True
@@ -601,7 +640,7 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
 
     if cmd == "/task" or cmd.startswith("/task "):
         parts = cmd[len("/task"):].strip().split()
-        return _handle_task_builtin(parts, config, db)
+        return _handle_task_builtin(parts, config, db, turns=_active_turns)
 
     if cmd == "/skill" or cmd.startswith("/skill "):
         parts = cmd[len("/skill"):].strip().split()
@@ -620,8 +659,9 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
         _show_stats_csv(db)
         return True
 
-    if cmd in ("/memory", "shell memory"):
-        _show_memory(session_id)
+    if cmd in ("/memory", "shell memory") or cmd.startswith("/memory "):
+        subcmd = cmd[len("/memory"):].strip()
+        _handle_memory_builtin(subcmd, session_id, turns)
         return True
 
     return False
@@ -729,27 +769,69 @@ def _show_stats_csv(db) -> None:
         _out(f"Stats error: {exc}")
 
 
-def _show_memory(session_id: str) -> None:
-    from shell.memory.store import load_session_context
+def _handle_memory_builtin(subcmd: str, session_id: str, turns: list[dict]) -> None:
+    """Handle /memory subcommands: versions, revert <id>, show, clear."""
+    from shell.memory.store import (
+        load_session_context, save_session_context,
+        list_versions, load_version,
+    )
     username = os.environ.get("USER", os.environ.get("USERNAME", "user"))
+
+    if subcmd == "versions" or subcmd == "list":
+        versions = list_versions(username)
+        if not versions:
+            _out("No saved memory versions.")
+            return
+        _out("\n  ID   tokens  saved-at              preview")
+        _out("  " + "─" * 70)
+        for v in versions:
+            ts = (v["created_at"] or "")[:19]
+            _out(f"  {v['id']:<5} {v['token_count']:<7} {ts}  {v['preview'][:50]}")
+        _out("\n  use: /memory revert <id>  to restore a version")
+        return
+
+    if subcmd.startswith("revert"):
+        parts = subcmd.split()
+        if len(parts) < 2:
+            _out("usage: /memory revert <id>")
+            return
+        try:
+            vid = int(parts[1])
+        except ValueError:
+            _out(f"invalid id: {parts[1]}")
+            return
+        snap = load_version(vid, username)
+        if snap is None:
+            _out(f"version {vid} not found")
+            return
+        # Restore raw turns into active session
+        raw = snap["raw_turns"]
+        turns.clear()
+        turns.extend(raw)
+        # Also save as new snapshot so it shows in versions list
+        save_session_context(session_id, snap["compressed"], raw, len(snap["compressed"].split()))
+        _out(f"reverted to version {vid} — {len(raw)} turns restored")
+        _out(f"context preview: {snap['compressed'][:200]}")
+        return
+
+    if subcmd == "clear":
+        turns.clear()
+        save_session_context(session_id, "", [], 0)
+        _out("Session context cleared.")
+        return
+
+    # Default: show current context
     ctx = load_session_context(username)
     if not ctx:
-        _out("No session context loaded.")
+        _out("No session context saved yet.")
+        _out("use: /memory versions  to list all snapshots")
         return
     _out("\nActive session context:")
     _out("─" * 60)
     _out(ctx[:1000])
     if len(ctx) > 1000:
         _out("... (truncated)")
-    _out("")
-    try:
-        answer = input("[c]lear context or Enter to keep: ").strip().lower()
-        if answer == "c":
-            from shell.memory.store import save_session_context
-            save_session_context(session_id, "", [], 0)
-            _out("Context cleared.")
-    except (EOFError, KeyboardInterrupt):
-        pass
+    _out("\nuse: /memory versions | /memory revert <id> | /memory clear")
 
 
 def _start_new_session() -> None:
@@ -866,7 +948,9 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
 
     backend = _build_backend(config)
     # Track conversation turns for session continuity
+    global _active_turns
     turns: list[dict] = []
+    _active_turns = turns  # keep module-level ref in sync for builtins
 
     try:
         while True:
@@ -944,6 +1028,26 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if exit_code != 0:
                     _out(f"exit {exit_code}")
                 continue
+
+            # Autonomous agent spawn requested by LLM
+            if response.spawn and isinstance(response.spawn, dict):
+                spawn_name = response.spawn.get("name", "").strip().replace(" ", "-")
+                spawn_goal = response.spawn.get("goal", "").strip()
+                if spawn_name and spawn_goal:
+                    try:
+                        from shell.tasks.manager import TaskManager
+                        context = _build_spawn_context(turns, spawn_goal)
+                        mgr = TaskManager(config=config, db=db)
+                        mgr.spawn(spawn_name, spawn_goal, context=context)
+                        _out(f"◈ agent '{spawn_name}' spawned autonomously")
+                        _out(f"  goal: {spawn_goal}")
+                        _out(f"  {len(context)} chars of context handed off")
+                        turns.append({"role": "user", "content": line})
+                        turns.append({"role": "assistant", "content": f"spawned agent '{spawn_name}': {spawn_goal}"})
+                        _save_turns_if_needed(turns, session_id, config)
+                    except Exception as exc:
+                        _out(f"[error] failed to spawn agent: {exc}")
+                    continue
 
             if response.plan:
                 last_exit = execute_plan(response.plan, cwd, description=line)
