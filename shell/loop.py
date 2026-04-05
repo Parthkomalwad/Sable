@@ -777,9 +777,10 @@ def _start_new_session() -> None:
         subprocess.run(["tmux", "new-session", "-d", "-s", new_name,
                         "-x", str(_ts.columns), "-y", str(_ts.lines)], check=True)
 
-        # Step 1: split bottom 30% → tasks panel (pane 0.1)
-        subprocess.run(["tmux", "split-window", "-v", "-t", f"{new_name}:0.0", "-p", "30"], check=True)
-        # Step 2: split top-left right → telemetry sidebar (pane 0.2, 48 cols)
+        # Step 1: split bottom for tasks panel (~30% = 15 lines)
+        task_lines = max(8, _ts.lines * 30 // 100)
+        subprocess.run(["tmux", "split-window", "-v", "-t", f"{new_name}:0.0", "-l", str(task_lines)], check=True)
+        # Step 2: split top-left right → telemetry sidebar (48 cols)
         subprocess.run(["tmux", "split-window", "-h", "-t", f"{new_name}:0.0", "-l", "48"], check=True)
 
         # Layout: 0.0=main shell, 0.1=tasks panel, 0.2=telemetry

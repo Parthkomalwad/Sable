@@ -65,8 +65,10 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     # Split right: telemetry sidebar (48 cols) — new pane on the right
     TELE_PANE=\$(tmux split-window -h -t "\$MAIN_PANE" -l 48 -P -F "#{pane_id}")
 
-    # Split main pane bottom: tasks panel (30% height)
-    TASK_PANE=\$(tmux split-window -v -t "\$MAIN_PANE" -p 30 -P -F "#{pane_id}")
+    # Split main pane bottom: tasks panel (~30% height in lines)
+    _TASK_LINES=\$(( _ROWS * 30 / 100 ))
+    [ "\$_TASK_LINES" -lt 8 ] && _TASK_LINES=8
+    TASK_PANE=\$(tmux split-window -v -t "\$MAIN_PANE" -l "\$_TASK_LINES" -P -F "#{pane_id}")
 
     # Layout:
     #  MAIN_PANE = top-left  → agentic shell
