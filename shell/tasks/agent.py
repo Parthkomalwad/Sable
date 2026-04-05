@@ -277,10 +277,48 @@ class TaskAgent:
 
             if parsed.get("done"):
                 self._update_task_status("completed")
+                self._write_result_summary()
                 print(f"\n[task '{self._name}'] Goal achieved. Window kept open for review.")
                 break
 
         self._running = False
+
+    def _write_result_summary(self) -> None:
+        """Write a result.md summary so the orchestrator knows what was done."""
+        try:
+            # Collect all assistant turns as summary
+            turns = self._memory._turns
+            steps = [
+                t["content"] for t in turns
+                if t.get("role") == "assistant"
+            ]
+            # Run ls in workspace to capture final file tree
+            import subprocess
+            tree = subprocess.run(
+                ["find", ".", "-not", "-path", "*/.agentic/*", "-not", "-name", ".*"],
+                capture_output=True, text=True, cwd=self._workspace, timeout=5,
+            ).stdout.strip()
+
+            summary = (
+                f"# Task: {self._name}\n"
+                f"**Goal**: {self._goal}\n"
+                f"**Workspace**: {self._workspace}\n\n"
+                f"## Files created\n```\n{tree or '(none)'}\n```\n\n"
+                f"## Steps taken ({len(steps)})\n"
+            )
+            for i, s in enumerate(steps[-10:], 1):
+                try:
+                    p = json.loads(s)
+                    summary += f"{i}. `{p.get('command','')}`  — {p.get('explanation','')}\n"
+                except Exception:
+                    summary += f"{i}. {s[:120]}\n"
+
+            result_path = Path(self._workspace).parent / ".agentic" / "result.md"
+            result_path.parent.mkdir(parents=True, exist_ok=True)
+            result_path.write_text(summary)
+            print(f"[agent] result written to {result_path}", flush=True)
+        except Exception as exc:
+            print(f"[agent] could not write result: {exc}", flush=True)
 
 
 if __name__ == "__main__":

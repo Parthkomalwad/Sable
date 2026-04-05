@@ -271,6 +271,13 @@ async def _call_llm(backend, user_input: str, cwd: str, config: ShellConfig, ses
     if session_context:
         messages.append({"role": "user", "content": f"[Previous session context]\n{session_context}"})
         messages.append({"role": "assistant", "content": "Understood, I have the context from your previous session."})
+
+    # Inject any completed task results the orchestrator hasn't seen yet
+    task_context = _collect_pending_task_results(config)
+    if task_context:
+        messages.append({"role": "user", "content": task_context})
+        messages.append({"role": "assistant", "content": "Understood. I now have the results from the background agents."})
+
     messages.append({"role": "user", "content": nl_input})
 
     try:
@@ -425,6 +432,45 @@ _HELP_TEXT = (
     "  Ctrl+B         Next command runs as raw bash\n"
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
+
+
+_PROBE_PREFIXES = ("ls", "find", "cat", "pwd", "echo", "which", "whoami",
+                   "df", "du", "file", "head", "tail", "grep", "wc", "stat")
+
+def _is_probe_command(command: str) -> bool:
+    """Return True if command is a safe read-only probe (no side effects)."""
+    if not command:
+        return False
+    stripped = command.strip()
+    # Must not have write operators
+    if any(op in stripped for op in (">", ">>", "|", ";", "&&", "rm", "mv", "cp")):
+        return False
+    first_word = stripped.split()[0].split("/")[-1]
+    return first_word in _PROBE_PREFIXES
+
+
+def _collect_pending_task_results(config) -> str:
+    """Check ~/tasks/*/  .agentic/result.md for unread results.
+
+    Reads and deletes each result.md so it's only injected once.
+    Returns a combined context string or empty string.
+    """
+    from pathlib import Path as _P
+    tasks_base = _P(getattr(config, "tasks_base_dir", "~/tasks")).expanduser()
+    results = []
+    try:
+        for result_path in sorted(tasks_base.glob("*/.agentic/result.md")):
+            try:
+                content = result_path.read_text()
+                results.append(content)
+                result_path.unlink()  # consume once
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if not results:
+        return ""
+    return "[Background agent results]\n\n" + "\n\n---\n\n".join(results)
 
 
 def _get_recent_turns() -> list[dict]:
@@ -1058,6 +1104,43 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 turns.append({"role": "assistant", "content": f"plan: {response.plan}"})
                 _save_turns_if_needed(turns, session_id, config)
                 continue
+
+            # Exploratory probe: run silently and feed output back for a richer response
+            if _is_probe_command(response.command):
+                probe_output = ""
+                try:
+                    _, probe_output = execute_bash(response.command, cwd)
+                except Exception:
+                    pass
+                if probe_output.strip():
+                    # Feed probe result back into LLM for a conversational response
+                    probe_messages = [
+                        {"role": "user", "content": line},
+                        {"role": "assistant", "content": f"Let me check: `{response.command}`"},
+                        {"role": "user", "content": f"Output:\n{probe_output[:2000]}"},
+                    ]
+                    try:
+                        from shell.llm.base import build_system_prompt
+                        sys2 = build_system_prompt(cwd=cwd,
+                            user=os.environ.get("USER", "user"),
+                            os_info=_get_os_info())
+                        loop2 = asyncio.new_event_loop()
+                        response2 = loop2.run_until_complete(
+                            asyncio.wait_for(backend.complete(probe_messages, sys2), timeout=30.0)
+                        )
+                        loop2.close()
+                        # Show explanation as conversational response, then offer command
+                        sys.stdout.write(f'\n{PURPLE}  ✦{RESET} {response2.explanation}\n\n')
+                        sys.stdout.flush()
+                        if response2.command:
+                            response = response2  # fall through to normal command preview
+                        else:
+                            turns.append({"role": "user", "content": line})
+                            turns.append({"role": "assistant", "content": response2.explanation})
+                            _save_turns_if_needed(turns, session_id, config)
+                            continue
+                    except Exception:
+                        pass  # fall through to normal flow
 
             command = _display_command_preview(response)
             if command is None:
