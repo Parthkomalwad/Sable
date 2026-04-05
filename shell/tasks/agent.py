@@ -37,6 +37,7 @@ You have full read/write access inside this folder. You can read (but NOT write)
 Rules:
 - Always use relative paths. Never cd outside the workspace.
 - Use `docker compose` (NOT `docker-compose` — v1 is not installed).
+- In Dockerfiles, always use `node:20` or newer (node:16 is too old for modern Vite/React).
 - npm/yarn local installs are allowed. Global installs (-g/--global) are blocked.
 - apt/dpkg are blocked. Do not try to install system packages.
 - If a command fails, read the error and adapt — do not repeat the same command.
