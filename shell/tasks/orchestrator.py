@@ -223,10 +223,12 @@ class OrchestratorAgent:
         # If the command timed out, auto-spawn a sub-agent with the remaining goal
         if "[timeout after" in (output or ""):
             _out("  [orchestrator] command timed out — delegating remaining goal to sub-agent")
+            # Inject original CWD so sub-agent works in the right directory
+            goal_with_cwd = f"Working directory: {self._cwd}\n{self._goal}"
             self._handle_spawn({
                 "action": "spawn",
                 "name": self._slug,
-                "goal": self._goal,
+                "goal": goal_with_cwd,
                 "explanation": f"Command '{confirmed_cmd}' timed out — handing off full goal to sub-agent",
             })
             raise _TimeoutDelegated()
@@ -243,6 +245,10 @@ class OrchestratorAgent:
             self._task_dir = self._tasks_base / self._slug
             self._task_dir.mkdir(parents=True, exist_ok=True)
             (self._task_dir / ".agentic").mkdir(exist_ok=True)
+
+        # Prepend CWD so sub-agent knows where to operate
+        if not goal.startswith("Working directory:"):
+            goal = f"Working directory: {self._cwd}\n{goal}"
 
         _out(f"  \u25c8 spawning agent: {name}")
         _out(f"    goal: {goal}")

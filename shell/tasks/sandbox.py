@@ -126,9 +126,11 @@ export -f _resolve _inside _guard cp mv rm rmdir mkdir touch ln chmod chown tee 
 
 
 class Sandbox:
-    def __init__(self, task_dir: str, shared_read_dir: str | None = None) -> None:
+    def __init__(self, task_dir: str, shared_read_dir: str | None = None,
+                 extra_write_dirs: list[str] | None = None) -> None:
         self._task_dir = os.path.realpath(task_dir)
         self._shared_read_dir = os.path.realpath(shared_read_dir) if shared_read_dir else None
+        self._extra_write_dirs = [os.path.realpath(d) for d in (extra_write_dirs or [])]
         self.use_bwrap = self._probe_bwrap()
 
     def _probe_bwrap(self) -> bool:
@@ -165,22 +167,42 @@ class Sandbox:
             ro_bind = ""
             if self._shared_read_dir:
                 ro_bind = f"--ro-bind {shlex.quote(self._shared_read_dir)} {shlex.quote(self._shared_read_dir)} "
+            extra_rw = " ".join(
+                f"--bind {shlex.quote(d)} {shlex.quote(d)}"
+                for d in self._extra_write_dirs
+            )
+            if extra_rw:
+                extra_rw += " "
             return (
                 f"bwrap "
                 f"--bind {self._task_dir} {self._task_dir} "
+                f"{extra_rw}"
                 f"{ro_bind}"
                 f"--ro-bind / / "
                 f"--unshare-pid "
                 f"-- /bin/bash -c {shlex.quote(command)}"
             )
         # Bash-wrapper fallback: reads already allowed everywhere, writes blocked outside task_dir
+        # Also allow extra_write_dirs
+        extra_workspaces = " ".join(shlex.quote(d) for d in self._extra_write_dirs)
         guard = _BASH_GUARD_TEMPLATE.format(
             workspace=shlex.quote(self._task_dir),
             command=command,
         )
+        if self._extra_write_dirs:
+            # Patch _inside() to also allow extra dirs
+            extra_cases = "\n        ".join(
+                f'"{d}"/*|"{d}") return 0 ;;' for d in self._extra_write_dirs
+            )
+            guard = guard.replace(
+                '"$WORKSPACE"/*|"$WORKSPACE") return 0 ;;',
+                f'"$WORKSPACE"/*|"$WORKSPACE") return 0 ;;\n        {extra_cases}',
+            )
         return guard
 
     def intercept_write(self, path: str) -> bool:
-        """Return True if writing to path is permitted (inside task_dir)."""
+        """Return True if writing to path is permitted (inside task_dir or extra_write_dirs)."""
         real = os.path.realpath(path)
-        return real.startswith(self._task_dir)
+        if real.startswith(self._task_dir):
+            return True
+        return any(real.startswith(d) for d in self._extra_write_dirs)

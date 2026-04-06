@@ -87,7 +87,16 @@ class TaskAgent:
             except Exception:
                 pass
 
-        self._sandbox = Sandbox(task_dir=workspace, shared_read_dir=shared_read_dir)
+        # Extract orchestrator's original CWD from goal prefix "Working directory: <path>"
+        extra_write_dirs: list[str] = []
+        if goal.startswith("Working directory:"):
+            first_line = goal.split("\n", 1)[0]
+            cwd_path = first_line.removeprefix("Working directory:").strip()
+            if cwd_path and os.path.isdir(cwd_path):
+                extra_write_dirs.append(cwd_path)
+
+        self._sandbox = Sandbox(task_dir=workspace, shared_read_dir=shared_read_dir,
+                                extra_write_dirs=extra_write_dirs or None)
         self._skill_loader = TaskSkillLoader(task_name, tasks_base)
         self._guidance_q: queue.Queue = queue.Queue()
         self._running = True
@@ -279,11 +288,17 @@ class TaskAgent:
                 for s in skills:
                     self._memory.register_skill_hash(s["name"], s["content"])
 
-            try:
-                response = self._call_llm(messages)
-            except Exception as exc:
-                logger.error("LLM call failed: %s", exc)
-                self._update_task_status("lost")
+            response = None
+            for _attempt in range(3):
+                try:
+                    response = self._call_llm(messages)
+                    break
+                except Exception as exc:
+                    logger.warning("LLM call failed (attempt %d/3): %s", _attempt + 1, exc)
+                    if _attempt == 2:
+                        logger.error("LLM call failed after 3 attempts — giving up")
+                        self._update_task_status("lost")
+            if response is None:
                 break
 
             parsed = self._parse_response(response)
@@ -303,7 +318,7 @@ class TaskAgent:
             if command:
                 print(f"[agent] running: {command}", flush=True)
                 # Give docker/npm/pip commands extra time — image pulls can take minutes
-                cmd_timeout = 300 if any(kw in command for kw in ("docker", "npm", "pip", "yarn", "git clone")) else 120
+                cmd_timeout = 600 if any(kw in command for kw in ("docker", "npm", "pip", "yarn", "git clone")) else 120
                 output = self._run_command(command, timeout=cmd_timeout)
                 print(f"[agent] output: {output[:200]}", flush=True)
 
