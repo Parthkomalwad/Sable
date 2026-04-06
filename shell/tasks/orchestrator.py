@@ -16,21 +16,44 @@ from datetime import datetime
 from pathlib import Path
 
 _SPINNER_VERBS = [
-    'Accomplishing', 'Actioning', 'Architecting', 'Baking', 'Bootstrapping',
-    'Brewing', 'Calculating', 'Cascading', 'Cerebrating', 'Channeling',
-    'Choreographing', 'Churning', 'Cogitating', 'Coalescing', 'Composing',
-    'Computing', 'Concocting', 'Considering', 'Contemplating', 'Crafting',
-    'Crunching', 'Crystallizing', 'Deciphering', 'Deliberating', 'Determining',
-    'Elucidating', 'Fermenting', 'Finagling', 'Forging', 'Forming',
-    'Generating', 'Germinating', 'Harmonizing', 'Hatching', 'Ideating',
-    'Imagining', 'Improvising', 'Incubating', 'Inferring', 'Manifesting',
-    'Marinating', 'Metamorphosing', 'Mulling', 'Mustering', 'Musing',
-    'Noodling', 'Orchestrating', 'Percolating', 'Philosophising', 'Pondering',
-    'Pontificating', 'Processing', 'Propagating', 'Puzzling', 'Reticulating',
-    'Ruminating', 'Scampering', 'Seasoning', 'Simmering', 'Sketching',
-    'Spinning', 'Sprouting', 'Stewing', 'Synthesizing', 'Thinking',
-    'Tinkering', 'Transmuting', 'Unravelling', 'Vibing', 'Wandering',
-    'Whirring', 'Whisking', 'Working', 'Wrangling', 'Zesting',
+    'Accomplishing', 'Actioning', 'Actualizing', 'Architecting', 'Baking',
+    'Beaming', "Beboppin'", 'Befuddling', 'Billowing', 'Blanching',
+    'Bloviating', 'Boogieing', 'Boondoggling', 'Booping', 'Bootstrapping',
+    'Brewing', 'Bunning', 'Burrowing', 'Calculating', 'Canoodling',
+    'Caramelizing', 'Cascading', 'Catapulting', 'Cerebrating', 'Channeling',
+    'Channelling', 'Choreographing', 'Churning', 'Clauding', 'Coalescing',
+    'Cogitating', 'Combobulating', 'Composing', 'Computing', 'Concocting',
+    'Considering', 'Contemplating', 'Cooking', 'Crafting', 'Creating',
+    'Crunching', 'Crystallizing', 'Cultivating', 'Deciphering', 'Deliberating',
+    'Determining', 'Dilly-dallying', 'Discombobulating', 'Doing', 'Doodling',
+    'Drizzling', 'Ebbing', 'Effecting', 'Elucidating', 'Embellishing',
+    'Enchanting', 'Envisioning', 'Evaporating', 'Fermenting', 'Fiddle-faddling',
+    'Finagling', 'Flambéing', 'Flibbertigibbeting', 'Flowing', 'Flummoxing',
+    'Fluttering', 'Forging', 'Forming', 'Frolicking', 'Frosting',
+    'Gallivanting', 'Galloping', 'Garnishing', 'Generating', 'Gesticulating',
+    'Germinating', 'Gitifying', 'Grooving', 'Gusting', 'Harmonizing',
+    'Hashing', 'Hatching', 'Herding', 'Honking', 'Hullaballooing',
+    'Hyperspacing', 'Ideating', 'Imagining', 'Improvising', 'Incubating',
+    'Inferring', 'Infusing', 'Ionizing', 'Jitterbugging', 'Julienning',
+    'Kneading', 'Leavening', 'Levitating', 'Lollygagging', 'Manifesting',
+    'Marinating', 'Meandering', 'Metamorphosing', 'Misting', 'Moonwalking',
+    'Moseying', 'Mulling', 'Mustering', 'Musing', 'Nebulizing',
+    'Nesting', 'Newspapering', 'Noodling', 'Nucleating', 'Orbiting',
+    'Orchestrating', 'Osmosing', 'Perambulating', 'Percolating', 'Perusing',
+    'Philosophising', 'Photosynthesizing', 'Pollinating', 'Pondering', 'Pontificating',
+    'Pouncing', 'Precipitating', 'Prestidigitating', 'Processing', 'Proofing',
+    'Propagating', 'Puttering', 'Puzzling', 'Quantumizing', 'Razzle-dazzling',
+    'Razzmatazzing', 'Recombobulating', 'Reticulating', 'Roosting', 'Ruminating',
+    'Sautéing', 'Scampering', 'Schlepping', 'Scurrying', 'Seasoning',
+    'Shenaniganing', 'Shimmying', 'Simmering', 'Skedaddling', 'Sketching',
+    'Slithering', 'Smooshing', 'Sock-hopping', 'Spelunking', 'Spinning',
+    'Sprouting', 'Stewing', 'Sublimating', 'Swirling', 'Swooping',
+    'Symbioting', 'Synthesizing', 'Tempering', 'Thinking', 'Thundering',
+    'Tinkering', 'Tomfoolering', 'Topsy-turvying', 'Transfiguring', 'Transmuting',
+    'Twisting', 'Undulating', 'Unfurling', 'Unravelling', 'Vibing',
+    'Waddling', 'Wandering', 'Warping', 'Whatchamacalliting', 'Whirlpooling',
+    'Whirring', 'Whisking', 'Wibbling', 'Working', 'Wrangling',
+    'Zesting', 'Zigzagging',
 ]
 
 _SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
@@ -40,7 +63,7 @@ class _Spinner:
     """Animated spinner with a random verb from the list."""
 
     def __init__(self, verb: str | None = None) -> None:
-        self._verb = verb or random.choice(_SPINNER_VERBS)
+        self._fixed_verb = verb  # if set, don't cycle
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -59,13 +82,19 @@ class _Spinner:
     def _run(self) -> None:
         PURPLE = '\033[38;5;141m'
         RESET = '\033[0m'
+        verbs = [self._fixed_verb] if self._fixed_verb else random.sample(_SPINNER_VERBS, len(_SPINNER_VERBS))
         i = 0
+        verb_idx = 0
+        # change verb every 20 frames (~1.6s)
         while not self._stop.is_set():
             frame = _SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]
-            sys.stdout.write(f'\r{PURPLE}  {frame} {self._verb}...{RESET}')
+            verb = verbs[verb_idx % len(verbs)]
+            sys.stdout.write(f'\r{PURPLE}  {frame} {verb}...{RESET}')
             sys.stdout.flush()
             self._stop.wait(0.08)
             i += 1
+            if i % 20 == 0:
+                verb_idx += 1
 
 _SYSTEM_PROMPT = """You are an orchestrator shell agent running on Linux.
 The user has asked you to accomplish a goal. Reason step by step.
