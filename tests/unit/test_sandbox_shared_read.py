@@ -30,6 +30,7 @@ def test_bwrap_command_includes_ro_bind_when_shared(tmp_path, monkeypatch):
     cmd = sb.wrap_command("echo hi")
     assert "--ro-bind" in cmd
     assert str(shared.resolve()) in cmd
+    assert cmd.index(str(shared.resolve())) < cmd.index("--ro-bind / /")
 
 
 def test_bash_guard_no_change_when_shared(tmp_path):

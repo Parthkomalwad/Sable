@@ -164,7 +164,7 @@ class Sandbox:
         if self.use_bwrap:
             ro_bind = ""
             if self._shared_read_dir:
-                ro_bind = f"--ro-bind {self._shared_read_dir} {self._shared_read_dir} "
+                ro_bind = f"--ro-bind {shlex.quote(self._shared_read_dir)} {shlex.quote(self._shared_read_dir)} "
             return (
                 f"bwrap "
                 f"--bind {self._task_dir} {self._task_dir} "
