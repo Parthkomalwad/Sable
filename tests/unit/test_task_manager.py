@@ -49,6 +49,7 @@ def test_spawn_with_task_base_dir_uses_custom_path(tmp_path):
         )
 
     assert "frontend" in captured["cmd"]
+    assert "--goal-file" in captured["cmd"]
     expected_dir = shared / "frontend"
     assert expected_dir.exists()
 

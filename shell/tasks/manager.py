@@ -99,7 +99,11 @@ class TaskManager:
         project_root = str(Path(__file__).resolve().parents[2])
         existing_pp = _os.environ.get("PYTHONPATH", "")
         pythonpath = f"{project_root}:{existing_pp}" if existing_pp else project_root
-        safe_goal = goal.replace("'", "'\\''")
+
+        # Write goal to a file to avoid shell injection via send_keys
+        goal_file = task_dir / ".agentic" / "goal.txt"
+        goal_file.parent.mkdir(parents=True, exist_ok=True)
+        goal_file.write_text(goal, encoding="utf-8")
 
         # Pass shared_read_dir if spawned under a task_base_dir
         shared_arg = ""
@@ -108,7 +112,7 @@ class TaskManager:
 
         window.active_pane.send_keys(
             f"PYTHONPATH={pythonpath} {python_bin} -m shell.tasks.agent"
-            f" --task {shlex.quote(name)} --goal '{safe_goal}'{shared_arg}",
+            f" --task {shlex.quote(name)} --goal-file {shlex.quote(str(goal_file))}{shared_arg}",
             enter=True,
         )
 

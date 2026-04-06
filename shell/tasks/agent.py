@@ -158,7 +158,7 @@ class TaskAgent:
             loop.close()
             return result
         except asyncio.TimeoutError:
-            raise RuntimeError("LLM call timed out after 60s")
+            raise RuntimeError("LLM call timed out after 120s")
 
     def _parse_response(self, response) -> dict:
         # LLMResponse now carries a done field populated by the backend from the parsed JSON.
@@ -395,10 +395,18 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="TaskAgent runner")
     parser.add_argument("--task", required=True, help="Task name")
-    parser.add_argument("--goal", required=True, help="Goal text")
+    parser.add_argument("--goal", default=None, help="Goal text (deprecated, use --goal-file)")
+    parser.add_argument("--goal-file", default=None, help="Path to file containing goal text")
     parser.add_argument("--shared-read-dir", default=None,
                         help="Parent task dir to mount read-only for sub-agent")
     args = parser.parse_args()
+
+    if args.goal_file:
+        goal = _Path(args.goal_file).read_text(encoding="utf-8").strip()
+    elif args.goal:
+        goal = args.goal
+    else:
+        raise SystemExit("Either --goal or --goal-file must be provided")
 
     from shell.telemetry.db import DB_PATH
     config_path = _Path.home() / ".config" / "agentic-shell" / "config.json"
@@ -413,7 +421,7 @@ if __name__ == "__main__":
 
     agent = TaskAgent(
         task_name=args.task,
-        goal=args.goal,
+        goal=goal,
         config=config,
         db_path=str(DB_PATH),
         shared_read_dir=args.shared_read_dir,
