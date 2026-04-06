@@ -23,6 +23,7 @@ class LLMResponse:
     model: str | None = None
     done: bool = False           # set by task agent backends when LLM returns "done": true
     spawn: dict | None = None    # {"name": "task-name", "goal": "..."} for autonomous spawning
+    action: str = ""             # raw action field from orchestrator JSON (run | spawn | done)
 
 
 class LLMBackend(ABC):

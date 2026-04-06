@@ -145,4 +145,5 @@ class AnthropicBackend(LLMBackend):
             cost_usd=cost,
             done=bool(parsed.get("done", False)),
             spawn=parsed.get("spawn") or None,
+            action=parsed.get("action", ""),
         )

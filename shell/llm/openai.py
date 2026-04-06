@@ -124,4 +124,5 @@ class OpenAIBackend(LLMBackend):
             model=self.model,
             done=bool(parsed.get("done", False)),
             spawn=parsed.get("spawn") or None,
+            action=parsed.get("action", ""),
         )

@@ -247,27 +247,40 @@ class OrchestratorAgent:
             loop.close()
 
     def _extract_raw(self, response) -> str:
-        """Extract raw JSON string from LLMResponse for orchestrator action parsing."""
-        raw = getattr(response, "explanation", "") or ""
-        stripped = raw.strip()
-        if stripped.startswith("{"):
-            return stripped
-        # Backend parsed it partially — reconstruct from fields
-        cmd = getattr(response, "command", "")
+        """Reconstruct orchestrator action JSON from LLMResponse."""
+        action = getattr(response, "action", "")
+        command = getattr(response, "command", "")
+        explanation = getattr(response, "explanation", "") or ""
         done = getattr(response, "done", False)
         spawn = getattr(response, "spawn", None)
+
+        # If the backend captured the action field directly, use it
+        if action in ("run", "spawn", "done"):
+            if action == "run":
+                return json.dumps({"action": "run", "command": command, "explanation": explanation})
+            if action == "spawn" and isinstance(spawn, dict):
+                return json.dumps({
+                    "action": "spawn",
+                    "name": spawn.get("name", ""),
+                    "goal": spawn.get("goal", ""),
+                    "explanation": explanation,
+                })
+            if action == "done":
+                return json.dumps({"action": "done", "explanation": explanation})
+
+        # Fallback: infer from other fields
         if done:
-            return json.dumps({"action": "done", "explanation": raw})
+            return json.dumps({"action": "done", "explanation": explanation})
         if spawn and isinstance(spawn, dict):
             return json.dumps({
                 "action": "spawn",
                 "name": spawn.get("name", ""),
                 "goal": spawn.get("goal", ""),
-                "explanation": raw,
+                "explanation": explanation,
             })
-        if cmd:
-            return json.dumps({"action": "run", "command": cmd, "explanation": raw})
-        return json.dumps({"action": "done", "explanation": raw or "no response"})
+        if command:
+            return json.dumps({"action": "run", "command": command, "explanation": explanation})
+        return json.dumps({"action": "done", "explanation": explanation or "no response"})
 
     # ------------------------------------------------------------------
     # Action parsing

@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
@@ -85,3 +86,48 @@ def test_collect_agent_status_empty(tmp_path):
     orch = _make_orchestrator(tmp_path)
     summaries = orch._collect_agent_statuses()
     assert summaries == []
+
+
+def test_extract_raw_with_action_field(tmp_path):
+    """When LLMResponse has action field set, _extract_raw uses it directly."""
+    from shell.llm.base import LLMResponse
+    orch = _make_orchestrator(tmp_path)
+    response = LLMResponse(
+        command="ls -la", explanation="list files", safe=True, plan=None,
+        prompt_tokens=10, completion_tokens=5, cost_usd=0.0,
+        action="run",
+    )
+    result = orch._extract_raw(response)
+    parsed = json.loads(result)
+    assert parsed["action"] == "run"
+    assert parsed["command"] == "ls -la"
+
+
+def test_extract_raw_spawn_action(tmp_path):
+    """_extract_raw correctly handles spawn action."""
+    from shell.llm.base import LLMResponse
+    orch = _make_orchestrator(tmp_path)
+    response = LLMResponse(
+        command="", explanation="delegating", safe=True, plan=None,
+        prompt_tokens=10, completion_tokens=5, cost_usd=0.0,
+        action="spawn",
+        spawn={"name": "frontend", "goal": "build react app"},
+    )
+    result = orch._extract_raw(response)
+    parsed = json.loads(result)
+    assert parsed["action"] == "spawn"
+    assert parsed["name"] == "frontend"
+    assert parsed["goal"] == "build react app"
+
+
+def test_extract_raw_fallback_to_done(tmp_path):
+    """_extract_raw falls back to done when no meaningful fields set."""
+    from shell.llm.base import LLMResponse
+    orch = _make_orchestrator(tmp_path)
+    response = LLMResponse(
+        command="", explanation="", safe=True, plan=None,
+        prompt_tokens=10, completion_tokens=5, cost_usd=0.0,
+    )
+    result = orch._extract_raw(response)
+    parsed = json.loads(result)
+    assert parsed["action"] == "done"
