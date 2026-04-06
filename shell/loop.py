@@ -821,7 +821,6 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
         auto_suggest=AutoSuggestFromHistory(),
     )
 
-    backend = _build_backend(config)
     # Track conversation turns for session continuity
     global _active_turns
     turns: list[dict] = []
@@ -908,10 +907,11 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
             )
             try:
                 agent.run()
+                turns.append({"role": "user", "content": line})
+                turns.append({"role": "assistant", "content": f"[orchestrator handled: {line}]"})
+                _save_turns_if_needed(turns, session_id, config)
             except KeyboardInterrupt:
                 _out("[interrupted]")
-            turns.append({"role": "user", "content": line})
-            turns.append({"role": "assistant", "content": f"[orchestrator handled: {line}]"})
-            _save_turns_if_needed(turns, session_id, config)
+                continue
     finally:
         _save_turns_if_needed(turns, session_id, config)
