@@ -126,8 +126,9 @@ export -f _resolve _inside _guard cp mv rm rmdir mkdir touch ln chmod chown tee 
 
 
 class Sandbox:
-    def __init__(self, task_dir: str) -> None:
+    def __init__(self, task_dir: str, shared_read_dir: str | None = None) -> None:
         self._task_dir = os.path.realpath(task_dir)
+        self._shared_read_dir = os.path.realpath(shared_read_dir) if shared_read_dir else None
         self.use_bwrap = self._probe_bwrap()
 
     def _probe_bwrap(self) -> bool:
@@ -161,14 +162,18 @@ class Sandbox:
     def wrap_command(self, command: str) -> str:
         """Return the command wrapped with sandbox enforcement."""
         if self.use_bwrap:
+            ro_bind = ""
+            if self._shared_read_dir:
+                ro_bind = f"--ro-bind {self._shared_read_dir} {self._shared_read_dir} "
             return (
                 f"bwrap "
                 f"--bind {self._task_dir} {self._task_dir} "
+                f"{ro_bind}"
                 f"--ro-bind / / "
                 f"--unshare-pid "
                 f"-- /bin/bash -c {shlex.quote(command)}"
             )
-        # Bash-wrapper fallback: override write-capable commands in a subshell
+        # Bash-wrapper fallback: reads already allowed everywhere, writes blocked outside task_dir
         guard = _BASH_GUARD_TEMPLATE.format(
             workspace=shlex.quote(self._task_dir),
             command=command,
