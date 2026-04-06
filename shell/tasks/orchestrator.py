@@ -59,6 +59,10 @@ _SPINNER_VERBS = [
 _SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 
+class _TimeoutDelegated(Exception):
+    """Raised when a timed-out command has been auto-delegated to a sub-agent."""
+
+
 class _Spinner:
     """Animated spinner with a random verb from the list."""
 
@@ -101,11 +105,12 @@ The user has asked you to accomplish a goal. Reason step by step.
 
 Rules:
 1. Act directly (action=run) for simple, fast tasks — a single command or a few commands.
-2. Spawn a sub-agent (action=spawn) ONLY for long-running work (>30s estimated) or work that can run in parallel. Give each sub-agent a focused, self-contained goal.
-3. After spawning, continue your loop — check sub-agent status each turn.
-4. When the goal is fully achieved, emit action=done.
-5. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
-6. Never cd outside the current working directory.
+2. Spawn a sub-agent (action=spawn) for long-running work (>30s estimated), work that can run in parallel, OR if a command timed out (output contains "[timeout after"). Give each sub-agent a focused, self-contained goal.
+3. CRITICAL: If you see "[timeout after 128s]" in output, the command is still running in the background OR it failed. Do NOT retry the same command. Spawn a sub-agent with the full goal instead.
+4. After spawning, continue your loop — check sub-agent status each turn.
+5. When the goal is fully achieved, emit action=done.
+6. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
+7. Never cd outside the current working directory.
 
 Respond with JSON only — no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>"}
@@ -164,15 +169,19 @@ class OrchestratorAgent:
             raw = self._extract_raw(response)
             action = self._parse_action(raw)
 
-            if action["action"] == "run":
-                self._handle_run(action)
-            elif action["action"] == "spawn":
-                self._handle_spawn(action)
-            elif action["action"] == "done":
-                self._handle_done(action)
-                break
-            else:
-                _out(f"[orchestrator] unknown action '{action['action']}' — stopping")
+            action_type = action.get("action", "")
+            try:
+                if action_type == "run":
+                    self._handle_run(action)
+                elif action_type == "spawn":
+                    self._handle_spawn(action)
+                elif action_type == "done":
+                    self._handle_done(action)
+                    break
+                else:
+                    _out(f"[orchestrator] unknown action '{action_type}' — stopping")
+                    break
+            except _TimeoutDelegated:
                 break
         else:
             _out(f"[orchestrator] reached {_MAX_TURNS} turn limit — stopping")
@@ -210,6 +219,17 @@ class OrchestratorAgent:
             _write_audit_log("orchestrator", self._cwd, confirmed_cmd)
         except Exception:
             pass
+
+        # If the command timed out, auto-spawn a sub-agent with the remaining goal
+        if "[timeout after" in (output or ""):
+            _out("  [orchestrator] command timed out — delegating remaining goal to sub-agent")
+            self._handle_spawn({
+                "action": "spawn",
+                "name": self._slug,
+                "goal": self._goal,
+                "explanation": f"Command '{confirmed_cmd}' timed out — handing off full goal to sub-agent",
+            })
+            raise _TimeoutDelegated()
 
     def _handle_spawn(self, action: dict) -> None:
         name = action.get("name", "").strip().replace(" ", "-")
