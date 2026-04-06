@@ -5,6 +5,7 @@ All operations go through SQLite and libtmux.
 from __future__ import annotations
 
 import os
+import shlex
 import signal
 import sys
 from datetime import datetime, timezone
@@ -103,12 +104,11 @@ class TaskManager:
         # Pass shared_read_dir if spawned under a task_base_dir
         shared_arg = ""
         if task_base_dir:
-            import shlex as _shlex
-            shared_arg = f" --shared-read-dir {_shlex.quote(str(task_base_dir))}"
+            shared_arg = f" --shared-read-dir {shlex.quote(str(task_base_dir))}"
 
         window.active_pane.send_keys(
             f"PYTHONPATH={pythonpath} {python_bin} -m shell.tasks.agent"
-            f" --task {name} --goal '{safe_goal}'{shared_arg}",
+            f" --task {shlex.quote(name)} --goal '{safe_goal}'{shared_arg}",
             enter=True,
         )
 

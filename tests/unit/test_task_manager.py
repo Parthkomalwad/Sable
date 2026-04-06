@@ -1,4 +1,5 @@
 import os
+import shlex
 import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
@@ -13,16 +14,15 @@ def mock_libtmux():
 
 
 def _make_manager(tmp_path):
-    # Defer import to after libtmux is mocked
-    with patch.dict(sys.modules, {"libtmux": MagicMock()}):
-        from shell.tasks.manager import TaskManager
-        config = MagicMock()
-        config.tasks_base_dir = str(tmp_path / "tasks")
-        db = MagicMock()
-        db._conn = MagicMock()
-        db._conn.execute.return_value = MagicMock()
-        manager = TaskManager(config=config, db=db)
-        return manager
+    # Defer import to after libtmux is mocked (via autouse fixture)
+    from shell.tasks.manager import TaskManager
+    config = MagicMock()
+    config.tasks_base_dir = str(tmp_path / "tasks")
+    db = MagicMock()
+    db._conn = MagicMock()
+    db._conn.execute.return_value = MagicMock()
+    manager = TaskManager(config=config, db=db)
+    return manager
 
 
 def test_spawn_with_task_base_dir_uses_custom_path(tmp_path):
@@ -92,7 +92,7 @@ def test_spawn_with_task_base_dir_includes_shared_arg(tmp_path):
             task_base_dir=str(shared),
         )
 
-    assert "--shared-read-dir" in captured["cmd"]
+    assert f"--shared-read-dir {shlex.quote(str(shared))}" in captured["cmd"]
 
 
 def test_spawn_without_task_base_dir_no_shared_arg(tmp_path):
