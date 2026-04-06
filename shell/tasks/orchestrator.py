@@ -108,7 +108,14 @@ class OrchestratorAgent:
             })
             return
 
+        DIM = '\033[2;37m'
+        RESET = '\033[0m'
+        sys.stdout.write(f'  {DIM}running...{RESET}\n')
+        sys.stdout.flush()
         output = self._run_command(confirmed_cmd)
+        if output.strip():
+            sys.stdout.write(f'\n{output.rstrip()}\n\n')
+            sys.stdout.flush()
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": output or "(no output)"})
 
