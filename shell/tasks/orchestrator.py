@@ -8,10 +8,64 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import re
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
+
+_SPINNER_VERBS = [
+    'Accomplishing', 'Actioning', 'Architecting', 'Baking', 'Bootstrapping',
+    'Brewing', 'Calculating', 'Cascading', 'Cerebrating', 'Channeling',
+    'Choreographing', 'Churning', 'Cogitating', 'Coalescing', 'Composing',
+    'Computing', 'Concocting', 'Considering', 'Contemplating', 'Crafting',
+    'Crunching', 'Crystallizing', 'Deciphering', 'Deliberating', 'Determining',
+    'Elucidating', 'Fermenting', 'Finagling', 'Forging', 'Forming',
+    'Generating', 'Germinating', 'Harmonizing', 'Hatching', 'Ideating',
+    'Imagining', 'Improvising', 'Incubating', 'Inferring', 'Manifesting',
+    'Marinating', 'Metamorphosing', 'Mulling', 'Mustering', 'Musing',
+    'Noodling', 'Orchestrating', 'Percolating', 'Philosophising', 'Pondering',
+    'Pontificating', 'Processing', 'Propagating', 'Puzzling', 'Reticulating',
+    'Ruminating', 'Scampering', 'Seasoning', 'Simmering', 'Sketching',
+    'Spinning', 'Sprouting', 'Stewing', 'Synthesizing', 'Thinking',
+    'Tinkering', 'Transmuting', 'Unravelling', 'Vibing', 'Wandering',
+    'Whirring', 'Whisking', 'Working', 'Wrangling', 'Zesting',
+]
+
+_SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+
+class _Spinner:
+    """Animated spinner with a random verb from the list."""
+
+    def __init__(self, verb: str | None = None) -> None:
+        self._verb = verb or random.choice(_SPINNER_VERBS)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1)
+        sys.stdout.write('\r' + ' ' * 40 + '\r')
+        sys.stdout.flush()
+
+    def _run(self) -> None:
+        PURPLE = '\033[38;5;141m'
+        RESET = '\033[0m'
+        i = 0
+        while not self._stop.is_set():
+            frame = _SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]
+            sys.stdout.write(f'\r{PURPLE}  {frame} {self._verb}...{RESET}')
+            sys.stdout.flush()
+            self._stop.wait(0.08)
+            i += 1
 
 _SYSTEM_PROMPT = """You are an orchestrator shell agent running on Linux.
 The user has asked you to accomplish a goal. Reason step by step.
@@ -68,11 +122,15 @@ class OrchestratorAgent:
         _MAX_TURNS = 20
         for _turn in range(1, _MAX_TURNS + 1):
             messages = self._build_messages()
+            spinner = _Spinner()
+            spinner.start()
             try:
                 response = self._call_llm(messages)
             except Exception as exc:
+                spinner.stop()
                 _out(f"[orchestrator] LLM error: {exc}")
                 break
+            spinner.stop()
 
             raw = self._extract_raw(response)
             action = self._parse_action(raw)
@@ -108,11 +166,10 @@ class OrchestratorAgent:
             })
             return
 
-        DIM = '\033[2;37m'
-        RESET = '\033[0m'
-        sys.stdout.write(f'  {DIM}running...{RESET}\n')
-        sys.stdout.flush()
+        run_spinner = _Spinner(verb='Running')
+        run_spinner.start()
         output = self._run_command(confirmed_cmd)
+        run_spinner.stop()
         if output.strip():
             sys.stdout.write(f'\n{output.rstrip()}\n\n')
             sys.stdout.flush()
