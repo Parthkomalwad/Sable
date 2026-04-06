@@ -52,7 +52,8 @@ When the goal is fully achieved, set "done": true and leave "command" empty.
 
 
 class TaskAgent:
-    def __init__(self, task_name: str, goal: str, config, db_path: str) -> None:
+    def __init__(self, task_name: str, goal: str, config, db_path: str,
+                 shared_read_dir: str | None = None) -> None:
         from shell.tasks.memory import TaskMemory
         from shell.tasks.sandbox import Sandbox
         from shell.tasks.skills import TaskSkillLoader
@@ -86,7 +87,7 @@ class TaskAgent:
             except Exception:
                 pass
 
-        self._sandbox = Sandbox(task_dir=workspace)
+        self._sandbox = Sandbox(task_dir=workspace, shared_read_dir=shared_read_dir)
         self._skill_loader = TaskSkillLoader(task_name, tasks_base)
         self._guidance_q: queue.Queue = queue.Queue()
         self._running = True
@@ -395,6 +396,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TaskAgent runner")
     parser.add_argument("--task", required=True, help="Task name")
     parser.add_argument("--goal", required=True, help="Goal text")
+    parser.add_argument("--shared-read-dir", default=None,
+                        help="Parent task dir to mount read-only for sub-agent")
     args = parser.parse_args()
 
     from shell.telemetry.db import DB_PATH
@@ -413,5 +416,6 @@ if __name__ == "__main__":
         goal=args.goal,
         config=config,
         db_path=str(DB_PATH),
+        shared_read_dir=args.shared_read_dir,
     )
     agent.run()

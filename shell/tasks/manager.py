@@ -48,15 +48,22 @@ class TaskManager:
             pass
         return None
 
-    def spawn(self, name: str, goal: str, context: str = "") -> None:
+    def spawn(self, name: str, goal: str, context: str = "",
+              task_base_dir: str | None = None) -> None:
         """Spawn a new task agent in a dedicated tmux window.
 
         Args:
             name: Task name (used as tmux window name and directory).
             goal: Natural language goal for the agent.
             context: Optional orchestrator context summary to seed the agent's memory.
+            task_base_dir: If set, use this as the parent dir instead of global tasks_base.
+                           Sub-agent's workspace = task_base_dir/name/workspace/
+                           shared_read_dir passed to Sandbox = task_base_dir/
         """
-        task_dir = self._tasks_base / name
+        if task_base_dir:
+            task_dir = Path(task_base_dir) / name
+        else:
+            task_dir = self._tasks_base / name
         task_dir.mkdir(parents=True, exist_ok=True)
 
         # Write context to a handoff file so agent can load it on startup
@@ -92,8 +99,16 @@ class TaskManager:
         existing_pp = _os.environ.get("PYTHONPATH", "")
         pythonpath = f"{project_root}:{existing_pp}" if existing_pp else project_root
         safe_goal = goal.replace("'", "'\\''")
+
+        # Pass shared_read_dir if spawned under a task_base_dir
+        shared_arg = ""
+        if task_base_dir:
+            import shlex as _shlex
+            shared_arg = f" --shared-read-dir {_shlex.quote(str(task_base_dir))}"
+
         window.active_pane.send_keys(
-            f"PYTHONPATH={pythonpath} {python_bin} -m shell.tasks.agent --task {name} --goal '{safe_goal}'",
+            f"PYTHONPATH={pythonpath} {python_bin} -m shell.tasks.agent"
+            f" --task {name} --goal '{safe_goal}'{shared_arg}",
             enter=True,
         )
 
