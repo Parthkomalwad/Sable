@@ -121,7 +121,7 @@ class OrchestratorAgent:
     def _handle_spawn(self, action: dict) -> None:
         name = action.get("name", "").strip().replace(" ", "-")
         goal = action.get("goal", "").strip()
-        if not name or not goal:
+        if not re.search(r'[a-z0-9]', name) or not goal:
             _out("[orchestrator] spawn action missing name or goal — skipping")
             return
 
@@ -334,6 +334,8 @@ class OrchestratorAgent:
 
     def _run_command(self, command: str, timeout: int = 120) -> str:
         """Run a command via ptyprocess in cwd. Returns output string."""
+        if not command.strip():
+            return "(empty command)"
         import select
         import signal
         import tempfile

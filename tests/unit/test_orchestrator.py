@@ -131,3 +131,59 @@ def test_extract_raw_fallback_to_done(tmp_path):
     result = orch._extract_raw(response)
     parsed = json.loads(result)
     assert parsed["action"] == "done"
+
+
+def test_handle_spawn_creates_task_dir(tmp_path):
+    """_handle_spawn creates the shared task dir lazily."""
+    orch = _make_orchestrator(tmp_path, goal="build an app")
+    orch._task_manager.spawn = MagicMock()
+
+    action = {"action": "spawn", "name": "frontend", "goal": "build react app", "explanation": "long task"}
+    orch._handle_spawn(action)
+
+    assert orch._task_dir is not None
+    assert orch._task_dir.exists()
+    assert "frontend" in orch._spawned
+
+
+def test_handle_spawn_skips_invalid_name(tmp_path):
+    """_handle_spawn skips actions with degenerate name (no alphanumeric chars)."""
+    orch = _make_orchestrator(tmp_path, goal="build an app")
+    orch._task_manager.spawn = MagicMock()
+
+    action = {"action": "spawn", "name": "---", "goal": "some goal", "explanation": "x"}
+    orch._handle_spawn(action)
+
+    orch._task_manager.spawn.assert_not_called()
+
+
+def test_collect_agent_statuses_consumes_result(tmp_path):
+    """_collect_agent_statuses reads result.md, removes it, and removes agent from _spawned."""
+    orch = _make_orchestrator(tmp_path, goal="build an app")
+    # Manually set up task dir and a fake completed agent
+    orch._task_dir = tmp_path / "tasks" / orch._slug
+    agent_agentic = orch._task_dir / "frontend" / ".agentic"
+    agent_agentic.mkdir(parents=True)
+    (agent_agentic / "result.md").write_text("# Done\nBuilt react app")
+    orch._spawned = ["frontend"]
+
+    statuses = orch._collect_agent_statuses()
+
+    assert len(statuses) == 1
+    assert "COMPLETED" in statuses[0]
+    assert not (agent_agentic / "result.md").exists()  # consumed
+    assert "frontend" not in orch._spawned
+
+
+def test_handle_done_writes_result(tmp_path):
+    """_handle_done writes result.md when task_dir exists."""
+    orch = _make_orchestrator(tmp_path, goal="build an app")
+    orch._task_dir = tmp_path / "tasks" / orch._slug
+    (orch._task_dir / ".agentic").mkdir(parents=True)
+
+    action = {"action": "done", "explanation": "all done, react app is running"}
+    orch._handle_done(action)
+
+    result_path = orch._task_dir / ".agentic" / "result.md"
+    assert result_path.exists()
+    assert "all done" in result_path.read_text()
