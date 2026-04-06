@@ -1,11 +1,9 @@
 """Main REPL loop."""
 from __future__ import annotations
 
-import asyncio
 import os
 import platform
 import sys
-import threading
 from pathlib import Path
 
 os.environ["PROMPT_TOOLKIT_NO_CPR"] = "1"
@@ -66,65 +64,6 @@ def _out(text: str) -> None:
     sys.stdout.write(text + "\n")
     sys.stdout.flush()
 
-
-_SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-
-
-class _ThinkingSpinner:
-    """Animated spinner that runs in a background thread during LLM calls."""
-
-    def __init__(self) -> None:
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=1)
-        # Clear the spinner line
-        sys.stdout.write('\r' + ' ' * 30 + '\r')
-        sys.stdout.flush()
-
-    def _run(self) -> None:
-        PURPLE = '\033[38;5;141m'
-        RESET = '\033[0m'
-        i = 0
-        while not self._stop.is_set():
-            frame = _SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]
-            sys.stdout.write(f'\r{PURPLE}  {frame} thinking...{RESET}')
-            sys.stdout.flush()
-            self._stop.wait(0.08)
-            i += 1
-
-
-def _print_exec_result(exit_code: int, elapsed: float, cost_usd: float = 0.0, total_tokens: int = 0) -> None:
-    """Print ✓ done in Xs or ✗ exit N (Xs) after command execution.
-
-    Only called for agentic commands — pure bash gets no chrome.
-    """
-    GREEN = '\033[38;5;114m'
-    RED = '\033[38;5;203m'
-    DIM = '\033[38;5;238m'
-    RESET = '\033[0m'
-
-    if total_tokens > 0:
-        if cost_usd > 0:
-            cost_part = f'  {DIM}·   ${cost_usd:.4f} · {total_tokens} tok{RESET}'
-        else:
-            cost_part = f'  {DIM}·   {total_tokens} tok{RESET}'
-    else:
-        cost_part = ''
-
-    if exit_code == 0:
-        sys.stdout.write(f'\n  {GREEN}✓ done in {elapsed:.1f}s{RESET}{cost_part}\n\n')
-    else:
-        sys.stdout.write(f'\n  {RED}✗ exit {exit_code}  ({elapsed:.1f}s){RESET}{cost_part}\n\n')
-    sys.stdout.flush()
 
 
 def _render_prompt(cwd: str, last_exit: int) -> str:
@@ -250,92 +189,6 @@ def _get_os_info() -> str:
         return "Linux"
 
 
-async def _call_llm(backend, user_input: str, cwd: str, config: ShellConfig, session_context: str = ""):
-    import httpx
-    from shell.llm.base import build_system_prompt
-
-    system = build_system_prompt(
-        cwd=cwd,
-        user=os.environ.get("USER", os.environ.get("USERNAME", "user")),
-        os_info=_get_os_info(),
-    )
-
-    nl_input = user_input
-    if config.privacy_mode:
-        from shell.safety import strip_secrets
-        nl_input, count = strip_secrets(user_input)
-        if count:
-            _out(f"[redacted {count} secret pattern(s)]")
-
-    messages = []
-    if session_context:
-        messages.append({"role": "user", "content": f"[Previous session context]\n{session_context}"})
-        messages.append({"role": "assistant", "content": "Understood, I have the context from your previous session."})
-
-    # Inject any completed task results the orchestrator hasn't seen yet
-    task_context = _collect_pending_task_results(config)
-    if task_context:
-        messages.append({"role": "user", "content": task_context})
-        messages.append({"role": "assistant", "content": "Understood. I now have the results from the background agents."})
-
-    messages.append({"role": "user", "content": nl_input})
-
-    try:
-        response = await backend.complete(messages, system)
-        if _offline_mode:
-            set_offline_mode(False)
-            _out("[model back online]")
-        return response
-    except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError):
-        set_offline_mode(True)
-        _out("[model offline — running in manual mode]")
-        return None
-
-
-def _display_command_preview(response) -> str | None:
-    """Display styled explanation + command preview, then prompt for confirm/edit/cancel.
-
-    Output format:
-      ✦ <explanation>
-
-      $ <command>
-
-      ↵ run   e edit   q cancel  ›
-    """
-    PURPLE = '\033[38;5;141m'
-    BRIGHT_WHITE = '\033[1;37m'
-    DIM = '\033[2;37m'
-    RESET = '\033[0m'
-
-    sys.stdout.write('\n')
-    sys.stdout.write(f'{PURPLE}  ✦{RESET} {response.explanation}\n')
-    sys.stdout.write('\n')
-    sys.stdout.write(f'  {BRIGHT_WHITE}$ {response.command}{RESET}\n')
-    sys.stdout.write('\n')
-    sys.stdout.write(f'  {DIM}↵ run   e edit   q cancel  ›{RESET}\n')
-    sys.stdout.flush()
-
-    try:
-        answer = input('').strip()
-    except (EOFError, KeyboardInterrupt):
-        return None
-
-    if answer.lower() == 'q':
-        sys.stdout.write(f'  {DIM}cancelled{RESET}\n')
-        sys.stdout.flush()
-        return None
-
-    if answer.lower() == 'e':
-        sys.stdout.write(f'  edit> ')
-        sys.stdout.flush()
-        try:
-            edited = input('').strip()
-        except (EOFError, KeyboardInterrupt):
-            return None
-        return edited or response.command
-
-    return response.command
-
 
 def _audit_log(action: str, command: str, exit_code: int | None = None) -> None:
     import datetime, getpass
@@ -365,27 +218,6 @@ def _write_audit_log(session_id: str, cwd: str, command: str) -> None:
     except (PermissionError, OSError):
         pass
 
-
-def _log_event(db, session_id: str, response, command: str, exit_code: int, nl_input: str) -> None:
-    try:
-        from datetime import datetime, timezone
-        from shell.telemetry.events import TokenEvent
-        event = TokenEvent(
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            session_id=session_id,
-            action_type="nl_route",
-            nl_input=nl_input,
-            command=command,
-            prompt_tokens=response.prompt_tokens,
-            completion_tokens=response.completion_tokens,
-            total_tokens=response.prompt_tokens + response.completion_tokens,
-            cost_usd=response.cost_usd,
-            model=getattr(response, "model", None),
-            exit_code=exit_code,
-        )
-        db.write_event(event)
-    except Exception:
-        pass
 
 
 def _check_and_enforce_budget(db, config: ShellConfig, session_id: str) -> bool:
@@ -433,53 +265,6 @@ _HELP_TEXT = (
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
 
-
-_PROBE_PREFIXES = ("ls", "find", "cat", "pwd", "echo", "which", "whoami",
-                   "df", "du", "file", "head", "tail", "grep", "wc", "stat")
-
-def _is_probe_command(command: str) -> bool:
-    """Return True if command is a safe read-only probe (no side effects)."""
-    if not command:
-        return False
-    stripped = command.strip()
-    # Must not have write operators
-    if any(op in stripped for op in (">", ">>", "|", ";", "&&", "rm", "mv", "cp")):
-        return False
-    first_word = stripped.split()[0].split("/")[-1]
-    return first_word in _PROBE_PREFIXES
-
-
-def _collect_pending_task_results(config) -> str:
-    """Collect context from background agents:
-    - result.md: completed agent summary (read once, then deleted)
-    - status.md: live running agent status (read every time, never deleted)
-    """
-    from pathlib import Path as _P
-    tasks_base = _P(getattr(config, "tasks_base_dir", "~/tasks")).expanduser()
-    results = []
-    try:
-        # Completed results — consume once
-        for p in sorted(tasks_base.glob("*/.agentic/result.md")):
-            try:
-                results.append(("completed", p.read_text()))
-                p.unlink()
-            except Exception:
-                pass
-        # Live status — always inject so orchestrator knows what's running
-        for p in sorted(tasks_base.glob("*/.agentic/status.md")):
-            try:
-                results.append(("running", p.read_text()))
-            except Exception:
-                pass
-    except Exception:
-        pass
-    if not results:
-        return ""
-    sections = []
-    for kind, content in results:
-        label = "Background agent result" if kind == "completed" else "Background agent status (live)"
-        sections.append(f"[{label}]\n{content}")
-    return "\n\n---\n\n".join(sections)
 
 
 def _get_recent_turns() -> list[dict]:
@@ -1015,7 +800,6 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
     from shell.executor import execute_bash
     from shell.router import classify, Route
     from shell.safety import is_destructive, confirm_destructive
-    from shell.planner import execute_plan
 
     db = None
     try:
@@ -1110,114 +894,24 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     _out(f"exit {exit_code}")
                 continue
 
-            _spinner = _ThinkingSpinner()
-            _spinner.start()
+            # NL path: hand off to OrchestratorAgent reasoning loop
+            from shell.tasks.manager import TaskManager
+            from shell.tasks.orchestrator import OrchestratorAgent
+            from shell.telemetry.db import DB_PATH
+            task_manager = TaskManager(config=config, db=db)
+            agent = OrchestratorAgent(
+                goal=line,
+                cwd=cwd,
+                config=config,
+                db_path=str(DB_PATH),
+                task_manager=task_manager,
+            )
             try:
-                response = asyncio.run(_call_llm(backend, line, cwd, config, session_context))
-                _spinner.stop()
+                agent.run()
             except KeyboardInterrupt:
-                _spinner.stop()
-                _out("cancelled")
-                continue
-
-            if response is None:
-                exit_code, _ = execute_bash(line, cwd)
-                if exit_code != 0:
-                    _out(f"exit {exit_code}")
-                continue
-
-            # Autonomous agent spawn requested by LLM
-            if response.spawn and isinstance(response.spawn, dict):
-                spawn_name = response.spawn.get("name", "").strip().replace(" ", "-")
-                spawn_goal = response.spawn.get("goal", "").strip()
-                if spawn_name and spawn_goal:
-                    try:
-                        from shell.tasks.manager import TaskManager
-                        context = _build_spawn_context(turns, spawn_goal)
-                        mgr = TaskManager(config=config, db=db)
-                        mgr.spawn(spawn_name, spawn_goal, context=context)
-                        _out(f"◈ agent '{spawn_name}' spawned autonomously")
-                        _out(f"  goal: {spawn_goal}")
-                        _out(f"  {len(context)} chars of context handed off")
-                        turns.append({"role": "user", "content": line})
-                        turns.append({"role": "assistant", "content": f"spawned agent '{spawn_name}': {spawn_goal}"})
-                        _save_turns_if_needed(turns, session_id, config)
-                    except Exception as exc:
-                        _out(f"[error] failed to spawn agent: {exc}")
-                    continue
-
-            if response.plan:
-                last_exit = execute_plan(response.plan, cwd, description=line)
-                sys.stdout.write(f'  \033[38;5;238m·   ${response.cost_usd:.4f} · {response.prompt_tokens + response.completion_tokens} tok\033[0m\n')
-                sys.stdout.flush()
-                _log_event(db, session_id, response, str(response.plan), last_exit, line)
-                turns.append({"role": "user", "content": line})
-                turns.append({"role": "assistant", "content": f"plan: {response.plan}"})
-                _save_turns_if_needed(turns, session_id, config)
-                continue
-
-            # Exploratory probe: run silently and feed output back for a richer response
-            if _is_probe_command(response.command):
-                probe_output = ""
-                try:
-                    _, probe_output = execute_bash(response.command, cwd)
-                except Exception:
-                    pass
-                if probe_output.strip():
-                    # Feed probe result back into LLM for a conversational response
-                    probe_messages = [
-                        {"role": "user", "content": line},
-                        {"role": "assistant", "content": f"Let me check: `{response.command}`"},
-                        {"role": "user", "content": f"Output:\n{probe_output[:2000]}"},
-                    ]
-                    try:
-                        from shell.llm.base import build_system_prompt
-                        sys2 = build_system_prompt(cwd=cwd,
-                            user=os.environ.get("USER", "user"),
-                            os_info=_get_os_info())
-                        loop2 = asyncio.new_event_loop()
-                        response2 = loop2.run_until_complete(
-                            asyncio.wait_for(backend.complete(probe_messages, sys2), timeout=30.0)
-                        )
-                        loop2.close()
-                        # Show explanation as conversational response, then offer command
-                        sys.stdout.write(f'\n{PURPLE}  ✦{RESET} {response2.explanation}\n\n')
-                        sys.stdout.flush()
-                        if response2.command:
-                            response = response2  # fall through to normal command preview
-                        else:
-                            turns.append({"role": "user", "content": line})
-                            turns.append({"role": "assistant", "content": response2.explanation})
-                            _save_turns_if_needed(turns, session_id, config)
-                            continue
-                    except Exception:
-                        pass  # fall through to normal flow
-
-            command = _display_command_preview(response)
-            if command is None:
-                continue
-
-            ai_flagged = not response.safe
-            regex_flagged = is_destructive(command)
-            if ai_flagged or regex_flagged:
-                reason = "AI flagged as potentially unsafe" if ai_flagged else "matched destructive pattern"
-                if not confirm_destructive(command, reason=reason):
-                    continue
-
-            import time as _time
-            _t0 = _time.monotonic()
-            exit_code, _ = execute_bash(command, cwd)
-            _elapsed = _time.monotonic() - _t0
-            _last_exit = exit_code
-            _print_exec_result(exit_code, _elapsed, cost_usd=response.cost_usd, total_tokens=response.prompt_tokens + response.completion_tokens)
-
-            _log_event(db, session_id, response, command, exit_code, line)
-            _audit_log("agentic", command, exit_code)
-            _write_audit_log(session_id, cwd, command)
-
-            # Track turn for session continuity
+                _out("[interrupted]")
             turns.append({"role": "user", "content": line})
-            turns.append({"role": "assistant", "content": f"command: {command}\nexplanation: {response.explanation}"})
+            turns.append({"role": "assistant", "content": f"[orchestrator handled: {line}]"})
             _save_turns_if_needed(turns, session_id, config)
     finally:
         _save_turns_if_needed(turns, session_id, config)
