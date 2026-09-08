@@ -1,0 +1,49 @@
+# Playground image — interactive dev/test environment for Windows/macOS hosts.
+# Adds what the production image lacks for full-feature testing:
+#   bubblewrap (real sandbox), openssh-server (SSH bypass test), git, procps.
+#
+# Build:  docker build -t agentic-playground -f docker/Dockerfile.playground .
+# Run:    scripts/playground.ps1   (Windows)   |   scripts/playground.sh (Linux/macOS)
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PROMPT_TOOLKIT_NO_CPR=1
+ENV TERM=xterm-256color
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv bash tmux curl ca-certificates \
+    bubblewrap openssh-server git procps vim less locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt pytest \
+    && python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base'); tiktoken.get_encoding('o200k_base')"
+
+# Runtime dirs + audit log
+RUN mkdir -p /root/.config/agentic-shell /root/.local/share/agentic-shell /var/log/agentic-shell /run/sshd \
+    && touch /var/log/agentic-shell/audit.log && chmod 0666 /var/log/agentic-shell/audit.log
+
+# Login-shell wrapper (source is bind-mounted at /app at run time)
+RUN printf '#!/bin/bash\nexport PYTHONPATH=/app\nexec python3 -m shell.main "$@"\n' > /usr/local/bin/agentic-shell \
+    && chmod +x /usr/local/bin/agentic-shell \
+    && echo "/usr/local/bin/agentic-shell" >> /etc/shells
+
+# Passwordless local SSH so `ssh localhost` / `scp` exercise the SSH_ORIGINAL_COMMAND bypass
+RUN ssh-keygen -A \
+    && ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519 \
+    && cat /root/.ssh/id_ed25519.pub >> /root/.ssh/authorized_keys \
+    && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
+    && printf 'Host localhost\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' > /root/.ssh/config \
+    && chsh -s /usr/local/bin/agentic-shell root
+
+# Config is written at container start by scripts/playground-entry.sh from env vars
+COPY docker/playground-entry.sh /usr/local/bin/playground-entry.sh
+RUN chmod +x /usr/local/bin/playground-entry.sh
+
+CMD ["/usr/local/bin/playground-entry.sh"]

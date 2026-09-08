@@ -1,0 +1,33 @@
+{
+  "name": "AgenticOS playground",
+  "build": {
+    "dockerfile": "../docker/Dockerfile.playground",
+    "context": ".."
+  },
+  "workspaceFolder": "/app",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "mounts": [
+    "source=agentic-playground-home,target=/root,type=volume"
+  ],
+  "runArgs": [
+    "--cap-add=SYS_ADMIN",
+    "--security-opt", "seccomp=unconfined",
+    "--add-host=host.docker.internal:host-gateway"
+  ],
+  "containerEnv": {
+    "PYTHONPATH": "/app",
+    "AGENTIC_API_BASE": "http://host.docker.internal:11434"
+  },
+  "overrideCommand": true,
+  "postStartCommand": "/usr/sbin/sshd || true",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "anthropic.claude-code"],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests/unit"],
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}

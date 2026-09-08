@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Conventions (CLAUDE.md)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No bare `except Exception` or `print(` in shell/
+        run: |
+          set -e
+          bad=0
+          if grep -rnE "except Exception\b" shell/ --include='*.py'; then bad=1; fi
+          if grep -rnE "^\s*print\(" shell/ --include='*.py' | grep -v "shell/tasks/agent.py"; then bad=1; fi
+          if [ "$bad" = "1" ]; then
+            echo "::warning::Convention violations found (non-blocking until Phase 1 refactor lands)"
+          fi
+      - name: SSH bypass is the first executable statement in main.py
+        run: |
+          python3 - <<'EOF'
+          import ast, sys
+          src = open("shell/main.py").read()
+          tree = ast.parse(src)
+          for node in tree.body:
+              if isinstance(node, (ast.Import, ast.ImportFrom)):
+                  continue
+              if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                  continue  # module docstring
+              seg = ast.get_source_segment(src, node)
+              if "SSH_ORIGINAL_COMMAND" in seg:
+                  print("OK: first executable statement is the SSH bypass")
+                  sys.exit(0)
+              print("FAIL: first executable statement is not the SSH bypass:\n", seg[:200])
+              sys.exit(1)
+          EOF
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -r requirements.txt pytest pytest-timeout
+      - run: pytest tests/unit/ -q --timeout=60
+        env:
+          PYTHONPATH: .
+
+  integration:
+    name: Integration (playground image)
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build playground image
+        run: docker build -t agentic-playground -f docker/Dockerfile.playground .
+      - name: Run integration tests in Linux with tmux + bwrap
+        run: |
+          docker run --rm -v "$PWD:/app" \
+            --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            agentic-playground bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q"

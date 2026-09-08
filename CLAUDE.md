@@ -10,6 +10,14 @@ A Python login shell that replaces `/bin/bash` on a Linux server. When a user SS
 
 Full spec: read `PRD.md` before starting any task. It contains every architectural decision, function signature, JSON contract, and risk mitigation. Do not make architectural decisions not covered in PRD.md without asking first.
 
+**v4 planning docs (September 2026)** — read these before any v4 work, in this order:
+1. `docs/VISION_v4_FEATURE_BRIEF.md` — verified current state, external research, 50-feature catalog (IDs A1…H6)
+2. `docs/ROADMAP_v4.md` — phases 0–9, per-phase gates you can test, install/playground instructions
+3. `docs/STRUCTURE_v4.md` — target `agentic/` package layout, layering rule, config model, visibility principles, migration plan
+`docs/superpowers/specs/PRD_v3.md` documents the task engine + skills that already exist under `shell/tasks/` and `shell/skills/`. The project-structure section below describes the **current** tree; STRUCTURE_v4.md describes the **target** tree.
+
+Project hygiene in place: `.github/workflows/ci.yml` (unit + integration-in-Docker + convention checks), `.devcontainer/`, `LICENSE` (MIT), `CONTRIBUTING.md`, `CHANGELOG.md` (update *Unreleased* in every PR), `SECURITY.md`. Playground for non-Linux hosts: `scripts/playground.ps1` / `.sh`.
+
 ---
 
 ## Project structure — read this before reading any files
