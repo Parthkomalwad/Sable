@@ -1,4 +1,4 @@
-# Agentic Shell Layer — production image
+# Agentic Shell Layer production image
 # Base: Ubuntu 22.04 LTS (matches target deployment environment)
 #
 # Build:  docker build -t agentic-shell -f docker/Dockerfile .

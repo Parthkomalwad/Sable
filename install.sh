@@ -3,7 +3,7 @@ set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# If run via sudo, use the real user's home — not root's
+# If run via sudo, use the real user's home not root's
 if [ -n "${SUDO_USER:-}" ]; then
     REAL_USER="$SUDO_USER"
     REAL_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
@@ -45,11 +45,11 @@ CURRENT_STAMP="$INSTALL_DIR:$VENV_DIR"
 
 if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     if tmux has-session -t "\$SESSION" 2>/dev/null; then
-        # Session exists — just reattach (second SSH connection, don't kill it)
+        # Session exists just reattach (second SSH connection, don't kill it)
         exec tmux attach-session -t "\$SESSION"
     fi
 
-    # No existing session — create fresh with 3 panes
+    # No existing session create fresh with 3 panes
     echo "\$CURRENT_STAMP" > "\$STAMP_FILE"
     _COLS=\$(tput cols 2>/dev/null || echo 220)
     _ROWS=\$(tput lines 2>/dev/null || echo 50)
@@ -62,7 +62,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     # Start: only pane %0 exists (main shell)
     MAIN_PANE=\$(tmux display-message -t "\$SESSION":0.0 -p "#{pane_id}")
 
-    # Split right: telemetry sidebar (48 cols) — new pane on the right
+    # Split right: telemetry sidebar (48 cols) new pane on the right
     TELE_PANE=\$(tmux split-window -h -t "\$MAIN_PANE" -l 48 -P -F "#{pane_id}")
 
     # Split main pane bottom: tasks panel (~30% height in lines)
@@ -77,7 +77,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
 
     tmux send-keys -t "\$TELE_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
     tmux send-keys -t "\$TASK_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
-    tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done" Enter
+    tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited restarting in 2s]'; sleep 2; done" Enter
 
     tmux select-pane -t "\$MAIN_PANE"
     exec tmux attach-session -t "\$SESSION"

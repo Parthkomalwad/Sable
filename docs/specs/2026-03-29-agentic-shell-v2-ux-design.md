@@ -1,4 +1,4 @@
-# Agentic Shell v2 — Conversational UX & Visual Design
+# Agentic Shell v2 Conversational UX & Visual Design
 
 **Date:** 2026-03-29
 **Status:** Approved
@@ -13,19 +13,19 @@ Make the shell feel like a smart assistant, not a command translator. Every inte
 
 ## 1. Prompt
 
-Powerline-style colored block segments. No special font required — uses Unicode block characters (`\ue0b0` with fallback to plain text if unsupported).
+Powerline-style colored block segments. No special font required uses Unicode block characters (`\ue0b0` with fallback to plain text if unsupported).
 
 ```
  ~/Agentic_OS   main   11:42 ❯
 ```
 
 **Segments (left to right):**
-- **Path block** — soft blue background, white text, current working directory (home collapsed to `~`)
-- **Git branch block** — soft purple background, white text, current branch name (skipped if not a git repo)
-- **Time block** — dark background, dim white text, `HH:MM`
-- **`❯` cursor** — soft white normally, red if last command exited non-zero
+- **Path block** soft blue background, white text, current working directory (home collapsed to `~`)
+- **Git branch block** soft purple background, white text, current branch name (skipped if not a git repo)
+- **Time block** dark background, dim white text, `HH:MM`
+- **`❯` cursor** soft white normally, red if last command exited non-zero
 
-**Implementation:** `_render_prompt()` in `loop.py`. Uses `HTML()` from prompt_toolkit for ANSI coloring. Git branch read via `subprocess.run(["git", "branch", "--show-current"], capture_output=True)` with a short timeout — returns empty string on failure, silently skipped.
+**Implementation:** `_render_prompt()` in `loop.py`. Uses `HTML()` from prompt_toolkit for ANSI coloring. Git branch read via `subprocess.run(["git", "branch", "--show-current"], capture_output=True)` with a short timeout returns empty string on failure, silently skipped.
 
 ---
 
@@ -94,7 +94,7 @@ Once the LLM responds:
 
 ### Pure bash commands (no LLM)
 
-No `✦`, no timing summary. Raw output only, same as today. The shell stays invisible for bash — only agentic interactions get the styled treatment.
+No `✦`, no timing summary. Raw output only, same as today. The shell stays invisible for bash only agentic interactions get the styled treatment.
 
 ---
 
@@ -118,12 +118,12 @@ No `✦`, no timing summary. Raw output only, same as today. The shell stays inv
 
 | File | Change |
 |------|--------|
-| `shell/loop.py` | Add `_render_prompt()` — Powerline segments with git + time |
+| `shell/loop.py` | Add `_render_prompt()` Powerline segments with git + time |
 | `shell/loop.py` | Print `✦ thinking...` immediately before `asyncio.run(_call_llm(...))` |
 | `shell/loop.py` | Rewrite `_display_command_preview()` with new styled output |
 | `shell/loop.py` | Record `time.monotonic()` before `execute_bash()`, print `✓/✗ done in Xs` after |
 | `shell/loop.py` | Track last exit code for prompt `❯` color |
-| `shell/executor.py` | No changes needed — timing done in loop.py |
+| `shell/executor.py` | No changes needed timing done in loop.py |
 | `shell/router.py` | No changes |
 
 **No new dependencies.** Uses only `sys.stdout.write`, `subprocess` (already imported), `time` (stdlib), and prompt_toolkit's existing `HTML()`.

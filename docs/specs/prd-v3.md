@@ -1,4 +1,4 @@
-# AgenticOS v3 — Product Requirements Document
+# AgenticOS v3 Product Requirements Document
 
 > Task Engine + Adaptive Skill Learning: autonomous background agents and a system that gets smarter the more you use it.
 
@@ -24,7 +24,7 @@ shell/
     openai.py
     anthropic.py
   telemetry/
-    db.py                  # SQLite WAL — token_events, session_memory, snippets
+    db.py                  # SQLite WAL token_events, session_memory, snippets
     events.py              # TokenEvent dataclass
     watch.py               # sidebar: 7 Rich panels, 5s poll, pane 1
   memory/
@@ -55,7 +55,7 @@ shell/
 - Add autonomous long-running task agents that survive SSH disconnects
 - Add a full-width bottom tasks panel (tmux pane 2) on the orchestrator window
 - Add adaptive skill learning: system observes usage, auto-creates skills, improves them over time
-- Preserve all existing v2 behaviour exactly — no regressions
+- Preserve all existing v2 behaviour exactly no regressions
 
 ## Non-goals
 
@@ -65,7 +65,7 @@ shell/
 
 ---
 
-## Phase 1 — Database schema
+## Phase 1 Database schema
 
 **Modify: `shell/telemetry/db.py`**
 
@@ -135,7 +135,7 @@ tasks_base_dir: str = "~/tasks"
 
 ---
 
-## Phase 2 — tmux layout: pane 2
+## Phase 2 tmux layout: pane 2
 
 **Modify: `shell/tui/layout.py`**
 
@@ -163,20 +163,20 @@ The resulting layout on window 0:
 │   ~80% width                │  44 cols fixed   │
 │                             │                  │
 ├─────────────────────────────┴──────────────────┤
-│           tasks panel (pane 2) — full width     │
+│           tasks panel (pane 2) full width     │
 │  [react-app] ● running  step 3/6 · 2,341 tok   │
 └─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Phase 3 — Task Engine files
+## Phase 3 Task Engine files
 
 Create directory `shell/tasks/` with an empty `__init__.py`. Then create each file below.
 
 ### `shell/tasks/panel.py`
 
-Runs inside pane 2. Polls the `tasks` SQLite table every 5 seconds and renders a single status line using Rich. Overwrites in place using `\r` — never scrolls.
+Runs inside pane 2. Polls the `tasks` SQLite table every 5 seconds and renders a single status line using Rich. Overwrites in place using `\r` never scrolls.
 
 **Output format:**
 
@@ -197,8 +197,8 @@ Runs inside pane 2. Polls the `tasks` SQLite table every 5 seconds and renders a
 **Rules:**
 - Uses the same SQLite path as the rest of the shell
 - If no tasks exist: show `TASKS  no active tasks`
-- Handle SQLite read errors silently — table may not exist on first launch
-- Do not query cursor position — set `PROMPT_TOOLKIT_NO_CPR=1` in environment
+- Handle SQLite read errors silently table may not exist on first launch
+- Do not query cursor position set `PROMPT_TOOLKIT_NO_CPR=1` in environment
 - Poll interval: 5 seconds, matching the sidebar
 
 ---
@@ -214,7 +214,7 @@ class TaskMemory:
     def compress(self, turns: list, goal: str) -> dict:
         """
         Compress using AGGRESSIVE mode (vs MODERATE in the main shell).
-        Goal is always pinned at position 0 — never compressed, never moved.
+        Goal is always pinned at position 0 never compressed, never moved.
         After each completed plan step: replace raw turn exchange with
         a 1-2 sentence summary. Only the current step's raw turns kept verbatim.
         Returns: {"compressed": str, "raw_last_turns": list,
@@ -232,7 +232,7 @@ class TaskMemory:
         """
         Load by version ("v2") or label ("before database setup").
         Auto-saves current state as a snapshot before loading.
-        Does NOT undo filesystem changes — context only.
+        Does NOT undo filesystem changes context only.
         """
 
     def list_snapshots(self) -> list:
@@ -301,12 +301,12 @@ bwrap \
   -- /bin/bash -c "<command>"
 ```
 
-Network is unrestricted. `safety.py` blocklist still runs on every task command — sandbox is a second enforcement layer, not a replacement.
+Network is unrestricted. `safety.py` blocklist still runs on every task command sandbox is a second enforcement layer, not a replacement.
 
 If bwrap is not found at runtime, print once to the orchestrator pane:
 
 ```
-[warning] bubblewrap not found — using software sandbox (weaker isolation)
+[warning] bubblewrap not found using software sandbox (weaker isolation)
 ```
 
 ---
@@ -325,7 +325,7 @@ class TaskAgent:
         Main loop per turn:
         1. Build context: system prompt + pinned goal + compressed history
            + matched skills list
-        2. Call backend.complete() — same LLMBackend interface as loop.py
+        2. Call backend.complete() same LLMBackend interface as loop.py
         3. Run safety.py blocklist check
         4. Execute via sandbox.wrap_command() + PtyProcessUnicode
         5. Update tasks row: last_output, step_count, status
@@ -342,7 +342,7 @@ class TaskAgent:
 [system prompt]
 GOAL (pinned, never compressed): <goal text>
 [compressed history of previous steps]
-[current step raw turns — verbatim]
+[current step raw turns verbatim]
 Available skills: deploy-nginx, setup-react, seed_db (local)
 ```
 
@@ -387,14 +387,14 @@ class TaskManager:
         # Trigger TaskMemory.save_snapshot(label).
 
     def revert(self, name: str, version_or_label: str) -> None:
-        # Call TaskMemory.load_snapshot(). Context only — no filesystem undo.
+        # Call TaskMemory.load_snapshot(). Context only no filesystem undo.
 
     def list_tasks(self) -> list:
         # Return all tasks from SQLite with current status.
 
     def stats(self, name: str) -> dict:
         # Token cost per step, compression ratios, total cost/tokens/calls,
-        # runtime, step count, snapshot count — from task_events table.
+        # runtime, step count, snapshot count from task_events table.
 
     def history(self, name: str) -> list:
         # All memory snapshots from task_memory table.
@@ -451,11 +451,11 @@ class TaskSkillLoader:
 
 ---
 
-## Phase 4 — Builtin command wiring
+## Phase 4 Builtin command wiring
 
 **Modify: `shell/loop.py`**
 
-Add `/task` and `/skill` to the existing builtin check block. These must be checked before the router is called — exactly like `/clip`, `/config`, and `/help`.
+Add `/task` and `/skill` to the existing builtin check block. These must be checked before the router is called exactly like `/clip`, `/config`, and `/help`.
 
 **`/task` command routing:**
 
@@ -498,7 +498,7 @@ for name in lost_tasks:
 
 ---
 
-## Phase 5 — Adaptive skill learning
+## Phase 5 Adaptive skill learning
 
 Create directory `shell/skills/` with an empty `__init__.py`. Then create the following files.
 
@@ -570,7 +570,7 @@ class SkillCrystalliser:
 
 ### `shell/skills/index.py`
 
-Manages `skills_index.json` — the metadata registry for all skills.
+Manages `skills_index.json` the metadata registry for all skills.
 
 ```python
 class SkillIndex:
@@ -643,7 +643,7 @@ if pending:
 
 ---
 
-## Phase 6 — File and directory layout (complete picture)
+## Phase 6 File and directory layout (complete picture)
 
 After all phases are implemented, the full additions to the filesystem are:
 
@@ -687,14 +687,14 @@ shell/
 
 | Constraint | Reason |
 |---|---|
-| SQLite WAL mode already set — do not change it | Sidebar + task panel + agent all read/write simultaneously |
+| SQLite WAL mode already set do not change it | Sidebar + task panel + agent all read/write simultaneously |
 | All new processes must not block the main REPL | Same reason watch.py is a separate process |
 | `safety.py` runs on every command including task agent commands | Sandbox is a second layer, not a replacement |
 | Goal is always pinned verbatim in task memory | Agent must never lose sight of what it is trying to do |
 | Revert is context-only, never filesystem | Filesystem undo is git's job |
 | Auto-generated skills are flagged in the index | LLM treats them as strong suggestions until confidence is high |
 | Pattern threshold is 3 occurrences before crystallisation | Avoids creating skills from one-off commands |
-| Skill confidence is nudged, not set absolutely | Gradual trust-building — a skill earns its weight over time |
+| Skill confidence is nudged, not set absolutely | Gradual trust-building a skill earns its weight over time |
 
 ---
 
@@ -706,7 +706,7 @@ Phase 2 is complete when: a new login shows a three-row bottom strip below the m
 
 Phase 3 is complete when: `python3 -m shell.tasks.agent --task test --goal "create a file called hello.txt"` runs, creates the file inside `~/tasks/test/`, and marks the task completed in SQLite.
 
-Phase 4 is complete when: `/task list` prints task rows, `/task <name> pause` pauses a running task, and `/skill list` prints available skills — all from the main shell.
+Phase 4 is complete when: `/task list` prints task rows, `/task <name> pause` pauses a running task, and `/skill list` prints available skills all from the main shell.
 
 Phase 5 is complete when: running the same deploy sequence 3 times across sessions causes a skill file to appear in `skills/instructions/` and `skills_index.json` to contain a matching entry.
 

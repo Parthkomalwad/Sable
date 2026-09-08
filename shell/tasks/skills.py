@@ -1,4 +1,4 @@
-"""TaskSkillLoader — keyword-match goal text to skill files.
+"""TaskSkillLoader keyword-match goal text to skill files.
 
 Local skills (~/tasks/<name>/.agentic/skills/) override global skills
 on name collision. Returns list of dicts: {name, content, hash, source}.

@@ -39,7 +39,7 @@ def compress(turns: list[dict]) -> str:
         Compressed context string.
     """
     if len(turns) <= 2:
-        # Nothing to compress — return as plain text
+        # Nothing to compress return as plain text
         return "\n".join(
             f"{t.get('role', 'user')}: {t.get('content', '')}" for t in turns
         )
@@ -74,11 +74,11 @@ def _compress_with_token_reducer(text: str) -> str:
         )
         return result if isinstance(result, str) else str(result)
     except ImportError:
-        # token-reducer not installed — fall back to truncation
+        # token-reducer not installed fall back to truncation
         max_chars = 2000
         if len(text) > max_chars:
             return text[:max_chars] + "\n[... truncated ...]"
         return text
     except Exception:
-        # Any other failure — return original
+        # Any other failure return original
         return text

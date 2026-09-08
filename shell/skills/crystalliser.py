@@ -1,4 +1,4 @@
-"""SkillCrystalliser — LLM-driven skill file generator.
+"""SkillCrystalliser LLM-driven skill file generator.
 
 Pulls raw command history for a pattern cluster from audit.log.
 Sends to LLM with a skill-writing system prompt.
@@ -68,7 +68,7 @@ class SkillCrystalliser:
         messages = [{"role": "user", "content": prompt}]
         try:
             response = asyncio.run(backend.complete(messages, _SKILL_SYSTEM_PROMPT))
-            # LLMResponse has no .content — the markdown skill text comes back
+            # LLMResponse has no .content the markdown skill text comes back
             # in .explanation (backends put free-form text there when no JSON found)
             content = response.explanation or response.command or str(response)
         except Exception as exc:

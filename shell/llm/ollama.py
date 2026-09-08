@@ -11,7 +11,7 @@ from shell.llm.base import LLMBackend, LLMResponse, parse_llm_json, calculate_co
 
 
 class OllamaBackend(LLMBackend):
-    """Ollama backend — connects to a local Ollama instance via HTTP."""
+    """Ollama backend connects to a local Ollama instance via HTTP."""
 
     def __init__(self, base_url: str, model: str) -> None:
         """
@@ -66,7 +66,7 @@ class OllamaBackend(LLMBackend):
                         prompt_tokens = chunk.get("prompt_eval_count", 0)
                         completion_tokens = chunk.get("eval_count", 0)
 
-        # Parse JSON from model response — fallback chain steps 1+2
+        # Parse JSON from model response fallback chain steps 1+2
         try:
             parsed = parse_llm_json(full_text)
         except ValueError:

@@ -1,4 +1,4 @@
-"""OrchestratorAgent — multi-turn reasoning loop for the main REPL.
+"""OrchestratorAgent multi-turn reasoning loop for the main REPL.
 
 Replaces the single LLM call in loop.py for NL-routed input.
 Each turn the LLM returns one action: run | spawn | done.
@@ -104,15 +104,15 @@ _SYSTEM_PROMPT = """You are an orchestrator shell agent running on Linux.
 The user has asked you to accomplish a goal. Reason step by step.
 
 Rules:
-1. Act directly (action=run) for simple, fast tasks — a single command or a few commands.
+1. Act directly (action=run) for simple, fast tasks a single command or a few commands.
 2. Spawn a sub-agent (action=spawn) for long-running work (>30s estimated), work that can run in parallel, OR if a command timed out (output contains "[timeout after"). Give each sub-agent a focused, self-contained goal.
 3. CRITICAL: If you see "[timeout after 128s]" in output, the command is still running in the background OR it failed. Do NOT retry the same command. Spawn a sub-agent with the full goal instead.
-4. After spawning, continue your loop — check sub-agent status each turn.
+4. After spawning, continue your loop check sub-agent status each turn.
 5. When the goal is fully achieved, emit action=done.
 6. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
 7. Never cd outside the current working directory.
 
-Respond with JSON only — no markdown, no extra text:
+Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>"}
 {"action": "spawn", "name": "<slug-name>", "goal": "<full goal for sub-agent>", "explanation": "<why delegating>"}
 {"action": "done", "explanation": "<summary of what was accomplished>"}
@@ -143,7 +143,7 @@ class OrchestratorAgent:
         self._task_manager = task_manager
         self._slug = _make_slug(goal)
         self._tasks_base = Path(config.tasks_base_dir).expanduser()
-        self._task_dir: Path | None = None  # lazy — created only on first spawn
+        self._task_dir: Path | None = None  # lazy created only on first spawn
         self._history: list[dict] = []      # orchestrator's own turn history
         self._spawned: list[str] = []       # names of spawned sub-agents
 
@@ -179,12 +179,12 @@ class OrchestratorAgent:
                     self._handle_done(action)
                     break
                 else:
-                    _out(f"[orchestrator] unknown action '{action_type}' — stopping")
+                    _out(f"[orchestrator] unknown action '{action_type}' stopping")
                     break
             except _TimeoutDelegated:
                 break
         else:
-            _out(f"[orchestrator] reached {_MAX_TURNS} turn limit — stopping")
+            _out(f"[orchestrator] reached {_MAX_TURNS} turn limit stopping")
 
     # ------------------------------------------------------------------
     # Action handlers
@@ -222,14 +222,14 @@ class OrchestratorAgent:
 
         # If the command timed out, auto-spawn a sub-agent with the remaining goal
         if "[timeout after" in (output or ""):
-            _out("  [orchestrator] command timed out — delegating remaining goal to sub-agent")
+            _out("  [orchestrator] command timed out delegating remaining goal to sub-agent")
             # Inject original CWD so sub-agent works in the right directory
             goal_with_cwd = f"Working directory: {self._cwd}\n{self._goal}"
             self._handle_spawn({
                 "action": "spawn",
                 "name": self._slug,
                 "goal": goal_with_cwd,
-                "explanation": f"Command '{confirmed_cmd}' timed out — handing off full goal to sub-agent",
+                "explanation": f"Command '{confirmed_cmd}' timed out handing off full goal to sub-agent",
             })
             raise _TimeoutDelegated()
 
@@ -237,7 +237,7 @@ class OrchestratorAgent:
         name = action.get("name", "").strip().replace(" ", "-")
         goal = action.get("goal", "").strip()
         if not re.search(r'[a-z0-9]', name) or not goal:
-            _out("[orchestrator] spawn action missing name or goal — skipping")
+            _out("[orchestrator] spawn action missing name or goal skipping")
             return
 
         # Lazy-create shared task dir on first spawn

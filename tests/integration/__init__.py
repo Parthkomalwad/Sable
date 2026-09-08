@@ -1,1 +1,1 @@
-"""Integration tests — requires Docker and mock_llm."""
+"""Integration tests requires Docker and mock_llm."""

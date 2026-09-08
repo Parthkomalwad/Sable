@@ -75,7 +75,7 @@ def create_session(username: str) -> None:
             python_bin = sys.executable
             sidebar_pane.send_keys(f"{python_bin} -m shell.telemetry.watch", enter=True)
 
-        # Create tasks panel — horizontal strip at bottom (vertical=True splits horizontally)
+        # Create tasks panel horizontal strip at bottom (vertical=True splits horizontally)
         tasks_pane = window.split_window(
             vertical=True,
             percent=TASKS_PANEL_HEIGHT_PERCENT,
@@ -95,7 +95,7 @@ def create_session(username: str) -> None:
         os.execvp("tmux", ["tmux", "attach-session", "-t", session_name])
 
     except Exception:
-        # libtmux unavailable or failed — run without sidebar
+        # libtmux unavailable or failed run without sidebar
         return
 
 
@@ -112,7 +112,7 @@ def toggle_sidebar() -> None:
         if not session:
             # Try to find current session from TMUX env
             tmux_env = os.environ.get("TMUX", "")
-            # TMUX=socket,pid,session_id — use list-panes approach
+            # TMUX=socket,pid,session_id use list-panes approach
             import subprocess
             result = subprocess.run(
                 ["tmux", "display-message", "-p", "#{session_name}"],

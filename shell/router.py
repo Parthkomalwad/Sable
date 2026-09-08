@@ -1,4 +1,4 @@
-"""Input router — classifies each line as bash or agentic (NL).
+"""Input router classifies each line as bash or agentic (NL).
 
 Two modes:
 - prefix mode: lines starting with '>>' route to LLM; everything else to bash.
@@ -68,7 +68,7 @@ def classify(line: str, mode: str = "auto") -> Route:
     if shutil.which(first_word):
         bash_score += 1
     if SHELL_SYNTAX.search(stripped):
-        bash_score += 2  # weight higher — strong signal
+        bash_score += 2  # weight higher strong signal
 
     # NL signals
     word_set = set(words)

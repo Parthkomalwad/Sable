@@ -8,7 +8,7 @@ This document describes the full system architecture across three layers: the co
 
 ## Diagram 1 - Core shell flow
 
-![Core shell flow](Core.png)
+![Core shell flow](assets/core.png)
 
 This diagram covers everything from SSH connection to command execution. It shows how a user's input travels from the SSH client through the entry point, into the REPL loop, gets classified by the router, and lands in the executor. Storage on the right represents the SQLite database and config file that persist across sessions.
 
@@ -26,7 +26,7 @@ This diagram covers everything from SSH connection to command execution. It show
 
 ## Diagram 2 - Intelligence and telemetry layer
 
-![Intelligence and telemetry layer](Architecture.png)
+![Intelligence and telemetry layer](assets/architecture.png)
 
 This diagram covers the LLM backends, safety guard, multi-step planner, telemetry database, session memory, and audit trail. These components activate on every agentic route decision.
 
@@ -46,7 +46,7 @@ This diagram covers the LLM backends, safety guard, multi-step planner, telemetr
 
 ## Diagram 3 - Sidebar, tmux layout, and clipboard
 
-![Sidebar, tmux layout, and clipboard](tmux-layout.png)
+![Sidebar, tmux layout, and clipboard](assets/tmux-layout.png)
 
 This diagram covers the tmux session structure, the sidebar watch process and its seven panels, the clipboard manager and TUI picker, and the file-based IPC used for sidebar key navigation.
 

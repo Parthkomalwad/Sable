@@ -1,4 +1,4 @@
-"""TaskMemory — versioned context snapshots for task agents.
+"""TaskMemory versioned context snapshots for task agents.
 
 - Goal is always pinned at position 0 in context (never compressed).
 - After each completed step: replace exchange with 1-2 sentence summary.

@@ -123,4 +123,4 @@ def save_session_context(
         )
         db.close()
     except Exception:
-        pass  # Fail silently — memory persistence is best-effort
+        pass  # Fail silently memory persistence is best-effort

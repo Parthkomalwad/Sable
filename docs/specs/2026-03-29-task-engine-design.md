@@ -1,4 +1,4 @@
-# Task Engine — Design Spec
+# Task Engine Design Spec
 
 **Date:** 2026-03-29
 **Status:** Approved
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The Task Engine adds autonomous, sandboxed, long-running task agents to AgenticOS. The main shell becomes an orchestrator — it spawns named task agents, each running in its own tmux window with an isolated filesystem sandbox, separate LLM context, versioned memory, and access to a shared skills library. Tasks survive SSH disconnects and can be monitored, entered, interrupted, and resumed at any time.
+The Task Engine adds autonomous, sandboxed, long-running task agents to AgenticOS. The main shell becomes an orchestrator it spawns named task agents, each running in its own tmux window with an isolated filesystem sandbox, separate LLM context, versioned memory, and access to a shared skills library. Tasks survive SSH disconnects and can be monitored, entered, interrupted, and resumed at any time.
 
 ---
 
@@ -49,7 +49,7 @@ Skills Library
 │         ~80% width          │   44 cols fixed  │
 │                             │                  │
 ├─────────────────────────────┴──────────────────┤
-│           Tasks Panel (pane 2) — full width     │
+│           Tasks Panel (pane 2) full width     │
 │  [react-app] ● running  step 3/6 · 2,341 tok   │
 └─────────────────────────────────────────────────┘
 ```
@@ -65,7 +65,7 @@ shell/
     agent.py        task REPL loop (goal-directed, trimmed from loop.py)
     sandbox.py      bubblewrap wrapper + write-intercept fallback
     memory.py       per-task memory + versioned snapshot management
-    skills.py       skill loader — global + local merge, keyword matching
+    skills.py       skill loader global + local merge, keyword matching
     reconcile.py    startup reconciliation against live tmux windows
 ```
 
@@ -200,11 +200,11 @@ bwrap \
 If `bwrap` not found at runtime, `sandbox.py` falls back to Python-layer interception:
 - Parses every command before execution
 - Blocks any write-targeting path outside the task folder
-- Orchestrator warns on startup: `bubblewrap not found — using software sandbox (weaker)`
+- Orchestrator warns on startup: `bubblewrap not found using software sandbox (weaker)`
 
 ### Safety Layer
 
-Bubblewrap is a second layer — `safety.py` destructive blocklist still runs on every task command. Dangerous commands require `YES` confirmation in the task window.
+Bubblewrap is a second layer `safety.py` destructive blocklist still runs on every task command. Dangerous commands require `YES` confirmation in the task window.
 
 ---
 
@@ -258,13 +258,13 @@ Saves current memory state immediately with user-provided label.
 ```
 
 - Loads snapshot as active context for next LLM call
-- Does NOT undo filesystem changes — context only
+- Does NOT undo filesystem changes context only
 - Previous active context auto-saved as snapshot before revert
 
 ### Orchestrator View
 
 - Bottom panel: `snapshot_count` and `last_checkpoint_label` per task
-- `/task <name> history` — full snapshot list with labels, turn counts, token counts
+- `/task <name> history` full snapshot list with labels, turn counts, token counts
 
 ---
 
@@ -272,13 +272,13 @@ Saves current memory state immediately with user-provided label.
 
 Three layers applied to task agents:
 
-**Layer 1 — AGGRESSIVE compression mode**
+**Layer 1 AGGRESSIVE compression mode**
 Tasks are goal-directed and linear. Older steps compress very well. `token-reducer` called with `AGGRESSIVE` setting (vs `MODERATE` for main shell).
 
-**Layer 2 — Step summaries**
+**Layer 2 Step summaries**
 After each completed plan step, agent summarizes what it did in 1-2 sentences. Raw turn exchange replaced with summary. Only current step's raw turns kept verbatim. Dramatically reduces context growth for long tasks.
 
-**Layer 3 — Skill deduplication**
+**Layer 3 Skill deduplication**
 Skills loaded as context are content-hashed. If the same skill appeared in the previous snapshot, it is referenced by hash rather than re-embedded. Saves tokens on every call after the first.
 
 ---
@@ -316,11 +316,11 @@ Polls SQLite every 5 seconds. Full-width pane, fixed height (configurable, defau
 
 ```
 ~/.local/share/agentic-shell/skills/
-  instructions/          (global markdown — loaded as LLM context)
+  instructions/          (global markdown loaded as LLM context)
     deploy-nginx.md
     setup-react.md
     docker-basics.md
-  scripts/               (global executables — called by agent)
+  scripts/               (global executables called by agent)
     deploy_nginx.py
     health_check.sh
 
@@ -331,16 +331,16 @@ Polls SQLite every 5 seconds. Full-width pane, fixed height (configurable, defau
 
 ### How Agents Use Skills
 
-**Markdown skills** — merged (local overrides global), keyword-matched against current goal, injected into system prompt. Not all skills loaded every call — only relevant ones.
+**Markdown skills** merged (local overrides global), keyword-matched against current goal, injected into system prompt. Not all skills loaded every call only relevant ones.
 
-**Executable scripts** — called by name:
+**Executable scripts** called by name:
 ```
 skill:deploy_nginx
 skill:health_check --port 3000
 ```
 `skills.py` resolves path (local first, then global), runs inside sandbox, returns output to agent as context.
 
-**Skill discovery** — on task start, available skills listed in system prompt:
+**Skill discovery** on task start, available skills listed in system prompt:
 ```
 Available skills: deploy-nginx, setup-react, docker-basics, seed_db (local)
 Call executable skills with: skill:<name> [args]
@@ -357,7 +357,7 @@ Call executable skills with: skill:<name> [args]
 /skill edit deploy-nginx             # opens in $EDITOR
 ```
 
-Skills are plain files — naturally versioned by git if the folder is a git repo.
+Skills are plain files naturally versioned by git if the folder is a git repo.
 
 ---
 
@@ -413,11 +413,11 @@ Skills are plain files — naturally versioned by git if the folder is a git rep
 | Decision | Reason |
 |---|---|
 | tmux windows per task | Survives SSH disconnect, natural navigation with Ctrl+B, orchestrator always window 0 |
-| SQLite reconciliation on startup | No daemon needed — libtmux + SQLite is sufficient for robust state recovery |
+| SQLite reconciliation on startup | No daemon needed libtmux + SQLite is sufficient for robust state recovery |
 | bubblewrap as primary sandbox | Kernel-enforced, not code-enforced. Available on Ubuntu 22.04+, used by Flatpak |
-| AGGRESSIVE compression for tasks | Tasks are linear goal-directed sequences — old steps compress far better than open-ended shell sessions |
-| Step summaries replace raw turns | Single biggest token savings for multi-step tasks — raw turns grow O(N), summaries grow O(1) per step |
-| Skill keyword matching | Avoids bloating every LLM call with all skills — only injects what's relevant to current goal |
+| AGGRESSIVE compression for tasks | Tasks are linear goal-directed sequences old steps compress far better than open-ended shell sessions |
+| Step summaries replace raw turns | Single biggest token savings for multi-step tasks raw turns grow O(N), summaries grow O(1) per step |
+| Skill keyword matching | Avoids bloating every LLM call with all skills only injects what's relevant to current goal |
 | Local skills override global | Project-specific deploy scripts should take precedence without needing to modify global library |
 | Goal pinned verbatim in compression | Agent must never lose sight of what it's trying to accomplish |
-| Revert is context-only | Filesystem changes are not tracked/reversible here — that's git's job. Memory revert is about correcting LLM direction, not undoing commands |
+| Revert is context-only | Filesystem changes are not tracked/reversible here that's git's job. Memory revert is about correcting LLM direction, not undoing commands |

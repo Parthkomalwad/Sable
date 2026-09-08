@@ -29,7 +29,7 @@ def store_api_key(service: str, key: str) -> None:
             replace=True,
         )
     except Exception:
-        # Keyring unavailable — caller should fall back to config.json
+        # Keyring unavailable caller should fall back to config.json
         raise RuntimeError(f"Keyring unavailable: cannot store key for {service!r}")
 
 

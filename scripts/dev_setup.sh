@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev_setup.sh — sets up a local development environment for agentic-shell
+# dev_setup.sh sets up a local development environment for agentic-shell
 # Run once after cloning: bash scripts/dev_setup.sh
 set -euo pipefail
 

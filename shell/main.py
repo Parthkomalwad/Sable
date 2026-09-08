@@ -15,7 +15,7 @@ if _original_cmd:
 
 
 def main() -> None:
-    """Shell entry point — called by the installed binary."""
+    """Shell entry point called by the installed binary."""
     import json
     import uuid
     from pathlib import Path
@@ -30,7 +30,7 @@ def main() -> None:
     if not config_path.exists():
         from shell.config.wizard import run_wizard
         run_wizard()
-        # After wizard, re-check — wizard saves the file
+        # After wizard, re-check wizard saves the file
         if not config_path.exists():
             sys.exit(0)
 
@@ -38,7 +38,7 @@ def main() -> None:
     try:
         raw = json.loads(config_path.read_text())
         config = ShellConfig.from_dict(raw)
-        # Carry api_key through as a plain attribute (not in dataclass — avoids validation issues)
+        # Carry api_key through as a plain attribute (not in dataclass avoids validation issues)
         if "api_key" in raw and raw["api_key"]:
             config.api_key = raw["api_key"]  # type: ignore[attr-defined]
     except (json.JSONDecodeError, ValueError, KeyError) as exc:
@@ -86,7 +86,7 @@ def main() -> None:
         try:
             from shell.tui.layout import create_session
             create_session(username)
-            # create_session calls os.execvp to attach — if we reach here, tmux unavailable
+            # create_session calls os.execvp to attach if we reach here, tmux unavailable
         except Exception:
             pass
 

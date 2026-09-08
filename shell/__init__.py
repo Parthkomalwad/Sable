@@ -1,1 +1,1 @@
-"""Agentic Shell Layer — top-level package."""
+"""Agentic Shell Layer top-level package."""

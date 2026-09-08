@@ -1,8 +1,8 @@
-# Clipboard / Snippets Feature — Design Spec
+# Clipboard / Snippets Feature Design Spec
 
 > **For agentic workers:** No tests required. Development only.
 
-**Goal:** Add a persistent snippet/clipboard system to AgenticOS — a sidebar panel showing saved commands, a `/clip` builtin for managing them, and click-to-run from the sidebar via tmux.
+**Goal:** Add a persistent snippet/clipboard system to AgenticOS a sidebar panel showing saved commands, a `/clip` builtin for managing them, and click-to-run from the sidebar via tmux.
 
 **Architecture:** New `shell/clipboard/` module handles TUI and logic. SQLite DB extended with a `snippets` table. Sidebar gets a new scrollable `◈ clipboard` panel between tokens and shortcuts. Arrow keys in the sidebar pane scroll the panel; Enter sends the selected snippet to the main pane.
 
@@ -47,7 +47,7 @@ def increment_use(self, snippet_id: int) -> None:
 
 ---
 
-## Sidebar Panel — `shell/telemetry/watch.py`
+## Sidebar Panel `shell/telemetry/watch.py`
 
 ### Placement
 Between `_panel_tokens` and `_panel_shortcuts` in `_render_all()`.
@@ -96,7 +96,7 @@ Since `watch.py` is a separate process, key events are communicated via a small 
 
 ---
 
-## `/clip` Builtin — `shell/loop.py`
+## `/clip` Builtin `shell/loop.py`
 
 Added to `_handle_builtin()`. Parses the following forms:
 
@@ -113,7 +113,7 @@ Parsing: simple `shlex.split()` on the remainder after `/clip`.
 
 ---
 
-## Interactive TUI — `shell/clipboard/manager.py`
+## Interactive TUI `shell/clipboard/manager.py`
 
 Single function: `open_picker(db: Database) -> None`
 
@@ -132,18 +132,18 @@ Renders a full-screen (main pane width) picker using `prompt_toolkit` `Applicati
 ```
 
 ### Key bindings inside TUI
-- `↑` / `↓` — navigate snippets
-- `/` — focus filter input (filters by note text or tag, live)
-- `a` — open inline add form: prompts command → note → tags sequentially
-- `d` — delete highlighted snippet (confirm with `y`)
-- `Enter` — send highlighted command to main pane via `tmux send-keys -t <session>:0.0`, increment use_count, exit TUI
-- `q` / `Escape` — quit TUI without running anything
+- `↑` / `↓` navigate snippets
+- `/` focus filter input (filters by note text or tag, live)
+- `a` open inline add form: prompts command → note → tags sequentially
+- `d` delete highlighted snippet (confirm with `y`)
+- `Enter` send highlighted command to main pane via `tmux send-keys -t <session>:0.0`, increment use_count, exit TUI
+- `q` / `Escape` quit TUI without running anything
 
 ### Add form (inside TUI, triggered by `a`)
 Three sequential `prompt_toolkit` prompts inline:
-1. `Command: ` — the shell command
-2. `Note: ` — short description (optional, Enter to skip)
-3. `Tags: ` — comma-separated tags (optional, Enter to skip)
+1. `Command: ` the shell command
+2. `Note: ` short description (optional, Enter to skip)
+3. `Tags: ` comma-separated tags (optional, Enter to skip)
 
 On completion, snippet saved to DB, list refreshes.
 
@@ -167,4 +167,4 @@ subprocess.run([
 | `shell/telemetry/watch.py` | Add `_panel_clipboard()`, scroll state, key file reader, `_bind_sidebar_keys()` |
 | `shell/loop.py` | Add `/clip` parsing + dispatch in `_handle_builtin()` |
 | `shell/clipboard/__init__.py` | New empty file |
-| `shell/clipboard/manager.py` | New file — `open_picker()` TUI + `run_clip_command()` parser |
+| `shell/clipboard/manager.py` | New file `open_picker()` TUI + `run_clip_command()` parser |

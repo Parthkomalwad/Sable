@@ -1,7 +1,7 @@
 """Bash executor.
 
 All commands run inside a ptyprocess so interactive programs (vim, htop, ssh)
-work correctly. cd is intercepted and handled via os.chdir() — never subprocess.
+work correctly. cd is intercepted and handled via os.chdir() never subprocess.
 Simple file-view commands (cat, head, tail of a single file) are intercepted and
 rendered with Rich syntax highlighting for a better reading experience.
 
@@ -26,7 +26,7 @@ _VIEW_RE = re.compile(r'^(cat|head|tail)\s+(-n\s*\d+\s+)?([^\s|&;<>]+)$')
 
 # Commands we intercept for Rich ls rendering.
 # Allowed flags: l(ong) a(ll) h(uman) A(lmost-all) F(classify) s(size) 1(one-per-line).
-# -R (recursive) and --color are intentionally excluded — fall through to pty.
+# -R (recursive) and --color are intentionally excluded fall through to pty.
 _LS_RE = re.compile(r'^ls(\s+(-[lahAFs1]+))?\s*([^\s|&;<>]*)$')
 
 # Track previous directory for 'cd -' command
@@ -172,7 +172,7 @@ def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
         old_settings = termios.tcgetattr(fd)
         tty.setraw(fd)
     except Exception:
-        pass  # Not a tty (e.g. piped input) — skip raw mode
+        pass  # Not a tty (e.g. piped input) skip raw mode
 
     output = []
     try:
@@ -187,7 +187,7 @@ def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
                 try:
                     chunk = proc.read(4096)
                     if old_settings:
-                        # In raw mode \n doesn't add \r — fix newlines
+                        # In raw mode \n doesn't add \r fix newlines
                         chunk = chunk.replace("\n", "\r\n")
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
@@ -232,7 +232,7 @@ def execute_bash(command: str, cwd: str) -> tuple[int, str]:
     """
     stripped = command.strip()
 
-    # cd interception — MUST use os.chdir, never subprocess
+    # cd interception MUST use os.chdir, never subprocess
     if stripped.startswith("cd"):
         global _prev_cwd
         rest = stripped[2:].strip()

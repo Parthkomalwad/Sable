@@ -1,4 +1,4 @@
-# Orchestrator Agent — Design Document
+# Orchestrator Agent Design Document
 
 **Date:** 2026-04-06
 **Status:** Approved for implementation
@@ -15,8 +15,8 @@ The main REPL agent is too limited: it makes a single LLM call, emits one shell 
 
 Two changes on top of the existing v3 codebase:
 
-1. **OrchestratorAgent** — a multi-turn reasoning loop that replaces the single LLM call in `loop.py`. It acts directly for simple tasks and spawns `TaskAgent`s for long-running or parallelizable work.
-2. **Shared task folder with per-agent write isolation** — one folder per user request; sub-agents share read access but write only to their own subfolder.
+1. **OrchestratorAgent** a multi-turn reasoning loop that replaces the single LLM call in `loop.py`. It acts directly for simple tasks and spawns `TaskAgent`s for long-running or parallelizable work.
+2. **Shared task folder with per-agent write isolation** one folder per user request; sub-agents share read access but write only to their own subfolder.
 
 ---
 
@@ -39,9 +39,9 @@ loop.py REPL
 **New file:** `shell/tasks/orchestrator.py`
 
 **Changed files:**
-- `loop.py` — NL branch replaced with `OrchestratorAgent.run()`
-- `shell/tasks/sandbox.py` — add `shared_read_dir` parameter
-- `shell/tasks/manager.py` — add `task_base_dir` parameter to `spawn()`
+- `loop.py` NL branch replaced with `OrchestratorAgent.run()`
+- `shell/tasks/sandbox.py` add `shared_read_dir` parameter
+- `shell/tasks/manager.py` add `task_base_dir` parameter to `spawn()`
 
 **Unchanged:** `TaskAgent`, all LLM backends, `safety.py`, `router.py`, `executor.py`, `watch.py`
 
@@ -65,7 +65,7 @@ OrchestratorAgent(
 
 On init:
 - Generates a task slug: `<sanitized-goal-prefix>-<YYYYMMDD>` (e.g. `build-react-app-20260406`)
-- Does **not** create the task folder yet — creation is lazy
+- Does **not** create the task folder yet creation is lazy
 - Task folder `tasks/<slug>/` is created only when the first `spawn` action is triggered
 - Simple tasks that never spawn leave no folder on disk
 
@@ -105,7 +105,7 @@ The orchestrator's system prompt instructs the LLM to respond with one of three 
 - Print `[spawning agent: <name>]`
 - Write handoff file to `tasks/<slug>/<name>/.agentic/handoff.txt` containing: original goal + orchestrator history summary + sub-agent's specific goal
 - Call `task_manager.spawn(name=<name>, goal=<goal>, task_base_dir=tasks/<slug>/)`
-- Continue loop (non-blocking — orchestrator does not wait)
+- Continue loop (non-blocking orchestrator does not wait)
 
 **`done`:**
 - Print explanation to user
@@ -115,8 +115,8 @@ The orchestrator's system prompt instructs the LLM to respond with one of three 
 ### Sub-agent Monitoring
 
 Each turn, before calling LLM, orchestrator reads:
-- `tasks/<slug>/<agent-name>/.agentic/status.md` — injected as `[agent <name> status]` message
-- `tasks/<slug>/<agent-name>/.agentic/result.md` — if exists, injected as `[agent <name> result]` and marked consumed
+- `tasks/<slug>/<agent-name>/.agentic/status.md` injected as `[agent <name> status]` message
+- `tasks/<slug>/<agent-name>/.agentic/result.md` if exists, injected as `[agent <name> result]` and marked consumed
 
 ### Interruption
 
@@ -164,7 +164,7 @@ Ctrl+C during orchestrator loop → `KeyboardInterrupt` caught → print `[inter
 
 **Python-layer fallback (bash guard script):**
 - Current behavior: blocks writes outside `task_dir`
-- New behavior: additionally allows reads from `shared_read_dir` explicitly (no change needed — reads are already allowed everywhere; the guard only blocks writes)
+- New behavior: additionally allows reads from `shared_read_dir` explicitly (no change needed reads are already allowed everywhere; the guard only blocks writes)
 - No code change needed for reads in the Python fallback path
 
 **bwrap path:**
@@ -208,7 +208,7 @@ except KeyboardInterrupt:
     _out("[interrupted]")
 ```
 
-**Confirm/edit/cancel prompt** (`_display_command_preview`) moves into `OrchestratorAgent` — called before every `run` action.
+**Confirm/edit/cancel prompt** (`_display_command_preview`) moves into `OrchestratorAgent` called before every `run` action.
 
 **Telemetry** (`_log_event`, `_write_audit_log`, budget check) called inside orchestrator per turn, same as today.
 
@@ -218,7 +218,7 @@ except KeyboardInterrupt:
 
 ## Acceptance Criteria
 
-1. `"list files here"` → orchestrator runs `ls`, shows result, done in 1 turn — no task folder created
+1. `"list files here"` → orchestrator runs `ls`, shows result, done in 1 turn no task folder created
 2. `"build a React app with Docker"` → orchestrator creates task folder, spawns at least one sub-agent, monitors it, reports done when sub-agent finishes
 3. Sub-agent can read files from sibling agent's workspace but cannot write there (verified via sandbox)
 4. Ctrl+C during orchestrator loop returns to REPL; spawned agents continue running

@@ -1,4 +1,4 @@
-"""Sandbox — command isolation for task agents.
+"""Sandbox command isolation for task agents.
 
 Two modes depending on system support:
 
@@ -22,7 +22,7 @@ import shutil
 logger = logging.getLogger(__name__)
 _bwrap_warned = False
 
-# Commands that can write outside the workspace — we override them in bash
+# Commands that can write outside the workspace we override them in bash
 _WRITE_BLOCKLIST = [
     "cp", "mv", "rm", "rmdir", "mkdir", "touch", "ln", "chmod", "chown",
     "dd", "tee", "install", "rsync", "wget", "curl", "tar", "unzip", "zip",
@@ -107,13 +107,13 @@ yarn() {{
 pip() {{
     for arg in "$@"; do
         if [[ "$arg" == "--system" || "$arg" == "--user" ]]; then
-            echo "[sandbox] BLOCKED: pip system/user installs not allowed — use venv inside workspace" >&2; return 1
+            echo "[sandbox] BLOCKED: pip system/user installs not allowed use venv inside workspace" >&2; return 1
         fi
     done
     command pip "$@"
 }}
 
-# Redirect redirections (>) — enforced via shell option + ERR trap is not enough,
+# Redirect redirections (>) enforced via shell option + ERR trap is not enough,
 # so we wrap the user command in a subshell with WORKSPACE exported so scripts
 # that respect it behave correctly.
 export WORKSPACE
@@ -139,7 +139,7 @@ class Sandbox:
         if shutil.which("bwrap") is None:
             if not _bwrap_warned:
                 logger.warning(
-                    "bwrap not found — using bash-wrapper write interception as fallback"
+                    "bwrap not found using bash-wrapper write interception as fallback"
                 )
                 _bwrap_warned = True
             return False
@@ -155,7 +155,7 @@ class Sandbox:
             pass
         if not _bwrap_warned:
             logger.warning(
-                "bwrap present but user namespaces unavailable — "
+                "bwrap present but user namespaces unavailable "
                 "falling back to bash-wrapper write interception"
             )
             _bwrap_warned = True

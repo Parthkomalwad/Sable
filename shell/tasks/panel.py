@@ -1,4 +1,4 @@
-"""Tasks panel — runs in the bottom tmux pane.
+"""Tasks panel runs in the bottom tmux pane.
 
 Polls the tasks table every 3 seconds and renders a live Rich table.
 """

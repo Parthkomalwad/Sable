@@ -1,4 +1,4 @@
-"""PatternWatcher — session-end observer for command pattern detection.
+"""PatternWatcher session-end observer for command pattern detection.
 
 Called at /exit. Reads audit.log, groups commands by repo path and intent
 keywords, upserts skill_patterns table, returns patterns that crossed

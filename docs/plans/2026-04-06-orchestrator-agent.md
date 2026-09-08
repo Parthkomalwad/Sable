@@ -14,7 +14,7 @@
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| `shell/tasks/orchestrator.py` | **Create** | OrchestratorAgent class — reasoning loop, action dispatch, sub-agent monitoring |
+| `shell/tasks/orchestrator.py` | **Create** | OrchestratorAgent class reasoning loop, action dispatch, sub-agent monitoring |
 | `shell/tasks/sandbox.py` | **Modify** | Add `shared_read_dir` param to `__init__` and `wrap_command` |
 | `shell/tasks/manager.py` | **Modify** | Add `task_base_dir` param to `spawn()` |
 | `shell/loop.py` | **Modify** | Replace NL path (lines 1113–1221) with `OrchestratorAgent.run()` |
@@ -79,7 +79,7 @@ def test_bash_guard_no_change_when_shared(tmp_path):
     # Force bash-wrapper mode
     sb.use_bwrap = False
     cmd = sb.wrap_command("echo hi")
-    # Should still contain the guard template — no crash, no KeyError
+    # Should still contain the guard template no crash, no KeyError
     assert "WORKSPACE" in cmd
     assert "echo hi" in cmd
 ```
@@ -91,7 +91,7 @@ cd /path/to/AgenticOS
 pytest tests/unit/test_sandbox_shared_read.py -v
 ```
 
-Expected: `FAILED` — `Sandbox.__init__` does not accept `shared_read_dir`.
+Expected: `FAILED` `Sandbox.__init__` does not accept `shared_read_dir`.
 
 - [ ] **Step 3: Implement `shared_read_dir` in Sandbox**
 
@@ -221,7 +221,7 @@ def test_spawn_without_task_base_dir_uses_global(tmp_path):
 pytest tests/unit/test_task_manager.py -v
 ```
 
-Expected: `FAILED` — `spawn()` does not accept `task_base_dir`.
+Expected: `FAILED` `spawn()` does not accept `task_base_dir`.
 
 - [ ] **Step 3: Implement `task_base_dir` in `TaskManager.spawn()`**
 
@@ -440,7 +440,7 @@ def test_build_messages_pins_goal(tmp_path):
 
 def test_collect_agent_status_empty(tmp_path):
     orch = _make_orchestrator(tmp_path)
-    # No task folder yet — should return empty list
+    # No task folder yet should return empty list
     summaries = orch._collect_agent_statuses()
     assert summaries == []
 ```
@@ -451,12 +451,12 @@ def test_collect_agent_status_empty(tmp_path):
 pytest tests/unit/test_orchestrator.py -v
 ```
 
-Expected: all `FAILED` — `shell.tasks.orchestrator` does not exist.
+Expected: all `FAILED` `shell.tasks.orchestrator` does not exist.
 
 - [ ] **Step 3: Create `shell/tasks/orchestrator.py`**
 
 ```python
-"""OrchestratorAgent — multi-turn reasoning loop for the main REPL.
+"""OrchestratorAgent multi-turn reasoning loop for the main REPL.
 
 Replaces the single LLM call in loop.py for NL-routed input.
 Each turn the LLM returns one action: run | spawn | done.
@@ -475,14 +475,14 @@ _SYSTEM_PROMPT = """You are an orchestrator shell agent running on Linux.
 The user has asked you to accomplish a goal. Reason step by step.
 
 Rules:
-1. Act directly (action=run) for simple, fast tasks — a single command or a few commands.
+1. Act directly (action=run) for simple, fast tasks a single command or a few commands.
 2. Spawn a sub-agent (action=spawn) ONLY for long-running work (>30s estimated) or work that can run in parallel. Give each sub-agent a focused, self-contained goal.
-3. After spawning, continue your loop — check sub-agent status each turn.
+3. After spawning, continue your loop check sub-agent status each turn.
 4. When the goal is fully achieved, emit action=done.
 5. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
 6. Never cd outside the current working directory.
 
-Respond with JSON only — no markdown, no extra text:
+Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>"}
 {"action": "spawn", "name": "<slug-name>", "goal": "<full goal for sub-agent>", "explanation": "<why delegating>"}
 {"action": "done", "explanation": "<summary of what was accomplished>"}
@@ -513,7 +513,7 @@ class OrchestratorAgent:
         self._task_manager = task_manager
         self._slug = _make_slug(goal)
         self._tasks_base = Path(config.tasks_base_dir).expanduser()
-        self._task_dir: Path | None = None  # lazy — created only on first spawn
+        self._task_dir: Path | None = None  # lazy created only on first spawn
         self._history: list[dict] = []      # orchestrator's own turn history
         self._spawned: list[str] = []       # names of spawned sub-agents
 
@@ -543,11 +543,11 @@ class OrchestratorAgent:
                 self._handle_done(action)
                 break
             else:
-                _out(f"[orchestrator] unknown action '{action['action']}' — stopping")
+                _out(f"[orchestrator] unknown action '{action['action']}' stopping")
                 break
 
         else:
-            _out(f"[orchestrator] reached {_MAX_TURNS} turn limit — stopping")
+            _out(f"[orchestrator] reached {_MAX_TURNS} turn limit stopping")
 
     # ------------------------------------------------------------------
     # Action handlers
@@ -584,7 +584,7 @@ class OrchestratorAgent:
         goal = action.get("goal", "").strip()
         explanation = action.get("explanation", "")
         if not name or not goal:
-            _out("[orchestrator] spawn action missing name or goal — skipping")
+            _out("[orchestrator] spawn action missing name or goal skipping")
             return
 
         # Lazy-create shared task dir on first spawn
@@ -711,7 +711,7 @@ class OrchestratorAgent:
 
     def _extract_raw(self, response) -> str:
         """Extract raw JSON string from LLMResponse."""
-        # LLMResponse for orchestrator — the backend stores the full raw JSON
+        # LLMResponse for orchestrator the backend stores the full raw JSON
         # in explanation since we use a different schema here.
         # Try explanation field first (backends store full response text there
         # when command is empty), then fall back to reconstructing from fields.
@@ -720,7 +720,7 @@ class OrchestratorAgent:
         stripped = raw.strip()
         if stripped.startswith("{"):
             return stripped
-        # Otherwise the backend may have parsed it partially — reconstruct
+        # Otherwise the backend may have parsed it partially reconstruct
         cmd = getattr(response, "command", "")
         done = getattr(response, "done", False)
         spawn = getattr(response, "spawn", None)
@@ -911,7 +911,7 @@ def test_nl_path_uses_orchestrator(tmp_path):
     assert len(orchestrator_run_called) == 1
 ```
 
-- [ ] **Step 2: Run test to confirm it passes (it should — just validates imports work)**
+- [ ] **Step 2: Run test to confirm it passes (it should just validates imports work)**
 
 ```bash
 pytest tests/unit/test_loop_orchestrator_wiring.py -v
@@ -951,7 +951,7 @@ In `shell/loop.py`, replace lines 1107–1221 (the entire NL handling block from
             _save_turns_if_needed(turns, session_id, config)
 ```
 
-Also fix the `db_path` argument — `Database` stores its path. Update to pass it correctly. In `shell/loop.py` around line 1020 where `db = Database()` is called, check how `DB_PATH` is accessed:
+Also fix the `db_path` argument `Database` stores its path. Update to pass it correctly. In `shell/loop.py` around line 1020 where `db = Database()` is called, check how `DB_PATH` is accessed:
 
 ```python
             from shell.tasks.manager import TaskManager

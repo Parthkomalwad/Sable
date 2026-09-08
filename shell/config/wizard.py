@@ -56,9 +56,9 @@ def run_wizard() -> None:
 
     # Backend selection
     console.print("[bold]Available backends:[/bold]")
-    console.print("  1. ollama  — local model (free, no API key)")
-    console.print("  2. openai  — OpenAI API (gpt-4o, gpt-4o-mini, ...)")
-    console.print("  3. anthropic — Anthropic API (claude-...)")
+    console.print("  1. ollama  local model (free, no API key)")
+    console.print("  2. openai  OpenAI API (gpt-4o, gpt-4o-mini, ...)")
+    console.print("  3. anthropic Anthropic API (claude-...)")
     console.print()
 
     backend_choice = _ask("Backend [ollama/openai/anthropic]:", default="ollama")
@@ -93,8 +93,8 @@ def run_wizard() -> None:
     # Routing mode
     console.print()
     console.print("[bold]Routing modes:[/bold]")
-    console.print("  auto   — shell heuristic decides bash vs AI automatically")
-    console.print("  prefix — use '>>' prefix to invoke AI explicitly")
+    console.print("  auto   shell heuristic decides bash vs AI automatically")
+    console.print("  prefix use '>>' prefix to invoke AI explicitly")
     routing_mode = _ask("Routing mode [auto/prefix]:", default="auto")
     if routing_mode not in {"auto", "prefix"}:
         routing_mode = "auto"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_in_docker.sh — build the dev Docker image and run integration tests inside it
+# run_in_docker.sh build the dev Docker image and run integration tests inside it
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

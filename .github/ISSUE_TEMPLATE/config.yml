@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Parthkomalwad/Agentic_OS/blob/main/SECURITY.md
+    about: Please report privately as described in SECURITY.md.
+  - name: Roadmap & design docs
+    url: https://github.com/Parthkomalwad/Agentic_OS/blob/main/ROADMAP.md
+    about: Check whether your idea is already planned before opening a request.

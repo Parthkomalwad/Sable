@@ -1,4 +1,4 @@
-"""SkillIndex — manages skills_index.json.
+"""SkillIndex manages skills_index.json.
 
 Created automatically on first use (no separate init step needed).
 Tracks: name, file, keywords, auto_generated, confidence, use_count,

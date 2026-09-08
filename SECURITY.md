@@ -6,7 +6,7 @@ AgenticOS runs as a login shell and can execute commands proposed by a language 
 
 Email **parthkomalwad99@gmail.com** with the subject `AgenticOS security`. Include reproduction steps, affected version/commit, and impact. You will get an acknowledgement within 72 hours. Please do not open a public issue.
 
-## Scope — what we consider a vulnerability
+## Scope: what we consider a vulnerability
 
 - Any way for content the model reads (command output, files, web pages, MCP results) to cause a command to execute without the user's confirmation tier being honoured (prompt/output injection).
 - Sandbox escape from a task workspace (bwrap or bash-wrapper mode).

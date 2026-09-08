@@ -16,7 +16,7 @@ OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
 class OpenAIBackend(LLMBackend):
-    """OpenAI backend — connects to the OpenAI API."""
+    """OpenAI backend connects to the OpenAI API."""
 
     def __init__(self, api_key: str, model: str) -> None:
         """
@@ -80,7 +80,7 @@ class OpenAIBackend(LLMBackend):
                         prompt_tokens = usage.get("prompt_tokens", 0)
                         completion_tokens = usage.get("completion_tokens", 0)
 
-        # Parse JSON from model response — fallback chain
+        # Parse JSON from model response fallback chain
         try:
             parsed = parse_llm_json(full_text)
         except ValueError:

@@ -4,13 +4,13 @@
 
 **Goal:** Transform `shell/loop.py` to render a Powerline-style prompt, `✦ thinking...` indicator, styled explanation+command preview, and `✓/✗` post-execution timing summary.
 
-**Architecture:** All changes are confined to `shell/loop.py`. Five targeted additions: `_render_prompt()`, a `✦ thinking...` write before the LLM call, a rewritten `_display_command_preview()`, timing instrumentation around `execute_bash()`, and last-exit-code tracking for the prompt cursor color. No new dependencies — uses only `sys.stdout.write`, `subprocess`, `time`, and existing `prompt_toolkit HTML()`.
+**Architecture:** All changes are confined to `shell/loop.py`. Five targeted additions: `_render_prompt()`, a `✦ thinking...` write before the LLM call, a rewritten `_display_command_preview()`, timing instrumentation around `execute_bash()`, and last-exit-code tracking for the prompt cursor color. No new dependencies uses only `sys.stdout.write`, `subprocess`, `time`, and existing `prompt_toolkit HTML()`.
 
 **Tech Stack:** Python 3, prompt_toolkit (already imported), subprocess (already imported), time (stdlib), sys.stdout.write (already used throughout)
 
 ---
 
-### Task 1: Add `_render_prompt()` — Powerline segments
+### Task 1: Add `_render_prompt()` Powerline segments
 
 **Files:**
 - Modify: `shell/loop.py` (add function after `_out()`, replace prompt string in `start()`)
@@ -125,7 +125,7 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
 
     hhmm = _time.strftime("%H:%M")
 
-    # Path segment — soft blue bg (#005f87 = 24)
+    # Path segment soft blue bg (#005f87 = 24)
     path_seg = (
         '\033[48;5;24m\033[97m'   # blue bg, bright white fg
         f' {display_cwd} '
@@ -133,7 +133,7 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
         '\033[38;5;24m\033[48;5;55m\ue0b0\033[0m'  # powerline arrow (Unicode or space fallback)
     )
 
-    # Git segment — soft purple bg (55)
+    # Git segment soft purple bg (55)
     git_seg = ""
     if branch:
         git_seg = (
@@ -143,14 +143,14 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
             '\033[38;5;55m\033[48;5;236m\ue0b0\033[0m'
         )
 
-    # Time segment — dark grey bg (236)
+    # Time segment dark grey bg (236)
     time_seg = (
         '\033[48;5;236m\033[2;37m'
         f' {hhmm} '
         '\033[0m '
     )
 
-    # Cursor — white normally, red if last exit non-zero
+    # Cursor white normally, red if last exit non-zero
     if last_exit != 0:
         cursor = '\033[38;5;203m❯\033[0m'
     else:
@@ -178,7 +178,7 @@ rtk git add shell/loop.py tests/unit/test_loop_prompt.py && rtk git commit -m "f
 ### Task 2: Track last exit code and wire prompt into `start()`
 
 **Files:**
-- Modify: `shell/loop.py` — `start()` function
+- Modify: `shell/loop.py` `start()` function
 
 - [ ] **Step 1: Write the failing test**
 
@@ -224,7 +224,7 @@ user_input = session.prompt(
 )
 ```
 
-Note: `session.prompt()` accepts a plain string (with ANSI codes) directly — no HTML() wrapper needed since `_render_prompt()` returns raw ANSI.
+Note: `session.prompt()` accepts a plain string (with ANSI codes) directly no HTML() wrapper needed since `_render_prompt()` returns raw ANSI.
 
 Also add `global _last_exit` at the top of `start()`:
 
@@ -252,7 +252,7 @@ rtk git add shell/loop.py tests/unit/test_loop_prompt.py && rtk git commit -m "f
 ### Task 3: Add `✦ thinking...` indicator before LLM call
 
 **Files:**
-- Modify: `shell/loop.py` — agentic branch inside `start()`
+- Modify: `shell/loop.py` agentic branch inside `start()`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -366,7 +366,7 @@ rtk git add shell/loop.py tests/unit/test_loop_thinking.py && rtk git commit -m 
 ### Task 4: Rewrite `_display_command_preview()` with styled output
 
 **Files:**
-- Modify: `shell/loop.py` — `_display_command_preview()`
+- Modify: `shell/loop.py` `_display_command_preview()`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -529,7 +529,7 @@ rtk git add shell/loop.py tests/unit/test_loop_preview.py && rtk git commit -m "
 ### Task 5: Add post-execution timing summary (`✓/✗ done in Xs`)
 
 **Files:**
-- Modify: `shell/loop.py` — `start()` function, agentic and bash execution paths
+- Modify: `shell/loop.py` `start()` function, agentic and bash execution paths
 
 - [ ] **Step 1: Write the failing test**
 
@@ -586,7 +586,7 @@ Add this function after `_write_thinking()` in `shell/loop.py`:
 def _print_exec_result(exit_code: int, elapsed: float) -> None:
     """Print ✓ done in Xs or ✗ exit N (Xs) after command execution.
 
-    Only called for agentic commands — pure bash gets no chrome.
+    Only called for agentic commands pure bash gets no chrome.
     """
     GREEN = '\033[38;5;114m'
     RED = '\033[38;5;203m'
@@ -730,6 +730,6 @@ Spec section → Plan task coverage:
 | `✗ exit N (Xs)` on failure | Task 5 |
 | Pure bash: zero chrome | Task 5 (agentic-only `_print_exec_result`) |
 | Color palette (ANSI 256) | Tasks 1, 3, 4, 5 |
-| No new dependencies | All tasks — only stdlib + existing imports |
+| No new dependencies | All tasks only stdlib + existing imports |
 | `_render_prompt()` in loop.py | Task 1 |
 | `_last_exit` tracking | Task 2, 5 |

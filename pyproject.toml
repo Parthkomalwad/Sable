@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-os"
+version = "0.3.0"
+description = "A Linux login shell that understands plain English, runs sandboxed agents, and learns your server."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Parth Komalwad", email = "parthkomalwad99@gmail.com" }]
+requires-python = ">=3.11"
+keywords = ["shell", "llm", "agents", "tmux", "devops", "mcp"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Shells",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = [
+  "prompt_toolkit>=3.0.43",
+  "pygments>=2.17",
+  "ptyprocess>=0.7.0",
+  "httpx>=0.27",
+  "httpx-sse>=0.4",
+  "rich>=13.7",
+  "tiktoken==0.9.0",
+  "libtmux>=0.55,<0.56",
+  "token-reducer>=0.2.0",
+  "secretstorage>=3.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-timeout>=2.3"]
+
+[project.urls]
+Homepage = "https://github.com/Parthkomalwad/Agentic_OS"
+Roadmap = "https://github.com/Parthkomalwad/Agentic_OS/blob/main/ROADMAP.md"
+Issues = "https://github.com/Parthkomalwad/Agentic_OS/issues"
+Changelog = "https://github.com/Parthkomalwad/Agentic_OS/blob/main/CHANGELOG.md"
+
+[project.scripts]
+agentic-shell = "shell.main:main"
+
+[tool.setuptools.packages.find]
+include = ["shell*"]
+
+[tool.setuptools.package-data]
+"shell.llm" = ["pricing.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+timeout = 60
+markers = [
+  "integration: requires Linux, tmux and Docker (deselect with -m 'not integration')",
+]

@@ -1,4 +1,4 @@
-"""Safety guard — runs every command through blocklist and entropy checks.
+"""Safety guard runs every command through blocklist and entropy checks.
 
 Applied on both the bash path and the agentic path before any execution.
 
@@ -22,7 +22,7 @@ DESTRUCTIVE_PATTERNS: list[str] = [
     r"\bfdisk\b.*(/dev/)",             # partition a device
     r">\s*/dev/sd[a-z]\b",            # redirect into raw disk
     r">\s*/dev/nvme\d",               # redirect into nvme disk
-    # Recursive deletion — any path
+    # Recursive deletion any path
     r"\brm\s+-[^\s]*r[^\s]*\s+\S",   # rm -rf <anything>
     # Pipe-to-shell (arbitrary code execution from network)
     r"\bcurl\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b",

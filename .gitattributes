@@ -4,3 +4,12 @@
 # Shell scripts must use LF on checkout
 *.sh text eol=lf
 *.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+Dockerfile* text eol=lf
+.editorconfig text eol=lf
+CODEOWNERS text eol=lf
+*.png binary

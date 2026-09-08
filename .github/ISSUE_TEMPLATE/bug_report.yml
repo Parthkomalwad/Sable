@@ -1,0 +1,46 @@
+name: Bug report
+description: Something misbehaved in the shell, an agent, or the sidebar
+labels: ["bug", "triage"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: v0.3.0 or git sha
+    validations:
+      required: true
+  - type: dropdown
+    id: env
+    attributes:
+      label: Environment
+      options: ["Linux server (install.sh)", "Docker playground", "WSL2", "Devcontainer", "Other"]
+    validations:
+      required: true
+  - type: input
+    id: backend
+    attributes:
+      label: LLM backend and model
+      placeholder: ollama / llama3.1
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the input line, the block/confirm prompt you saw, and the outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output / audit log / `/task <name> events`
+      render: text
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security
+      options:
+        - label: This is NOT a security issue (otherwise follow SECURITY.md instead of filing here)
+          required: true

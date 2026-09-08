@@ -1,4 +1,4 @@
-"""Clipboard/snippet manager — interactive TUI picker and CLI parsing."""
+"""Clipboard/snippet manager interactive TUI picker and CLI parsing."""
 from __future__ import annotations
 
 import os
@@ -157,7 +157,7 @@ def _cmd_run(args: list[str], db: "Database") -> None:
         return
     session = _get_tmux_session()
     if not session:
-        sys.stdout.write(f"  {RED}not in a tmux session — cannot send to pane{RESET}\n\n")
+        sys.stdout.write(f"  {RED}not in a tmux session cannot send to pane{RESET}\n\n")
         sys.stdout.flush()
         return
     db.increment_use(snippet_id)
@@ -282,7 +282,7 @@ def open_picker(db: "Database") -> None:
         s = visible[selected[0]]
         session = _get_tmux_session()
         if not session:
-            message[0] = "not in tmux — cannot send to pane"
+            message[0] = "not in tmux cannot send to pane"
             return
         db.increment_use(s["id"])
         _send_to_main_pane(s["command"], session)

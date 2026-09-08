@@ -84,7 +84,7 @@ def render_settings_panel(config: object) -> object | None:
     rc.print()
     rc.print(Panel(
         "[bold]Edit settings[/bold]\n[dim]Leave blank to keep current value. Ctrl+C to cancel.[/dim]",
-        title="[bold cyan]/config — Settings[/bold cyan]",
+        title="[bold cyan]/config Settings[/bold cyan]",
         border_style="cyan",
     ))
     rc.print()

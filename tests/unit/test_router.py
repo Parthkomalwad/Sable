@@ -3,7 +3,7 @@
 Tests the classify() function with 30+ inputs covering:
 - Clear bash commands
 - Clear NL inputs
-- Edge cases (e.g. 'find large log files' — first word is a binary but rest is English)
+- Edge cases (e.g. 'find large log files' first word is a binary but rest is English)
 - Prefix mode ('>>' prefix)
 - Ambiguous inputs
 
@@ -90,7 +90,7 @@ class TestAutoModeNL:
 
 class TestEdgeCases:
     def test_find_large_log_files_routes_agentic(self):
-        # 'find' is a known binary, but rest is English prose — should be agentic
+        # 'find' is a known binary, but rest is English prose should be agentic
         assert classify("find large log files") == Route.AGENTIC
 
     def test_find_with_flags_routes_bash(self):

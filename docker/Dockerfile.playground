@@ -1,4 +1,4 @@
-# Playground image — interactive dev/test environment for Windows/macOS hosts.
+# Playground image interactive dev/test environment for Windows/macOS hosts.
 # Adds what the production image lacks for full-feature testing:
 #   bubblewrap (real sandbox), openssh-server (SSH bypass test), git, procps.
 #

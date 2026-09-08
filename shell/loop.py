@@ -92,7 +92,7 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
 
     hhmm = _time.strftime("%H:%M")
 
-    # Path segment — soft blue bg (#005f87 = 24)
+    # Path segment soft blue bg (#005f87 = 24)
     path_seg = (
         '\033[48;5;24m\033[97m'   # blue bg, bright white fg
         f' {display_cwd} '
@@ -100,7 +100,7 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
         '\033[38;5;24m\033[48;5;55m\ue0b0\033[0m'  # powerline arrow (Unicode or space fallback)
     )
 
-    # Git segment — soft purple bg (55)
+    # Git segment soft purple bg (55)
     git_seg = ""
     if branch:
         git_seg = (
@@ -110,14 +110,14 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
             '\033[38;5;55m\033[48;5;236m\ue0b0\033[0m'
         )
 
-    # Time segment — dark grey bg (236)
+    # Time segment dark grey bg (236)
     time_seg = (
         '\033[48;5;236m\033[2;37m'
         f' {hhmm} '
         '\033[0m '
     )
 
-    # Cursor — white normally, red if last exit non-zero
+    # Cursor white normally, red if last exit non-zero
     if last_exit != 0:
         cursor = '\033[38;5;203m❯\033[0m'
     else:
@@ -126,7 +126,7 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
     return path_seg + git_seg + time_seg + cursor + ' '
 
 
-# One-shot bash bypass flag — set by Ctrl+B, cleared after one command
+# One-shot bash bypass flag set by Ctrl+B, cleared after one command
 _bypass_next: bool = False
 _offline_mode: bool = False
 _budget_hard_stop: bool = False
@@ -234,7 +234,7 @@ def _check_and_enforce_budget(db, config: ShellConfig, session_id: str) -> bool:
             _out("Budget limit reached. LLM calls disabled. Use '/budget reset' to clear.")
             return False
         elif status == "WARNING":
-            _out("Warning: Budget at 80%+ — approaching limit.")
+            _out("Warning: Budget at 80%+ approaching limit.")
     except Exception:
         pass
     return True
@@ -347,7 +347,7 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
             db._conn.commit()
         except Exception:
             pass
-        _out("done — all task folders deleted")
+        _out("done all task folders deleted")
         return True
 
     if sub == "list":
@@ -355,7 +355,7 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
         if not tasks:
             _out("no tasks")
         for t in tasks:
-            _out(f"  [{t['status']}] {t['name']} — {t['goal'][:60]}")
+            _out(f"  [{t['status']}] {t['name']} {t['goal'][:60]}")
         return True
 
     if sub == "new" and len(parts) >= 3:
@@ -481,9 +481,9 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
         new_mode = "prefix" if current == "auto" else "auto"
         config.routing_mode = new_mode
         if new_mode == "prefix":
-            _out("Routing mode: prefix — prefix your request with >> to send to LLM")
+            _out("Routing mode: prefix prefix your request with >> to send to LLM")
         else:
-            _out("Routing mode: auto — shell auto-detects bash vs natural language")
+            _out("Routing mode: auto shell auto-detects bash vs natural language")
         return True
 
     if cmd == "/new":
@@ -622,7 +622,7 @@ def _show_stats(db) -> None:
         return
     try:
         rows = db.get_stats(days=7)
-        _out("\nToken Usage — Last 7 Days")
+        _out("\nToken Usage Last 7 Days")
         _out(f"{'Day':<12} {'Calls':>6} {'Tokens':>8} {'Cost':>10}")
         _out("-" * 40)
         for r in rows:
@@ -686,7 +686,7 @@ def _handle_memory_builtin(subcmd: str, session_id: str, turns: list[dict]) -> N
         turns.extend(raw)
         # Also save as new snapshot so it shows in versions list
         save_session_context(session_id, snap["compressed"], raw, len(snap["compressed"].split()))
-        _out(f"reverted to version {vid} — {len(raw)} turns restored")
+        _out(f"reverted to version {vid} {len(raw)} turns restored")
         _out(f"context preview: {snap['compressed'][:200]}")
         return
 
@@ -713,7 +713,7 @@ def _handle_memory_builtin(subcmd: str, session_id: str, turns: list[dict]) -> N
 def _start_new_session() -> None:
     import subprocess, shutil, time
     if not shutil.which("tmux"):
-        _out("tmux not found — restarting shell process.")
+        _out("tmux not found restarting shell process.")
         os.execv(sys.executable, [sys.executable, "-m", "shell.main"])
         return
 
@@ -763,14 +763,14 @@ def _start_new_session() -> None:
             f"trap '' INT; clear; while true; do PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 {venv_python} -m shell.tasks.panel; sleep 2; done",
             "Enter"], check=True)
 
-        # Shell in main pane — AGENTIC_NEW_SESSION=1 skips session resume
+        # Shell in main pane AGENTIC_NEW_SESSION=1 skips session resume
         subprocess.run(["tmux", "send-keys", "-t", main_pane,
-            f"trap '' INT; EXIT_FLAG=$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"$EXIT_FLAG\"; clear; PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 AGENTIC_NEW_SESSION=1 {venv_python} -m shell.main; AGENTIC_NEW_SESSION=''; if [ -f \"$EXIT_FLAG\" ]; then rm -f \"$EXIT_FLAG\"; echo 'dropping to bash — run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited — restarting in 2s]'; sleep 2; done",
+            f"trap '' INT; EXIT_FLAG=$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"$EXIT_FLAG\"; clear; PYTHONPATH={install_dir} PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 AGENTIC_NEW_SESSION=1 {venv_python} -m shell.main; AGENTIC_NEW_SESSION=''; if [ -f \"$EXIT_FLAG\" ]; then rm -f \"$EXIT_FLAG\"; echo 'dropping to bash run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited restarting in 2s]'; sleep 2; done",
             "Enter"], check=True)
 
         subprocess.run(["tmux", "select-pane", "-t", main_pane], check=True)
         subprocess.run(["tmux", "switch-client", "-t", new_name], check=True)
-        # Do NOT kill the old session — the SSH client is attached to it.
+        # Do NOT kill the old session the SSH client is attached to it.
         # Killing it would drop the connection. User can kill old sessions manually.
     except Exception as exc:
         _out(f"Failed to create new session: {exc}")
@@ -832,10 +832,10 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 try:
                     cwd = os.getcwd()
                 except FileNotFoundError:
-                    # cwd was deleted — fall back to home
+                    # cwd was deleted fall back to home
                     os.chdir(os.path.expanduser("~"))
                     cwd = os.getcwd()
-                    _out("[cwd deleted — moved to home]")
+                    _out("[cwd deleted moved to home]")
                 user_input = session.prompt(
                     ANSI(_render_prompt(cwd, _last_exit)),
                     in_thread=True

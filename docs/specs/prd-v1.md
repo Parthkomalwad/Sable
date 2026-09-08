@@ -1,4 +1,4 @@
-# Agentic Shell Layer — Product Requirements Document
+# Agentic Shell Layer Product Requirements Document
 
 > An intelligent login shell for any Linux server. SSH in. Your server understands plain English.
 
@@ -9,7 +9,7 @@ This document is the single source of truth for building the agentic shell layer
 ## Goals
 
 - Replace the default login shell on any Linux server with a Python process that routes input intelligently between raw bash and a language model.
-- Give the user complete visibility into what the model is doing, what it is costing, and what it has executed — directly inside the terminal, in real time.
+- Give the user complete visibility into what the model is doing, what it is costing, and what it has executed directly inside the terminal, in real time.
 - Keep accumulated context costs low through automatic session compression and resume on login.
 - Never compromise the stability of the underlying Linux server. The bash path must always work, even if the AI layer is broken, offline, or misconfigured.
 - Ship a system that can be installed on any Ubuntu 22.04+ or Debian 11+ server with a single command, with zero mandatory cloud dependencies.
@@ -21,7 +21,7 @@ This document is the single source of truth for building the agentic shell layer
 - This is not a terminal emulator. It does not replace SSH, sshd, or the PTY layer.
 - This is not an AI coding assistant. It does not read or edit files autonomously.
 - This is not a multi-agent system. One model call per user input.
-- This does not use any LLM gateway or proxy service (LiteLLM and equivalents are explicitly excluded due to supply chain risk — see risks section).
+- This does not use any LLM gateway or proxy service (LiteLLM and equivalents are explicitly excluded due to supply chain risk see risks section).
 - This does not send any telemetry, session data, or usage statistics to any external service.
 
 ---
@@ -119,7 +119,7 @@ All dependencies are MIT licensed. None have had supply chain incidents. Version
 | `httpx` | `>=0.27` | LLM HTTP calls | Replaces urllib |
 | `httpx-sse` | `>=0.4` | SSE streaming parsing | Companion to httpx |
 | `rich` | `>=13.7` | All terminal output rendering | Replaces all custom ANSI code |
-| `tiktoken` | `==0.9.0` | Token counting | Pin exact — counts must be reproducible |
+| `tiktoken` | `==0.9.0` | Token counting | Pin exact counts must be reproducible |
 | `libtmux` | `>=0.55,<0.56` | Programmatic tmux pane control | Pre-1.0, pin narrow range |
 | `token-reducer` | `>=0.2.0` | Session history compression | Downloads NLP weights on first use |
 | `secretstorage` | `>=3.3` | Linux keyring for API key storage | Phase 2 only |
@@ -303,7 +303,7 @@ JSON parse fallback chain in every backend:
 
 Each backend implementation handles SSE streaming with `httpx-sse`. Token counts are extracted from the final SSE chunk. Cost is calculated locally using the pricing table in `llm/pricing.json`.
 
-**Pricing table** (`llm/pricing.json`) — update manually when prices change:
+**Pricing table** (`llm/pricing.json`) update manually when prices change:
 
 ```json
 {
@@ -319,13 +319,13 @@ Each backend implementation handles SSE streaming with `httpx-sse`. Token counts
 
 **httpx timeout:** set `timeout=httpx.Timeout(30.0)` on the AsyncClient. Default is 5 seconds, which is too short for LLM calls.
 
-**Offline fallback:** wrap every LLM call in a try/except for `httpx.TimeoutException` and `httpx.ConnectError`. On either, display `[model offline — manual mode]` in the prompt and route all input to bash until the next successful LLM call.
+**Offline fallback:** wrap every LLM call in a try/except for `httpx.TimeoutException` and `httpx.ConnectError`. On either, display `[model offline manual mode]` in the prompt and route all input to bash until the next successful LLM call.
 
 ---
 
 ### Feature 06: Safety guard
 
-Every command — bash path and agentic path — passes through `safety.py` before execution.
+Every command bash path and agentic path passes through `safety.py` before execution.
 
 **Blocklist patterns** (regex, applied to the full command string):
 
@@ -459,7 +459,7 @@ compressed · 5 turns
 180 tokens loaded
 ```
 
-`Ctrl+T` toggles the sidebar pane visibility. If the terminal width is below 100 columns, auto-hide the sidebar and notify the user on login: `[sidebar hidden — terminal too narrow]`.
+`Ctrl+T` toggles the sidebar pane visibility. If the terminal width is below 100 columns, auto-hide the sidebar and notify the user on login: `[sidebar hidden terminal too narrow]`.
 
 ---
 
@@ -579,7 +579,7 @@ On `WARNING`: print one inline line and continue. Do not interrupt the command. 
 Typing `shell stats` at the prompt (or `/stats`) displays a Rich table inline:
 
 ```
-spend — last 7 days
+spend last 7 days
 ───────────────────────────────────────────────
  date       calls   tokens    cost
 ───────────────────────────────────────────────
@@ -744,7 +744,7 @@ Format:
 2026-03-28T14:22:11Z  user=parth  session=abc123  nl="find large log files"  cmd="find / -name '*.log' -size +100M"  exit=0
 ```
 
-Create the log file and set permissions at install time. If the file is not writable (permission error), skip audit logging silently — never crash the shell because the audit log failed.
+Create the log file and set permissions at install time. If the file is not writable (permission error), skip audit logging silently never crash the shell because the audit log failed.
 
 ---
 
@@ -757,7 +757,7 @@ try:
     response = await backend.complete(messages, system_prompt)
 except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
     set_offline_mode(True)
-    console.print("[model offline — running in manual mode]", style="yellow")
+    console.print("[model offline running in manual mode]", style="yellow")
     return execute_bash(user_input, cwd)
 ```
 
@@ -815,26 +815,26 @@ echo "keep /bin/bash on a backup user before switching."
 
 ## Phased build plan
 
-### Phase 0 — repo setup (2-3 days)
+### Phase 0 repo setup (2-3 days)
 
 Create the private repo. Scaffold all files with empty class/function stubs and docstrings. Write `dev_setup.sh`. Get Docker container running. Write `.claude/commands/build-phase.md`.
 
 Milestone: repo exists, structure is locked, all files scaffold in place, nothing runs yet.
 
-### Phase 1 — core shell loop (week 2-4)
+### Phase 1 core shell loop (week 2-4)
 
 Build in this exact order:
-1. `main.py` — SSH bypass check only
-2. `executor.py` — bash path with ptyprocess, cd interception
-3. `loop.py` — prompt_toolkit REPL, prompt string with cwd, FileHistory
-4. `router.py` — classifier, prefix mode, ambiguous prompt
-5. `llm/base.py` + `llm/ollama.py` — Ollama only, hardcoded URL, streaming
-6. `safety.py` — blocklist, confirm flow
-7. `planner.py` — plan mode execution
+1. `main.py` SSH bypass check only
+2. `executor.py` bash path with ptyprocess, cd interception
+3. `loop.py` prompt_toolkit REPL, prompt string with cwd, FileHistory
+4. `router.py` classifier, prefix mode, ambiguous prompt
+5. `llm/base.py` + `llm/ollama.py` Ollama only, hardcoded URL, streaming
+6. `safety.py` blocklist, confirm flow
+7. `planner.py` plan mode execution
 
 Milestone: SSH in, type plain English, command executes. Demo-able.
 
-### Phase 2 — config, backends, telemetry (week 4-8)
+### Phase 2 config, backends, telemetry (week 4-8)
 
 1. `config/wizard.py` + `config/schema.py`
 2. `llm/openai.py` + `llm/anthropic.py`
@@ -849,7 +849,7 @@ Milestone: SSH in, type plain English, command executes. Demo-able.
 
 Milestone: all backends work, telemetry sidebar live, session compression working, budget enforcement active.
 
-### Phase 3 — hardening and distribution (week 8-13)
+### Phase 3 hardening and distribution (week 8-13)
 
 1. Performance: measure cold start, target under 300ms from SSH connect to prompt
 2. TUI settings panel
@@ -862,7 +862,7 @@ Milestone: all backends work, telemetry sidebar live, session compression workin
 
 Milestone: used as daily driver with no major issues, install script tested on fresh Ubuntu 22.04.
 
-### Phase 4 — OSS launch (week 13-16)
+### Phase 4 OSS launch (week 13-16)
 
 1. README with demo GIF
 2. DigitalOcean one-click droplet
@@ -905,12 +905,12 @@ Use `mock_llm.py` which returns canned `LLMResponse` objects for known inputs. R
 - SSH in from Termius on mobile and desktop
 - Type 10 bash commands, verify identical to raw bash
 - Type 5 NL commands, verify correct routing and execution
-- Run `vim`, `htop`, `top`, `less`, `man bash` — verify TTY passthrough
-- Run `scp` from another machine — verify it does not hang
-- Open two SSH sessions simultaneously — verify no SQLite errors
-- Kill the shell mid-command — verify server still accessible via backup user
-- Test with terminal width below 100 columns — verify sidebar hides
-- Run `shell stats` — verify table renders correctly
+- Run `vim`, `htop`, `top`, `less`, `man bash` verify TTY passthrough
+- Run `scp` from another machine verify it does not hang
+- Open two SSH sessions simultaneously verify no SQLite errors
+- Kill the shell mid-command verify server still accessible via backup user
+- Test with terminal width below 100 columns verify sidebar hides
+- Run `shell stats` verify table renders correctly
 - Test budget enforcement at 80% and 100%
 - Test `Ctrl+B` escape hatch
 - Verify audit log written correctly
@@ -928,15 +928,15 @@ Use `mock_llm.py` which returns canned `LLMResponse` objects for known inputs. R
 | Model generates valid but destructive command | High | Edit-before-run step on every agentic command. Safety guard on all commands. Dry-run option for file-touching operations. |
 | Sensitive data sent to cloud model | Medium | Privacy mode strips secrets before every LLM call. Ollama local mode is always available as a zero-exfiltration option. |
 | Python cold start latency | Medium | Lazy-load all heavy modules. tiktoken and token-reducer pre-cached at install. Target under 300ms from connect to prompt. |
-| SQLite write conflicts (multiple SSH sessions) | Medium | WAL mode enabled on first connection. One writer, many readers — no conflict in practice. |
+| SQLite write conflicts (multiple SSH sessions) | Medium | WAL mode enabled on first connection. One writer, many readers no conflict in practice. |
 | libtmux API breaking change | Medium | Pinned to narrow version range `>=0.55,<0.56`. Only upgrade deliberately after testing. |
-| Budget miscalculation due to pricing table drift | Low | Pricing JSON is in the repo and updated manually. The actual API response token counts override the local estimate for logging — pricing table only affects pre-call budget checks, not recorded costs. |
+| Budget miscalculation due to pricing table drift | Low | Pricing JSON is in the repo and updated manually. The actual API response token counts override the local estimate for logging pricing table only affects pre-call budget checks, not recorded costs. |
 
 ---
 
 ## Coding conventions
 
-All code is Python 3.10+. Use type hints on all function signatures. Use dataclasses for structured data. No global mutable state — pass config and db as arguments.
+All code is Python 3.10+. Use type hints on all function signatures. Use dataclasses for structured data. No global mutable state pass config and db as arguments.
 
 Never use `print()` directly for output. Use Rich's `Console` instance. This ensures output goes through the right channel and can be suppressed in tests.
 

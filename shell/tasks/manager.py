@@ -1,4 +1,4 @@
-"""TaskManager — task lifecycle: spawn, pause, resume, kill, attach, inspect.
+"""TaskManager task lifecycle: spawn, pause, resume, kill, attach, inspect.
 
 All operations go through SQLite and libtmux.
 """
@@ -40,7 +40,7 @@ class TaskManager:
         return datetime.now(timezone.utc).isoformat()
 
     def _find_window(self, session, window_id: str):
-        """Find a tmux window by ID — compatible with libtmux >=0.28."""
+        """Find a tmux window by ID compatible with libtmux >=0.28."""
         try:
             for w in session.windows:
                 if w.window_id == window_id:

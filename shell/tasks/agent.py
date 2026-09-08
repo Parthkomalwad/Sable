@@ -1,4 +1,4 @@
-"""TaskAgent — autonomous goal-directed REPL for background task execution.
+"""TaskAgent autonomous goal-directed REPL for background task execution.
 
 Entry point: python3 -m shell.tasks.agent --task <name> --goal "<text>"
 
@@ -33,15 +33,15 @@ _SYSTEM_PROMPT_TEMPLATE = """You are an autonomous task agent running inside a s
 All commands run with that as CWD. You have full R/W access inside it; read-only outside.
 
 Principles:
-1. NON-INTERACTIVE — every command must run without user input. Use -y/--yes/--no-interaction flags. Pipe `yes |` if needed. Never run anything that waits for a keypress.
-2. DETACHED LONG-RUNNING PROCESSES — background services (docker, dev servers) must be started detached (e.g. `docker compose up -d --build`). Check their output separately with logs commands.
-3. USE CURRENT VERSIONS — pick tool versions that match the runtime. Check Node/Python version first if unsure; use compatible package versions.
-4. ADAPT ON FAILURE — read the error, understand the root cause, try a different approach. Never repeat a failed command unchanged.
-5. CHECK BEFORE CREATE — verify files/dirs exist before creating them (ls, cat). Don't overwrite work.
-6. RELATIVE PATHS ONLY — never cd outside the workspace.
-7. SANDBOX LIMITS — `docker compose` (v2) only, no apt/dpkg, no global npm/yarn installs.
+1. NON-INTERACTIVE every command must run without user input. Use -y/--yes/--no-interaction flags. Pipe `yes |` if needed. Never run anything that waits for a keypress.
+2. DETACHED LONG-RUNNING PROCESSES background services (docker, dev servers) must be started detached (e.g. `docker compose up -d --build`). Check their output separately with logs commands.
+3. USE CURRENT VERSIONS pick tool versions that match the runtime. Check Node/Python version first if unsure; use compatible package versions.
+4. ADAPT ON FAILURE read the error, understand the root cause, try a different approach. Never repeat a failed command unchanged.
+5. CHECK BEFORE CREATE verify files/dirs exist before creating them (ls, cat). Don't overwrite work.
+6. RELATIVE PATHS ONLY never cd outside the workspace.
+7. SANDBOX LIMITS `docker compose` (v2) only, no apt/dpkg, no global npm/yarn installs.
 
-For each turn respond with JSON only — no markdown, no extra text:
+For each turn respond with JSON only no markdown, no extra text:
 {{
   "command": "<bash command, or empty string if done>",
   "explanation": "<one sentence: what and why>",
@@ -65,7 +65,7 @@ class TaskAgent:
 
         tasks_base = str(Path(config.tasks_base_dir).expanduser())
         task_dir = os.path.join(tasks_base, task_name)
-        # workspace: agent's private R/W sandbox — all commands run from here
+        # workspace: agent's private R/W sandbox all commands run from here
         workspace = os.path.join(task_dir, "workspace")
         os.makedirs(workspace, exist_ok=True)
         self._workspace = workspace
@@ -214,7 +214,7 @@ class TaskAgent:
                 while True:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        print(f"[agent] command timed out after {timeout}s — killing", flush=True)
+                        print(f"[agent] command timed out after {timeout}s killing", flush=True)
                         try:
                             proc.kill(signal.SIGKILL)
                         except Exception:
@@ -260,7 +260,7 @@ class TaskAgent:
         while self._running:
             _step += 1
             if _step > _MAX_STEPS:
-                print(f"[agent] step limit ({_MAX_STEPS}) reached — stopping", flush=True)
+                print(f"[agent] step limit ({_MAX_STEPS}) reached stopping", flush=True)
                 self._update_task_status("lost")
                 break
 
@@ -296,7 +296,7 @@ class TaskAgent:
                 except Exception as exc:
                     logger.warning("LLM call failed (attempt %d/3): %s", _attempt + 1, exc)
                     if _attempt == 2:
-                        logger.error("LLM call failed after 3 attempts — giving up")
+                        logger.error("LLM call failed after 3 attempts giving up")
                         self._update_task_status("lost")
             if response is None:
                 break
@@ -317,7 +317,7 @@ class TaskAgent:
             output = ""
             if command:
                 print(f"[agent] running: {command}", flush=True)
-                # Give docker/npm/pip commands extra time — image pulls can take minutes
+                # Give docker/npm/pip commands extra time image pulls can take minutes
                 cmd_timeout = 600 if any(kw in command for kw in ("docker", "npm", "pip", "yarn", "git clone")) else 120
                 output = self._run_command(command, timeout=cmd_timeout)
                 print(f"[agent] output: {output[:200]}", flush=True)
@@ -356,10 +356,10 @@ class TaskAgent:
             status_path = Path(self._workspace).parent / ".agentic" / "status.md"
             status_path.parent.mkdir(parents=True, exist_ok=True)
             status_path.write_text(
-                f"# Agent: {self._name} (running — step {step})\n"
+                f"# Agent: {self._name} (running step {step})\n"
                 f"**Goal**: {self._goal}\n"
                 f"**Workspace**: {self._workspace}\n"
-                f"**Last action**: `{command}` — {explanation}\n\n"
+                f"**Last action**: `{command}` {explanation}\n\n"
                 f"## Current workspace files\n```\n{tree or '(empty)'}\n```\n"
             )
         except Exception:
@@ -391,7 +391,7 @@ class TaskAgent:
             for i, s in enumerate(steps[-10:], 1):
                 try:
                     p = json.loads(s)
-                    summary += f"{i}. `{p.get('command','')}`  — {p.get('explanation','')}\n"
+                    summary += f"{i}. `{p.get('command','')}`  {p.get('explanation','')}\n"
                 except Exception:
                     summary += f"{i}. {s[:120]}\n"
 

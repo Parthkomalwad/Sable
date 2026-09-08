@@ -67,7 +67,7 @@ def _last_command(db):
         if row and row[0]:
             cmd = row[0]
             return cmd[:30] + "…" if len(cmd) > 30 else cmd
-        return "—"
+        return " "
     except: return "n/a"
 
 def _current_dir():
@@ -150,8 +150,8 @@ def _network_ip():
             ["hostname", "-I"], capture_output=True, text=True, timeout=1
         ).stdout.strip()
         ips = [ip for ip in out.split() if not ip.startswith("127.")]
-        return ips[0] if ips else "—"
-    except: return "—"
+        return ips[0] if ips else " "
+    except: return " "
 
 def _disk_usage():
     """Return (used, total, pct) for root filesystem."""
@@ -173,7 +173,7 @@ def _panel_session(db, model):
         cost_str = f"${today['cost']:.4f}  ({today['calls']} calls)"
         cost_style = "color(203)" if today['cost'] > 0.10 else "color(221)" if today['cost'] > 0.01 else "color(114)"
     except Exception:
-        cost_str, cost_style = "—", "color(238)"
+        cost_str, cost_style = " ", "color(238)"
     t = Text()
     t.append("Model  ", style="color(238)"); t.append(model + "\n", style="color(141) bold")
     t.append("Uptime ", style="color(238)"); t.append(_uptime() + "\n", style="color(153)")
@@ -310,7 +310,7 @@ def _render_all(db, model) -> str:
 
 
 def _diff_write(prev_lines: List[str], new_lines: List[str]) -> None:
-    """Rewrite only lines that changed. Cursor moves by line number — no full clear."""
+    """Rewrite only lines that changed. Cursor moves by line number no full clear."""
     out = []
     for i, new_line in enumerate(new_lines):
         prev = prev_lines[i] if i < len(prev_lines) else None

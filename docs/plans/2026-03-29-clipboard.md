@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python, SQLite (existing WAL db), prompt_toolkit (existing), Rich (existing), tmux send-keys.
 
-**No tests required — development only.**
+**No tests required development only.**
 
 ---
 
@@ -127,7 +127,7 @@ git commit -m "feat: add snippets table and CRUD methods to Database"
 - [ ] **Step 2: Create `shell/clipboard/manager.py` with imports and helpers**
 
 ```python
-"""Clipboard/snippet manager — interactive TUI picker and CLI parsing."""
+"""Clipboard/snippet manager interactive TUI picker and CLI parsing."""
 from __future__ import annotations
 
 import os
@@ -318,7 +318,7 @@ def _cmd_run(args: list[str], db: "Database") -> None:
         return
     session = _get_tmux_session()
     if not session:
-        sys.stdout.write(f"  {RED}not in a tmux session — cannot send to pane{RESET}\n\n")
+        sys.stdout.write(f"  {RED}not in a tmux session cannot send to pane{RESET}\n\n")
         sys.stdout.flush()
         return
     db.increment_use(snippet_id)
@@ -354,7 +354,7 @@ Find the `_HELP_TEXT` string and add this line after the `/history` line:
 
 ```bash
 git add shell/clipboard/manager.py shell/loop.py
-git commit -m "feat: /clip CLI — add, del, list, run subcommands"
+git commit -m "feat: /clip CLI add, del, list, run subcommands"
 ```
 
 ---
@@ -452,7 +452,7 @@ def open_picker(db: "Database") -> None:
         s = visible[selected[0]]
         session = _get_tmux_session()
         if not session:
-            message[0] = "not in tmux — cannot send to pane"
+            message[0] = "not in tmux cannot send to pane"
             return
         db.increment_use(s["id"])
         _send_to_main_pane(s["command"], session)
@@ -830,11 +830,11 @@ Sidebar should show `◈ clipboard` panel between tokens and shortcuts with snip
 
 - [ ] **Step 5: Navigate sidebar with arrow keys**
 
-Click into the sidebar pane, press Down/Up — `▶` marker should move.
+Click into the sidebar pane, press Down/Up `▶` marker should move.
 
 - [ ] **Step 6: Run from sidebar**
 
-With snippet highlighted, press Enter — command should appear and run in the main pane.
+With snippet highlighted, press Enter command should appear and run in the main pane.
 
 - [ ] **Step 7: Open TUI picker**
 

@@ -1,6 +1,6 @@
-# AgenticOS v4 — Repository Structure, Configuration Model & Visibility Principles
+# AgenticOS v4 Repository Structure, Configuration Model & Visibility Principles
 
-> Companion to [ROADMAP_v4.md](ROADMAP_v4.md) and [VISION_v4_FEATURE_BRIEF.md](VISION_v4_FEATURE_BRIEF.md).
+> Companion to [roadmap-phases.md](roadmap-phases.md) and [vision.md](vision.md).
 > This doc answers three questions: **how should the code be organised so it scales**, **how is behaviour driven by configuration rather than hard-coding**, and **how does the user always know what is happening**.
 > The physical move is scheduled as **Phase 0.5** in the roadmap and must be done with tests green before and after.
 
@@ -25,7 +25,7 @@ Adding MCP, a daemon, a policy engine, and a Textual UI on top of this layout wo
 
 ## 2. Target layout
 
-Domain-first packages under a single `agentic/` namespace (rename from `shell/` — the project is no longer just a shell). Every package has one job, depends only on packages *above* it in this list, and never imports from `ui/` or `app/`.
+Domain-first packages under a single `agentic/` namespace (rename from `shell/` the project is no longer just a shell). Every package has one job, depends only on packages *above* it in this list, and never imports from `ui/` or `app/`.
 
 ```
 agentic/
@@ -54,7 +54,7 @@ agentic/
     ollama.py  openai.py  anthropic.py
     registry.py          build_backend(config.models.<role>)
     contracts.py         the JSON action schemas (single command, plan, agent action)
-    prompts/             *.md system prompts, loaded by name — editable without code
+    prompts/             *.md system prompts, loaded by name editable without code
     pricing.json
 
   policy/                ── what is allowed ─────────────────────────────────
@@ -139,7 +139,8 @@ docs/
   ARCHITECTURE.md        (replaces v2; diagrams regenerated)
   contracts.md           every JSON/SQL/file contract in one place
   config-reference.md    generated from schema.py
-  superpowers/           specs + plans (unchanged workflow)
+  specs/  plans/         design docs + checkbox plans (unchanged workflow)
+  assets/  history/
 
 .github/workflows/ci.yml   .devcontainer/   docker/   scripts/
 install.sh  uninstall.sh  pyproject.toml  LICENSE  CONTRIBUTING.md  CHANGELOG.md  SECURITY.md
@@ -151,7 +152,7 @@ Lower layers never import higher ones. `agents` never imports `ui`; it **publish
 
 ---
 
-## 3. Configuration model — everything that is a number, list, or prompt becomes data
+## 3. Configuration model everything that is a number, list, or prompt becomes data
 
 ### 3.1 One home
 ```
@@ -242,12 +243,12 @@ System prompts (`llm/prompts/orchestrator.md`, `worker.md`, `skill_writer.md`, `
 
 ---
 
-## 4. Visibility principles — the user always knows what is happening
+## 4. Visibility principles the user always knows what is happening
 
 These are UX rules every feature spec must satisfy. They're what turn "an agent did something" into "I watched it and could have stopped it".
 
 1. **Every state change is an event, every event is visible.** Agents, daemon, policy engine, and skill index all publish to the bus. The sidebar AGENTS panel, `/dash`, `/task <n> events`, and `/audit` are four views over the same stream. Nothing happens "silently".
-2. **Before, during, after — always three moments shown.**
+2. **Before, during, after always three moments shown.**
    - *Before*: the confirm block shows the command, the one-line reason, the blast-radius colour, the policy tier that applied and **which rule**, and which skill (if any) it came from.
    - *During*: a badge (`thinking · running 12s · waiting on worker-2 · blocked: needs approval`), streamed reasoning text, live output.
    - *After*: block header with exit code, duration, cost; if a skill was used, its confidence delta; if a sub-agent ran, a one-line result.
@@ -256,19 +257,19 @@ These are UX rules every feature spec must satisfy. They're what turn "an agent 
 5. **Autonomy is opt-in per tier and per surface.** Defaults: interactive = `confirm`; daemon = `allow`-tier only, everything else queued. Changing that is a one-line policy edit that `/config show` and `/policy explain` make visible.
 6. **Cost is always on screen.** Per-block cost, session total in the prompt segment, today's total in the sidebar, per-agent in `/dash`. Budget warnings are blocks, not log lines.
 7. **Nothing swallows errors.** Typed exceptions → an error block with the exception name, the action that failed, and a `/why` pointer. `except Exception: pass` is banned by a lint test.
-8. **Human-readable on disk.** Skills, knowledge, policy, schedules, prompts, audit — all plain text under `~/.agentic/`. If the UI is gone, `cat` still explains the system.
+8. **Human-readable on disk.** Skills, knowledge, policy, schedules, prompts, audit all plain text under `~/.agentic/`. If the UI is gone, `cat` still explains the system.
 9. **Progressive disclosure.** Default view is calm: one block per action, badges, counts. Detail is one key away (`Tab` expands a block, `/dash` opens lanes, `?` explains). Power users get `--verbose` and `/events tail`.
 10. **Consistent keys and colours across every surface** (REPL, sidebar, dash, palette): green read-only · amber writes · red destructive · purple AI-generated · blue policy/system. Defined once in `ui/theme/`.
 
 ---
 
-## 5. Migration plan (Phase 0.5 — do after tests exist, before the agent-runtime refactor)
+## 5. Migration plan (Phase 0.5 do after tests exist, before the agent-runtime refactor)
 
 Mechanical move first, behaviour change later. Every step ends with `pytest tests/unit` green.
 
-1. **Baseline**: Phase 0 tests merged; add `tests/unit/test_layering.py` (import-graph rule from §2) — it will fail initially and becomes the migration's finish line.
+1. **Baseline**: Phase 0 tests merged; add `tests/unit/test_layering.py` (import-graph rule from §2) it will fail initially and becomes the migration's finish line.
 2. **`git mv` packages** into the `agentic/` tree per §2 table below; leave `shell/__init__.py` as a **compat shim** that re-exports the old paths with a `DeprecationWarning` for one release so `install.sh`, the Dockerfiles, and tmux `send_keys` commands keep working.
-3. **Split `loop.py`** into `app/repl.py`, `app/builtins/*.py`, `core/audit.py`, `llm/registry.py`, `ui/prompt/*`. No logic changes — pure extraction with tests pinned.
+3. **Split `loop.py`** into `app/repl.py`, `app/builtins/*.py`, `core/audit.py`, `llm/registry.py`, `ui/prompt/*`. No logic changes pure extraction with tests pinned.
 4. **Extract data**: destructive patterns → `policy/defaults/policy.yaml`; prompts → `llm/prompts/*.md`; verbs/stopwords → `data/`; numeric constants → `config/schema.py` defaults.
 5. **Paths**: `core/paths.py` + symlink migration on first run; update `install.sh`, Dockerfiles, `uninstall.sh`.
 6. **Config format**: `config.json` → `config.toml` with automatic one-time conversion; `/config show` with layer provenance.
@@ -310,4 +311,4 @@ Mechanical move first, behaviour change later. Every step ends with `pytest test
 
 ## 7. Prompt for Opus (Phase 0.5)
 
-> Read `docs/STRUCTURE_v4.md` in full, then `CLAUDE.md`. Implement §5 migration steps 1–4 only, as a sequence of small commits, each leaving `pytest tests/unit` green. Do not change runtime behaviour, prompts, or thresholds — extraction and moves only. Add `tests/unit/test_layering.py` enforcing the §2 dependency rule and make it pass by the end. Update `CLAUDE.md`'s project-structure section to match. Stop and report before steps 5–7.
+> Read `docs/structure.md` in full, then `CLAUDE.md`. Implement §5 migration steps 1–4 only, as a sequence of small commits, each leaving `pytest tests/unit` green. Do not change runtime behaviour, prompts, or thresholds extraction and moves only. Add `tests/unit/test_layering.py` enforcing the §2 dependency rule and make it pass by the end. Update `CLAUDE.md`'s project-structure section to match. Stop and report before steps 5–7.

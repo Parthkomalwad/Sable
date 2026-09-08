@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a capability or improvement
+labels: ["enhancement", "triage"]
+body:
+  - type: input
+    id: roadmap
+    attributes:
+      label: Roadmap feature ID (if any)
+      description: See docs/vision.md §5 e.g. B4, E3. Leave blank for something new.
+      placeholder: A1
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or impossible today, from the user's seat at the prompt.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What the user would type/see. Example transcript welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: visibility
+    attributes:
+      label: How does the user see what is happening?
+      description: Which event, block, sidebar item, or `/why`-style command exposes it (docs/structure.md §4).
+  - type: dropdown
+    id: autonomy
+    attributes:
+      label: Does this let an agent act without confirmation?
+      options: ["No", "Yes I have described the policy tier and audit entry above"]
+    validations:
+      required: true

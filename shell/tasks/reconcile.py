@@ -1,7 +1,7 @@
-"""Reconcile — mark tasks whose tmux window is gone as 'lost'.
+"""Reconcile mark tasks whose tmux window is gone as 'lost'.
 
 Called once from main.py after config loads.
-Resolves the tmux session internally — main.py does not hold a session object.
+Resolves the tmux session internally main.py does not hold a session object.
 """
 from __future__ import annotations
 

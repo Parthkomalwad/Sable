@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# uninstall.sh — Remove agentic-shell and restore the user's login shell to bash.
+# uninstall.sh Remove agentic-shell and restore the user's login shell to bash.
 #
 # Usage: bash uninstall.sh
 # Must be run as the user whose shell will be restored.
@@ -34,7 +34,7 @@ if grep -q "$WRAPPER" /etc/shells 2>/dev/null; then
     sudo sed -i "\|$WRAPPER|d" /etc/shells
 fi
 
-# --- 4. Remove virtualenv (optional — keep data files) ---
+# --- 4. Remove virtualenv (optional keep data files) ---
 read -rp "Remove virtualenv at $VENV_DIR? [y/N]: " remove_venv
 if [[ "${remove_venv,,}" == "y" ]]; then
     echo "==> Removing virtualenv"

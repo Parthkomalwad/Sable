@@ -1,7 +1,7 @@
 """Anthropic Claude LLM backend.
 
 Uses httpx with httpx-sse for streaming. Timeout is always 30 seconds.
-MUST include the 'anthropic-version: 2023-06-01' header — requests fail without it.
+MUST include the 'anthropic-version: 2023-06-01' header requests fail without it.
 Token counts extracted from the final SSE chunk. Cost calculated locally
 from llm/pricing.json.
 """
@@ -18,7 +18,7 @@ ANTHROPIC_VERSION_HEADER = "2023-06-01"
 
 
 class AnthropicBackend(LLMBackend):
-    """Anthropic backend — connects to the Anthropic API."""
+    """Anthropic backend connects to the Anthropic API."""
 
     def __init__(self, api_key: str, model: str) -> None:
         """
@@ -86,10 +86,10 @@ class AnthropicBackend(LLMBackend):
                             elif event_type == "message_start":
                                 usage = data.get("message", {}).get("usage", {})
                                 prompt_tokens = usage.get("input_tokens", 0)
-                break  # success — exit retry loop
+                break  # success exit retry loop
             except Exception as exc:
                 err_str = str(exc)
-                # Non-streaming error response (rate limit, overload, etc.) — retry with backoff
+                # Non-streaming error response (rate limit, overload, etc.) retry with backoff
                 if "text/event-stream" in err_str or "application/json" in err_str:
                     if attempt < 2:
                         wait = (attempt + 1) * 10
@@ -102,7 +102,7 @@ class AnthropicBackend(LLMBackend):
                         continue
                 raise
 
-        # Parse JSON from model response — fallback chain
+        # Parse JSON from model response fallback chain
         try:
             parsed = parse_llm_json(full_text)
         except ValueError:

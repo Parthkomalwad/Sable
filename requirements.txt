@@ -1,4 +1,4 @@
-# Agentic Shell Layer — pinned dependencies
+# Agentic Shell Layer pinned dependencies
 # All MIT licensed. No LLM gateways (LiteLLM, LangChain excluded permanently).
 
 prompt_toolkit>=3.0.43

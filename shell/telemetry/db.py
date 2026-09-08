@@ -182,7 +182,7 @@ class Database:
 
         if config.daily_token_budget:
             daily_cost = self.get_daily_spend()
-            # Estimate tokens from cost — use a rough $0.001/1k tokens as fallback
+            # Estimate tokens from cost use a rough $0.001/1k tokens as fallback
             # For budget enforcement we track cost_usd directly
             daily_pct = daily_cost / max(config.daily_token_budget / 1_000_000, 0.000001)
             if daily_pct >= 1.0:
