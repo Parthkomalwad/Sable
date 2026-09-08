@@ -198,7 +198,7 @@ Most 2026 terminal AI tools are **clients you run on your laptop**. AgenticOS is
 ```mermaid
 flowchart LR
     SSH([SSH login]) --> M[main.py<br/>SSH bypass first]
-    M -->|SSH_ORIGINAL_COMMAND| B0[/bin/bash]
+    M -->|SSH_ORIGINAL_COMMAND| B0["/bin/bash"]
     M --> R[REPL<br/>prompt_toolkit]
     R --> RT{router}
     RT -->|bash| S[safety<br/>blocklist · YES]
