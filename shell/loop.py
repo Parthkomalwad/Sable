@@ -298,6 +298,7 @@ _HELP_TEXT = (
     "  /skill          Manage skill files\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
+    "  /tour           Guided walkthrough of what Sable does\n"
     "  /budget reset  Clear hard-stop budget flag\n"
     "  /memory                  View current context\n"
     "  /memory versions         List all saved snapshots\n"
@@ -619,6 +620,11 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
 
     if cmd in ("/history", "/hist"):
         _show_history(db)
+        return True
+
+    if cmd == "/tour":
+        from shell.tour import run_tour
+        run_tour()
         return True
 
     if cmd in ("/bash", "/plain"):

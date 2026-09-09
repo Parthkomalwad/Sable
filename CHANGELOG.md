@@ -17,6 +17,8 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `sable on|off|status` toggles the agentic layer via `~/.sable/disabled`, honoured by the `.bashrc` launcher, the wrapper and the tmux restart loop, which fall through to bash with "sable is off, run: sable on".
 - `sable` with no arguments re-attaches a running `sable-<user>` tmux session instead of starting a second one; `sable --wrap` runs inside an existing bash; `install.sh --wrap-only` skips chsh and /etc/shells.
 - `sable --version` and `sable --help`.
+- `/tour` (I10): a seven-screen walkthrough of routing, confirmation, the YES word, tasks, skills, the plain-bash escape and the rest. Calls no model, so it runs with `SABLE_MOCK_LLM=1` or no backend at all. Its routing examples are asserted against the real router, so the tour cannot drift from behaviour.
+- The first-run wizard explains the three confirm tiers before the first AI command, and points at `/tour`.
 - v4 planning: `docs/vision.md`, `docs/roadmap-phases.md`, `docs/structure.md`.
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
