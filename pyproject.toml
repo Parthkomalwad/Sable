@@ -57,8 +57,12 @@ include = ["shell*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
-timeout = 60
+# -p no:libtmux: libtmux ships a pytest plugin that applies marks to fixtures,
+# which pytest 9 rejects at collection time. We do not use its fixtures.
+# The timeout key is gone: it comes from pytest-timeout, a dev extra that the
+# playground image does not install, and as a bare ini key it warned on every
+# run where the plugin was absent. Pass --timeout=60 explicitly if you want it.
+addopts = "-q -p no:libtmux"
 markers = [
   "integration: requires Linux, tmux and Docker (deselect with -m 'not integration')",
 ]
