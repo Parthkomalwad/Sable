@@ -1,17 +1,31 @@
 """Entry point for Sable.
 
-SSH_ORIGINAL_COMMAND bypass MUST remain the first executable code.
+The non-interactive bypass MUST remain the first executable code.
 Handles startup, config loading, session resume, and launches the REPL.
 """
 import os
 import sys
 
-# --- SSH bypass: must be first executable lines, non-negotiable ---
-_original_cmd = os.environ.get("SSH_ORIGINAL_COMMAND")
-if _original_cmd:
-    os.execvp("/bin/bash", ["/bin/bash", "-c", _original_cmd])
+# --- Non-interactive bypass: must be first executable lines, non-negotiable ---
+# Two ways a command arrives instead of an interactive session, and both must
+# reach bash untouched or scp, rsync and git push over SSH hang:
+#
+# 1. `sable -c "<command>"`. This is the normal path. sshd runs the user's
+#    login shell with -c for `ssh host cmd`, scp and rsync, and SSH_ORIGINAL
+#    _COMMAND is NOT set. Anything that execs a login shell non-interactively
+#    (su -c, a subshell) looks the same.
+# 2. SSH_ORIGINAL_COMMAND set. Only happens behind ForceCommand or an
+#    authorized_keys command=, where the real command is moved into the env.
+#
+# Checking only the env var, as earlier versions did, misses the common case.
+_bypass_cmd = (
+    sys.argv[2] if len(sys.argv) >= 3 and sys.argv[1] == "-c"
+    else os.environ.get("SSH_ORIGINAL_COMMAND")
+)
+if _bypass_cmd:
+    os.execvp("/bin/bash", ["/bin/bash", "-c", _bypass_cmd])
     sys.exit(0)
-# -----------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 _CLI_USAGE = """sable - an agentic shell layer
