@@ -19,6 +19,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `sable --version` and `sable --help`.
 - `/tour` (I10): a seven-screen walkthrough of routing, confirmation, the YES word, tasks, skills, the plain-bash escape and the rest. Calls no model, so it runs with `SABLE_MOCK_LLM=1` or no backend at all. Its routing examples are asserted against the real router, so the tour cannot drift from behaviour.
 - The first-run wizard explains the three confirm tiers before the first AI command, and points at `/tour`.
+- `docs/architecture.md` gains task-engine and skills sections: the orchestrator action contract, sub-agent spawn and sandbox, how results flow back through status.md and result.md, the crystallisation pipeline, and the `~/tasks/`, `~/skills/` and `~/.sable/` layouts.
 - v4 planning: `docs/vision.md`, `docs/roadmap-phases.md`, `docs/structure.md`.
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
@@ -30,6 +31,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `docs/architecture-v4.md`: eight Mermaid diagrams tracing the system (layer map, request lifecycle, agent turn state machine, sub-agent spawn, skill loop, Memory Palace, daemon, processes and IPC).
 
 ### Changed
+- README claims verified against the code. Two were wrong: `/skill show` does not exist (the subcommands are list, new and edit), and the skill walkthrough implied confidence-ranked retrieval, which is not wired up yet. Both corrected, and the Phase 0 builtins added to the table.
 - Router rewritten for accuracy: bash recall rose from 0.790 to 0.997 and agentic from 0.930 to 0.977 on the corpus. `shutil.which()` is now a supporting signal rather than a decisive one, since whether `make` or `cargo` is installed is a property of the machine, not the user's intent; a `COMMON_COMMANDS` vocabulary carries that knowledge instead. Adds env-assignment, path-invocation, heredoc and variable detection, and treats a command name followed by three or more plain English words as a goal (`kill the nginx process`) rather than a command.
 - `looks_like_secret()` checks `SECRET_PATTERNS` before falling back to entropy, so structured credentials are detected; an AWS access key scored 3.68 against a 4.5 entropy threshold and was previously missed by the standalone predicate.
 - Tests that asserted absent behaviour were aligned to the code and given reasons: `chmod 777` and `kill -9` are deliberately not in the blocklist, `to_dict()` is a superset of older config files, and `from_dict()` defaults a missing backend to ollama.

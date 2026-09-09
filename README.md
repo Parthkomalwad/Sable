@@ -144,10 +144,12 @@ Sub-agents run in their own tmux window inside a `bwrap` sandbox: their workspac
 
 # next session
 ~/api ❯ deploy the api
-  ✦ Using skill deploy-api (confidence 0.55)   ← ranked in, fewer turns
+  ✦ Using skill deploy-api            ← matched by keyword, injected into context
 ```
 
-Skills are plain markdown you can read and edit. Confidence moves +0.05 on success and −0.10 on failure. `/skill list · show`.
+Skills are plain markdown you can read and edit: `/skill list · new · edit`. Each carries a confidence score that starts at 0.5 when generated and 1.0 when written by hand, and moves +0.05 on success and −0.10 on failure.
+
+Today skills are matched to a goal by keyword. Confidence is recorded but not yet used to rank them, and nothing calls the success and failure nudges automatically; closing that loop is the first item of [Phase 2](docs/roadmap-phases.md).
 </details>
 
 <details>
@@ -163,11 +165,14 @@ Skills are plain markdown you can read and edit. Confidence moves +0.05 on succe
 |---|---|---|---|
 | `/help` | all builtins | `Ctrl+B` | next line is raw bash |
 | `/task …` | manage sub-agents | `Ctrl+T` | toggle sidebar |
-| `/skill …` | list / show skills | `Ctrl+X` | settings overlay |
+| `/skill …` | list / new / edit skills | `Ctrl+X` | settings overlay |
 | `/clip …` | snippets | `Ctrl+R` | reverse history search |
 | `/stats` | 7-day token table | `Tab` | complete command or path |
 | `/memory` | view / clear session context | `→` | accept inline suggestion |
 | `/config` `/model` `/mode` | settings, backend, routing | `>>` | force agent mode |
+| `/route why "<line>"` | why a line routed as it did | `Ctrl+\` | plain bash subshell |
+| `/tour` | guided walkthrough | | |
+| `/bash` `/plain` | plain bash, `exit` returns | | |
 | `/budget reset` `/new` `/exit` | | | |
 </details>
 
