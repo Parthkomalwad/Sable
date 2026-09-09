@@ -1,0 +1,541 @@
+# input	label
+# Router corpus for tests/unit/test_router_accuracy.py (I3).
+ls	bash
+ls -la	bash
+ls -lh /var/log	bash
+ll	bash
+pwd	bash
+whoami	bash
+id	bash
+date	bash
+uptime	bash
+hostname	bash
+uname -a	bash
+df -h	bash
+du -sh .	bash
+du -sh /var/*	bash
+free -h	bash
+top -b -n1	bash
+htop	bash
+ps aux	bash
+ps -ef	bash
+kill -9 1234	bash
+killall nginx	bash
+pkill -f gunicorn	bash
+jobs	bash
+bg	bash
+fg	bash
+history	bash
+clear	bash
+reset	bash
+exit	bash
+logout	bash
+env	bash
+printenv	bash
+set -x	bash
+set +x	bash
+umask 022	bash
+ulimit -n	bash
+which python3	bash
+type -a ls	bash
+command -v jq	bash
+file /bin/bash	bash
+stat /etc/passwd	bash
+basename /a/b/c.txt	bash
+dirname /a/b/c.txt	bash
+readlink -f /proc/self	bash
+realpath .	bash
+sleep 5	bash
+true	bash
+false	bash
+yes | head -5	bash
+seq 1 10	bash
+echo hello	bash
+echo $HOME	bash
+echo $PATH	bash
+echo ${USER}	bash
+printf '%s\n' one two	bash
+cat /etc/hostname	bash
+cat -n main.py	bash
+head -20 /var/log/syslog	bash
+tail -f /var/log/nginx/error.log	bash
+tail -n 100 app.log	bash
+less README.md	bash
+more notes.txt	bash
+wc -l *.py	bash
+wc -c file.bin	bash
+sort names.txt	bash
+sort -u names.txt	bash
+uniq -c sorted.txt	bash
+cut -d: -f1 /etc/passwd	bash
+tr 'a-z' 'A-Z' < in.txt	bash
+rev names.txt	bash
+nl file.txt	bash
+tac file.txt	bash
+split -l 1000 big.csv	bash
+paste a.txt b.txt	bash
+join a.txt b.txt	bash
+column -t data.txt	bash
+tee out.log	bash
+xargs -n1 echo	bash
+nohup ./server &	bash
+watch -n2 df -h	bash
+time make build	bash
+timeout 30 ./slow.sh	bash
+nice -n 10 make	bash
+renice 5 -p 1234	bash
+ps aux | grep nginx	bash
+ps aux | grep -v grep | grep python	bash
+cat access.log | wc -l	bash
+ls -la | head -20	bash
+df -h | grep -v tmpfs	bash
+du -sh * | sort -h	bash
+netstat -tulpn | grep LISTEN	bash
+ss -tulpn | grep 8080	bash
+journalctl -u nginx | tail -50	bash
+dmesg | tail -20	bash
+grep -r TODO src/ | wc -l	bash
+find . -name '*.py' | xargs wc -l	bash
+cat urls.txt | xargs -P4 -n1 curl -sI	bash
+echo hi > out.txt	bash
+echo hi >> out.txt	bash
+cat a.txt b.txt > merged.txt	bash
+./run.sh > run.log 2>&1	bash
+make 2>&1 | tee build.log	bash
+sort file.txt | uniq > unique.txt	bash
+command1 && command2	bash
+make && make install	bash
+./configure && make && sudo make install	bash
+test -f .env && source .env	bash
+mkdir -p build && cd build	bash
+false || echo fallback	bash
+ping -c1 8.8.8.8 || echo down	bash
+echo $(date)	bash
+$(date)	bash
+echo `hostname`	bash
+export TAG=$(git rev-parse --short HEAD)	bash
+for f in *.log; do gzip $f; done	bash
+while read l; do echo $l; done < in.txt	bash
+if [ -f .env ]; then source .env; fi	bash
+case $1 in start) echo go;; esac	bash
+FOO=bar	bash
+FOO=bar ./run.sh	bash
+DEBUG=1 npm start	bash
+NODE_ENV=production node server.js	bash
+PORT=8080 python3 -m http.server	bash
+LC_ALL=C sort data.txt	bash
+PYTHONPATH=. python3 -m shell.main	bash
+CGO_ENABLED=0 go build -o app	bash
+AWS_PROFILE=prod aws s3 ls	bash
+http_proxy=http://proxy:3128 curl example.com	bash
+export PATH=$PATH:/usr/local/go/bin	bash
+export EDITOR=vim	bash
+unset DEBUG	bash
+cat <<EOF > config.yml	bash
+cat <<'EOF' | tee /etc/motd	bash
+sort <<< 'b\na'	bash
+bash <<EOF	bash
+python3 <<'PY'	bash
+mysql -u root <<SQL	bash
+git status	bash
+git status -sb	bash
+git add .	bash
+git add -p	bash
+git commit -m 'fix'	bash
+git commit --amend --no-edit	bash
+git push	bash
+git push origin main	bash
+git push -u origin feat/x	bash
+git push --force-with-lease	bash
+git pull	bash
+git pull --rebase	bash
+git fetch --all --prune	bash
+git checkout main	bash
+git checkout -b feat/router	bash
+git switch -c fix/bug	bash
+git branch -a	bash
+git branch -d old-branch	bash
+git merge develop	bash
+git rebase -i HEAD~3	bash
+git rebase --continue	bash
+git log --oneline -10	bash
+git log --graph --all --oneline	bash
+git diff	bash
+git diff --staged	bash
+git diff HEAD~1	bash
+git show HEAD	bash
+git blame app.py	bash
+git stash	bash
+git stash pop	bash
+git stash list	bash
+git reset --hard origin/main	bash
+git reset HEAD~1	bash
+git revert abc1234	bash
+git cherry-pick def5678	bash
+git tag -a v1.0 -m 'release'	bash
+git remote -v	bash
+git remote add origin git@github.com:u/r.git	bash
+git clone https://github.com/u/r.git	bash
+git submodule update --init --recursive	bash
+git clean -fd	bash
+git bisect start	bash
+git worktree add ../hotfix	bash
+git config --global user.name 'A'	bash
+docker ps	bash
+docker ps -a	bash
+docker images	bash
+docker pull nginx:alpine	bash
+docker build -t app:latest .	bash
+docker build --no-cache -t app .	bash
+docker run -d -p 8080:80 nginx	bash
+docker run --rm -it ubuntu bash	bash
+docker exec -it api bash	bash
+docker logs -f api	bash
+docker logs --tail 100 web	bash
+docker stop api	bash
+docker start api	bash
+docker restart api	bash
+docker rm -f api	bash
+docker rmi nginx:alpine	bash
+docker system prune -af	bash
+docker volume ls	bash
+docker network ls	bash
+docker inspect api	bash
+docker stats --no-stream	bash
+docker compose up -d	bash
+docker compose up -d --build	bash
+docker compose down	bash
+docker compose down -v	bash
+docker compose logs -f api	bash
+docker compose ps	bash
+docker compose restart worker	bash
+docker compose exec db psql -U postgres	bash
+make	bash
+make build	bash
+make test	bash
+make clean	bash
+make -j8	bash
+make install	bash
+npm install	bash
+npm i -D typescript	bash
+npm run build	bash
+npm run dev	bash
+npm test	bash
+npm ci	bash
+npm audit fix	bash
+npx create-react-app my-app	bash
+yarn install	bash
+yarn build	bash
+pnpm install	bash
+pnpm dev	bash
+pip install -r requirements.txt	bash
+pip install -e .	bash
+pip freeze > requirements.txt	bash
+pip list --outdated	bash
+python3 -m venv .venv	bash
+source .venv/bin/activate	bash
+deactivate	bash
+poetry install	bash
+poetry add httpx	bash
+cargo build --release	bash
+cargo test	bash
+cargo run	bash
+go build ./...	bash
+go test ./...	bash
+go mod tidy	bash
+mvn clean install	bash
+gradle build	bash
+apt update	bash
+apt install -y jq	bash
+apt-get install -y build-essential	bash
+dnf install -y nginx	bash
+yum update -y	bash
+brew install jq	bash
+snap install code --classic	bash
+systemctl status nginx	bash
+systemctl start nginx	bash
+systemctl stop nginx	bash
+systemctl restart nginx	bash
+systemctl reload nginx	bash
+systemctl enable nginx	bash
+systemctl disable nginx	bash
+systemctl daemon-reload	bash
+systemctl list-units --failed	bash
+systemctl --user status sabled	bash
+service nginx status	bash
+journalctl -u nginx -f	bash
+journalctl -xe	bash
+journalctl --since '1 hour ago'	bash
+journalctl -p err -b	bash
+cd /var/log	bash
+cd ..	bash
+cd -	bash
+cd ~	bash
+cd	bash
+pushd /tmp	bash
+popd	bash
+mkdir build	bash
+mkdir -p a/b/c	bash
+rmdir empty	bash
+touch .gitkeep	bash
+cp a.txt b.txt	bash
+cp -r src/ backup/	bash
+mv old.txt new.txt	bash
+mv *.log archive/	bash
+rm file.txt	bash
+rm -f stale.lock	bash
+rm -rf node_modules	bash
+ln -s /opt/app /usr/local/app	bash
+chmod +x deploy.sh	bash
+chmod 644 config.yml	bash
+chmod -R 755 public/	bash
+chown www-data:www-data /var/www	bash
+chgrp docker /var/run/docker.sock	bash
+./run.sh	bash
+./deploy.sh --prod	bash
+./scripts/build.sh	bash
+../bin/tool	bash
+/usr/local/bin/sable	bash
+~/bin/backup.sh	bash
+bash install.sh	bash
+sh setup.sh	bash
+python3 manage.py migrate	bash
+python3 -m pytest tests/unit/	bash
+pytest -q	bash
+pytest tests/ -k router	bash
+node server.js	bash
+ruby app.rb	bash
+perl script.pl	bash
+grep error app.log	bash
+grep -i warning /var/log/syslog	bash
+grep -rn TODO src/	bash
+grep -c 500 access.log	bash
+egrep '4[0-9]{2}' access.log	bash
+rg TODO	bash
+rg -t py 'def main'	bash
+ag pattern	bash
+find . -name '*.py'	bash
+find /var/log -size +100M	bash
+find . -type d -name node_modules	bash
+find . -mtime -1 -type f	bash
+find . -name '*.pyc' -delete	bash
+sed -i 's/foo/bar/g' config.txt	bash
+sed -n '10,20p' file.txt	bash
+awk '{print $1}' access.log	bash
+awk -F: '{print $1}' /etc/passwd	bash
+jq '.items[]' data.json	bash
+jq -r '.name' package.json	bash
+yq '.services' compose.yml	bash
+diff a.txt b.txt	bash
+diff -u old new	bash
+cmp a.bin b.bin	bash
+patch -p1 < fix.patch	bash
+curl https://example.com	bash
+curl -I https://example.com	bash
+curl -sSL -o f.tar.gz $URL	bash
+curl -X POST -d '{}' http://localhost:8080/api	bash
+wget https://example.com/f.tar.gz	bash
+ping -c4 example.com	bash
+dig example.com	bash
+nslookup example.com	bash
+host example.com	bash
+traceroute example.com	bash
+netstat -rn	bash
+ip addr	bash
+ip route	bash
+ifconfig	bash
+ssh user@server	bash
+ssh -i key.pem ubuntu@1.2.3.4	bash
+scp file.txt server:/tmp/	bash
+rsync -avz src/ server:/opt/app/	bash
+sftp user@server	bash
+nc -zv localhost 8080	bash
+openssl s_client -connect example.com:443	bash
+telnet localhost 25	bash
+tar -czf backup.tar.gz src/	bash
+tar -xzf archive.tar.gz	bash
+tar -tzf archive.tar.gz	bash
+zip -r out.zip dir/	bash
+unzip archive.zip	bash
+gzip large.log	bash
+gunzip large.log.gz	bash
+md5sum file.bin	bash
+sha256sum file.iso	bash
+base64 secret.txt	bash
+xxd file.bin | head	bash
+vim config.yml	bash
+nano .env	bash
+emacs notes.txt	bash
+tmux new -s work	bash
+tmux attach -t work	bash
+tmux ls	bash
+screen -r	bash
+crontab -l	bash
+crontab -e	bash
+at now + 1 hour	bash
+sudo -i	bash
+sudo apt update	bash
+su - postgres	bash
+mount /dev/sdb1 /mnt	bash
+umount /mnt	bash
+lsblk	bash
+blkid	bash
+fdisk -l	bash
+psql -U postgres -c '\l'	bash
+mysql -u root -p	bash
+redis-cli ping	bash
+sqlite3 db.sqlite '.tables'	bash
+kubectl get pods	bash
+kubectl logs -f deploy/api	bash
+kubectl apply -f k8s/	bash
+terraform plan	bash
+terraform apply -auto-approve	bash
+ansible-playbook site.yml	bash
+what is using port 8080	agentic
+what is taking up all the disk space	agentic
+what processes are eating the most memory	agentic
+what version of python is installed	agentic
+what changed in the last commit	agentic
+what is the status of the api service	agentic
+why is the server so slow	agentic
+why did the deployment fail	agentic
+why is nginx returning 502	agentic
+why does the build keep failing	agentic
+why is my container restarting	agentic
+how do I set up a python virtual environment	agentic
+how do I renew the ssl certificate	agentic
+how much free space is left on this box	agentic
+how many users are logged in right now	agentic
+how do I roll back the last deploy	agentic
+where are the nginx logs stored	agentic
+where is the config file for postgres	agentic
+where did all my disk space go	agentic
+when was this server last rebooted	agentic
+when did the api last restart	agentic
+which service is listening on port 443	agentic
+which files changed since yesterday	agentic
+is docker running on this machine	agentic
+is the database accepting connections	agentic
+are there any failed systemd units	agentic
+do I have enough space to pull this image	agentic
+can you check if redis is up	agentic
+show me the largest files in this directory	agentic
+show me the last 50 lines of the nginx error log	agentic
+show me all the running docker containers	agentic
+show me what changed in the last hour	agentic
+find large log files	agentic
+find all the config files in this repo	agentic
+find every file bigger than 100 megabytes	agentic
+find the process listening on port 3000	agentic
+list all the services that failed to start	agentic
+list every python file that imports requests	agentic
+list all containers including stopped ones	agentic
+give me a summary of disk usage by directory	agentic
+give me the top ten memory consumers	agentic
+tell me which ports are open	agentic
+check if the api is responding	agentic
+check whether the ssl cert is about to expire	agentic
+check the health of the database	agentic
+look for errors in the application log	agentic
+search the codebase for hardcoded passwords	agentic
+count how many lines of python are in this repo	agentic
+summarise what this script does	agentic
+explain what this error message means	agentic
+explain the difference between these two branches	agentic
+kill the nginx process	agentic
+restart the api container	agentic
+stop all the running containers	agentic
+clean up the old docker images	agentic
+free up some disk space on this server	agentic
+back up the postgres database	agentic
+back up the config directory to my home folder	agentic
+deploy the latest version of the api	agentic
+roll back to the previous release	agentic
+update all the system packages	agentic
+install docker on this machine	agentic
+set up a new python project in this folder	agentic
+create a new branch for the router work	agentic
+commit these changes with a sensible message	agentic
+push my work to the remote branch	agentic
+merge the develop branch into main	agentic
+tag this commit as version one point two	agentic
+add a gitignore for a python project	agentic
+write a dockerfile for this application	agentic
+write a systemd unit for the worker	agentic
+generate an ssh key for deployment	agentic
+rotate the application secrets	agentic
+compress all the old log files	agentic
+delete every log file older than thirty days	agentic
+archive last month's backups	agentic
+move all the images into an assets folder	agentic
+rename every jpeg in this folder to png	agentic
+fix the permissions on the web root	agentic
+make this script executable	agentic
+open a firewall rule for port 8080	agentic
+block traffic from that ip address	agentic
+add a cron job that runs the backup nightly	agentic
+schedule a nightly restart of the worker	agentic
+set up log rotation for the app logs	agentic
+configure nginx as a reverse proxy for port 3000	agentic
+point the domain at this server	agentic
+renew the letsencrypt certificate	agentic
+create a user account for the deploy bot	agentic
+give the deploy user sudo access	agentic
+mount the backup drive	agentic
+help me configure ssh key auth	agentic
+help me debug why the container keeps crashing	agentic
+help me set up a ci pipeline	agentic
+help me understand this stack trace	agentic
+I need to free up disk space	agentic
+I want to see the slowest queries	agentic
+I forgot the command to list open ports	agentic
+my build is failing and I do not know why	agentic
+the site is down, figure out what is wrong	agentic
+something is eating all the cpu, find it	agentic
+the disk is nearly full, sort it out	agentic
+nginx will not start, work out why	agentic
+the tests are failing on main, investigate	agentic
+figure out which commit broke the build	agentic
+work out why memory keeps climbing	agentic
+diagnose the high load average	agentic
+troubleshoot the failing health check	agentic
+find all the log files bigger than a hundred megabytes and compress them	agentic
+check if postgres is running and start it if it is not	agentic
+pull the latest code, install dependencies and run the tests	agentic
+build the docker image, tag it with the git sha and push it	agentic
+look through the nginx logs and tell me which endpoints are slowest	agentic
+go through the last week of logs and count the five hundred errors	agentic
+set up a python virtual environment, install the requirements and run the app	agentic
+create a backup of the database, compress it and copy it to the backup drive	agentic
+find every container that has been restarting and show me its logs	agentic
+work out which directory grew the most this week and clean it up	agentic
+check the certificate expiry for every domain on this box and warn me about any expiring soon	agentic
+audit the sudoers file and tell me if anything looks wrong	agentic
+review the open ports and tell me which ones should not be exposed	agentic
+compare the config on this server with the one in the repo	agentic
+walk through what happens when a request hits this server	agentic
+update the readme to describe the new router behaviour	agentic
+add tests for the function I just changed	agentic
+refactor this script so it handles missing files gracefully	agentic
+make the deploy script idempotent	agentic
+document how to run this project locally	agentic
+clean up	ambiguous
+restart	ambiguous
+status	ambiguous
+build	ambiguous
+deploy	ambiguous
+test	ambiguous
+check	ambiguous
+update	ambiguous
+backup	ambiguous
+logs	ambiguous
+start the server	ambiguous
+stop it	ambiguous
+run the tests	ambiguous
+check the logs	ambiguous
+clear the cache	ambiguous
+show status	ambiguous
+list containers	ambiguous
+disk space	ambiguous
+memory usage	ambiguous
+open ports	ambiguous

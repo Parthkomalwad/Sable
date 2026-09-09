@@ -1,26 +1,103 @@
 """Entry point for Sable.
 
-SSH_ORIGINAL_COMMAND bypass MUST remain the first executable code.
+The non-interactive bypass MUST remain the first executable code.
 Handles startup, config loading, session resume, and launches the REPL.
 """
 import os
 import sys
 
-# --- SSH bypass: must be first executable lines, non-negotiable ---
-_original_cmd = os.environ.get("SSH_ORIGINAL_COMMAND")
-if _original_cmd:
-    os.execvp("/bin/bash", ["/bin/bash", "-c", _original_cmd])
+# --- Non-interactive bypass: must be first executable lines, non-negotiable ---
+# Two ways a command arrives instead of an interactive session, and both must
+# reach bash untouched or scp, rsync and git push over SSH hang:
+#
+# 1. `sable -c "<command>"`. This is the normal path. sshd runs the user's
+#    login shell with -c for `ssh host cmd`, scp and rsync, and SSH_ORIGINAL
+#    _COMMAND is NOT set. Anything that execs a login shell non-interactively
+#    (su -c, a subshell) looks the same.
+# 2. SSH_ORIGINAL_COMMAND set. Only happens behind ForceCommand or an
+#    authorized_keys command=, where the real command is moved into the env.
+#
+# Checking only the env var, as earlier versions did, misses the common case.
+_bypass_cmd = (
+    sys.argv[2] if len(sys.argv) >= 3 and sys.argv[1] == "-c"
+    else os.environ.get("SSH_ORIGINAL_COMMAND")
+)
+if _bypass_cmd:
+    os.execvp("/bin/bash", ["/bin/bash", "-c", _bypass_cmd])
     sys.exit(0)
-# -----------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
-def main() -> None:
+_CLI_USAGE = """sable - an agentic shell layer
+
+  sable              start the shell, or re-attach a running session
+  sable on           enable the agentic layer for new logins
+  sable off          disable it; logins go straight to bash
+  sable status       report which mode is active
+  sable --wrap       run inside the current bash, no chsh or /etc/shells
+  sable --version    print the version
+"""
+
+
+def _handle_cli(argv: list[str]) -> bool:
+    """Handle the subcommands that never start a REPL.
+
+    Returns True if the process should exit now.
+    """
+    if not argv:
+        return False
+
+    command = argv[0]
+
+    if command in ("-h", "--help", "help"):
+        sys.stdout.write(_CLI_USAGE)
+        return True
+
+    if command in ("-V", "--version", "version"):
+        from shell import __version__
+
+        sys.stdout.write(f"sable {__version__}\n")
+        return True
+
+    if command in ("on", "off", "status"):
+        from shell import mode
+
+        action = {"on": mode.enable, "off": mode.disable, "status": mode.status}[command]
+        sys.stdout.write(action() + "\n")
+        sys.stdout.flush()
+        return True
+
+    return False
+
+
+def main(argv: list[str] | None = None) -> None:
     """Shell entry point called by the installed binary."""
     import json
     import uuid
     from pathlib import Path
 
     from shell.config.schema import ShellConfig
+
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    if _handle_cli(argv):
+        return
+
+    wrap_mode = "--wrap" in argv
+
+    # `sable off` is honoured here too, so an already-open terminal that runs
+    # `sable` after disabling gets the same answer as a fresh login.
+    from shell import mode, paths
+
+    if paths.is_disabled():
+        sys.stdout.write("sable is off, run: sable on\n")
+        sys.stdout.flush()
+        return
+
+    # With no arguments, re-attach a running session rather than starting a
+    # second one. Replaces this process when it succeeds.
+    if not argv and not wrap_mode:
+        mode.attach_existing()
 
     session_id = str(uuid.uuid4())
 
@@ -94,7 +171,12 @@ def main() -> None:
 
     # Welcome banner (screen already cleared by wrapper before Python starts)
     sys.stdout.write("\n\033[38;5;141m  ✦ Sable\033[0m\n")
-    sys.stdout.write(f"\033[2;37m  {config.backend} · {config.model}  |  type naturally or use bash directly\033[0m\n\n")
+    sys.stdout.write(f"\033[2;37m  {config.backend} · {config.model}  |  type naturally or use bash directly\033[0m\n")
+    if wrap_mode:
+        sys.stdout.write(
+            "\033[2;37m  wrap mode: running inside your bash, /exit returns to it\033[0m\n"
+        )
+    sys.stdout.write("\n")
     sys.stdout.flush()
 
     try:

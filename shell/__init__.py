@@ -1,1 +1,3 @@
-"""Agentic Shell Layer top-level package."""
+"""Sable top-level package."""
+
+__version__ = "0.3.0"

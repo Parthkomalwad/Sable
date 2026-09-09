@@ -37,9 +37,15 @@ class TestFromDict:
         assert config.backend == "anthropic"
         assert config.routing_mode == "prefix"
 
-    def test_invalid_missing_backend_raises(self):
-        with pytest.raises((ValueError, KeyError)):
-            ShellConfig.from_dict(INVALID_CONFIG_MISSING_BACKEND)
+    def test_missing_backend_defaults_to_ollama(self):
+        """A config without a backend is not fatal: it defaults to ollama so a
+        hand-edited file keeps working. Only an unrecognised backend raises."""
+        config = ShellConfig.from_dict(INVALID_CONFIG_MISSING_BACKEND)
+        assert config.backend == "ollama"
+
+    def test_unknown_backend_raises(self):
+        with pytest.raises(ValueError):
+            ShellConfig.from_dict({**INVALID_CONFIG_MISSING_BACKEND, "backend": "nope"})
 
     def test_invalid_routing_mode_raises(self):
         with pytest.raises(ValueError):
@@ -48,5 +54,16 @@ class TestFromDict:
 
 class TestToDict:
     def test_round_trip(self):
+        """to_dict() is a superset of the stored config: it always emits
+        tasks_base_dir and api_key, which older config files omit."""
         config = ShellConfig.from_dict(OLLAMA_CONFIG)
-        assert config.to_dict() == OLLAMA_CONFIG
+        result = config.to_dict()
+
+        for key, value in OLLAMA_CONFIG.items():
+            assert result[key] == value
+        assert result["tasks_base_dir"] == "~/tasks"
+        assert result["api_key"] == ""
+
+    def test_round_trip_through_from_dict_is_stable(self):
+        config = ShellConfig.from_dict(OLLAMA_CONFIG)
+        assert ShellConfig.from_dict(config.to_dict()).to_dict() == config.to_dict()

@@ -46,7 +46,7 @@ def run_wizard() -> None:
     """
     console.print()
     console.print(Panel(
-        "[bold]Welcome to Agentic Shell![/bold]\n\n"
+        "[bold]Welcome to Sable![/bold]\n\n"
         "Let's configure your AI backend. This takes about 30 seconds.\n"
         "[dim]Config will be saved to ~/.config/agentic-shell/config.json[/dim]",
         title="[bold cyan]First-Run Setup[/bold cyan]",
@@ -138,5 +138,34 @@ def run_wizard() -> None:
 
     console.print()
     console.print(f"[green]✓ Config saved to {CONFIG_PATH}[/green]")
+
+    _explain_confirm_tiers()
+
     console.print("[dim]Run 'sable' again to start.[/dim]")
+    console.print()
+
+
+def _explain_confirm_tiers() -> None:
+    """Explain how commands are confirmed, before the first AI command runs.
+
+    Someone whose login shell now routes typing to a model needs to know what
+    can happen without them saying so. That is worth one screen at setup rather
+    than a surprise later (I10).
+    """
+    console.print()
+    console.print(Panel(
+        "Sable never runs a command you have not seen. There are three levels:\n\n"
+        "  [green]read-only[/green]    shown, then run when you press enter\n"
+        "               [dim]ls, cat, git status, docker ps[/dim]\n\n"
+        "  [yellow]changes things[/yellow]  shown with an explanation, waits for you\n"
+        "               [dim]enter to run, e to edit it first, q to cancel[/dim]\n\n"
+        "  [red]destructive[/red]    you must type [bold]YES[/bold] in capitals\n"
+        "               [dim]rm -rf, mkfs, dd to a device, curl piped to a shell[/dim]\n\n"
+        "Editing a command before it runs is normal and useful: your version is\n"
+        "what runs, and the correction teaches the shell your preferences.",
+        title="[bold cyan]Before you start: how commands are confirmed[/bold cyan]",
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+    console.print("[dim]Run /tour once you are in for the rest.[/dim]")
     console.print()

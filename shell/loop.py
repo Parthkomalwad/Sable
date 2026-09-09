@@ -145,6 +145,11 @@ def _make_key_bindings(db=None) -> KeyBindings:
     def _ctrl_b(event) -> None:
         global _bypass_next
         _bypass_next = True
+        # Whatever is already typed was misrouted by definition: the user
+        # reached for the bypass. Record it as a bash correction (I3).
+        pending = event.app.current_buffer.text.strip()
+        if pending:
+            _record_router_correction(pending, "bash")
         _out("[bash mode] next command runs directly")
 
     @kb.add("c-t")
@@ -154,6 +159,14 @@ def _make_key_bindings(db=None) -> KeyBindings:
             toggle_sidebar()
         except Exception:
             pass
+
+    @kb.add("c-\\")
+    def _ctrl_backslash(event) -> None:
+        """Drop to a plain bash subshell for as long as the user wants."""
+        event.app.current_buffer.set_document(
+            __import__("prompt_toolkit.document", fromlist=["Document"]).Document("/bash")
+        )
+        event.app.current_buffer.validate_and_handle()
 
     @kb.add("c-x")
     def _ctrl_x(event) -> None:
@@ -165,7 +178,36 @@ def _make_key_bindings(db=None) -> KeyBindings:
     return kb
 
 
-def _build_backend(config: ShellConfig):
+def _mock_backend_or_none(mode: str = "orchestrator"):
+    """Return a MockLLMBackend when SABLE_MOCK_LLM is set, else None.
+
+    Lets the whole shell run with zero API calls for demos and the playground.
+    The fixture lives under tests/, which is not importable from an installed
+    copy, so an ImportError here falls back to the real backend rather than
+    breaking startup.
+    """
+    if os.environ.get("SABLE_MOCK_LLM", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        return None
+    try:
+        from tests.fixtures.mock_llm import MockLLMBackend
+    except ImportError:
+        _out("[sable] SABLE_MOCK_LLM is set but the mock backend is unavailable")
+        return None
+    return MockLLMBackend(mode=mode)
+
+
+def _build_backend(config: ShellConfig, mock_mode: str = "orchestrator"):
+    """Return the configured LLM backend, or the mock when SABLE_MOCK_LLM is set.
+
+    mock_mode selects which canned script the mock plays: "orchestrator" for
+    the REPL's reasoning loop, "worker" for a TaskAgent.
+    """
+    # Checked before importing the real backends so the mock path does not
+    # need httpx installed.
+    mock = _mock_backend_or_none(mock_mode)
+    if mock is not None:
+        return mock
+
     from shell.llm.ollama import OllamaBackend
     from shell.llm.openai import OpenAIBackend
     from shell.llm.anthropic import AnthropicBackend
@@ -254,6 +296,9 @@ _HELP_TEXT = (
     "  /clip           Snippet clipboard (add/run/del)\n"
     "  /task           Manage background agents\n"
     "  /skill          Manage skill files\n"
+    "  /route why \"<line>\"  Explain how a line would be routed\n"
+    "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
+    "  /tour           Guided walkthrough of what Sable does\n"
     "  /budget reset  Clear hard-stop budget flag\n"
     "  /memory                  View current context\n"
     "  /memory versions         List all saved snapshots\n"
@@ -441,6 +486,69 @@ def _handle_skill_builtin(parts: list[str]) -> bool:
     return True
 
 
+def _record_router_correction(line: str, label: str) -> None:
+    """Append one "input<TAB>label" row to the router corrections file.
+
+    Written whenever the user overrides a routing decision: Ctrl+B (this line
+    was bash, not a goal) or an answer to the [b/a] prompt. These rows are the
+    training data for the router accuracy programme (I3); the corpus in
+    tests/fixtures/router_corpus.tsv is the curated version of the same shape.
+    """
+    from shell import paths
+
+    text = line.strip()
+    if not text:
+        return
+    try:
+        paths.STATE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(paths.ROUTER_CORRECTIONS, "a", encoding="utf-8") as handle:
+            handle.write(text + "\t" + label + "\n")
+    except (PermissionError, OSError):
+        pass
+
+
+def _handle_route_builtin(argument: str, config: ShellConfig) -> bool:
+    """Handle `/route why "<line>"`. Returns True if handled."""
+    from shell.router import explain
+
+    argument = argument.strip()
+    if not argument.startswith("why"):
+        _out('usage: /route why "<line>"')
+        return True
+
+    target = argument[len("why"):].strip().strip('"').strip("'")
+    if not target:
+        _out('usage: /route why "<line>"')
+        return True
+
+    exp = explain(target, mode=getattr(config, "routing_mode", "auto"))
+
+    PURPLE = "[38;5;141m"
+    GREEN = "[38;5;114m"
+    YELLOW = "[38;5;179m"
+    DIM = "[2;37m"
+    RESET = "[0m"
+    colour = {"bash": GREEN, "agentic": PURPLE, "ambiguous": YELLOW}[exp.route.value]
+
+    _out("")
+    _out(f"  {DIM}line{RESET}   {exp.line}")
+    _out(f"  {DIM}route{RESET}  {colour}{exp.route.value}{RESET}")
+    _out(f"  {DIM}score{RESET}  bash {exp.bash_score}  vs  nl {exp.nl_score}")
+    _out("")
+    if exp.reasons:
+        _out(f"  {DIM}rules that fired{RESET}")
+        for side, reason, points in exp.reasons:
+            tag = f"{GREEN}bash{RESET}" if side == "bash" else f"{PURPLE}nl  {RESET}"
+            score = f"+{points}" if points else "  "
+            _out(f"    {tag} {score}  {reason}")
+    else:
+        _out(f"  {DIM}no scoring rules fired{RESET}")
+    _out("")
+    _out(f"  {DIM}decision{RESET}  {exp.decisive}")
+    _out("")
+    return True
+
+
 def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool:
     global _budget_hard_stop
     cmd = line.strip()
@@ -513,6 +621,19 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
     if cmd in ("/history", "/hist"):
         _show_history(db)
         return True
+
+    if cmd == "/tour":
+        from shell.tour import run_tour
+        run_tour()
+        return True
+
+    if cmd in ("/bash", "/plain"):
+        from shell.mode import run_plain_subshell
+        run_plain_subshell(os.getcwd())
+        return True
+
+    if cmd == "/route" or cmd.startswith("/route "):
+        return _handle_route_builtin(cmd[len("/route"):], config)
 
     if cmd == "/task" or cmd.startswith("/task "):
         parts = cmd[len("/task"):].strip().split()
@@ -873,6 +994,8 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 except (EOFError, KeyboardInterrupt):
                     choice = "b"
                 route = Route.AGENTIC if choice == "a" else Route.BASH
+                # The user just labelled this line for us (I3).
+                _record_router_correction(line, route.value)
 
             if route == Route.BASH:
                 if is_destructive(line):

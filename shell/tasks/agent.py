@@ -151,7 +151,7 @@ class TaskAgent:
     def _call_llm(self, messages: list[dict]):
         from shell.loop import _build_backend
         import asyncio
-        backend = _build_backend(self._config)
+        backend = _build_backend(self._config, mock_mode="worker")
         print("[agent] calling LLM...", flush=True)
         try:
             loop = asyncio.new_event_loop()
