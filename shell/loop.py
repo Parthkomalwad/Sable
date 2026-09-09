@@ -160,6 +160,14 @@ def _make_key_bindings(db=None) -> KeyBindings:
         except Exception:
             pass
 
+    @kb.add("c-\\")
+    def _ctrl_backslash(event) -> None:
+        """Drop to a plain bash subshell for as long as the user wants."""
+        event.app.current_buffer.set_document(
+            __import__("prompt_toolkit.document", fromlist=["Document"]).Document("/bash")
+        )
+        event.app.current_buffer.validate_and_handle()
+
     @kb.add("c-x")
     def _ctrl_x(event) -> None:
         event.app.current_buffer.set_document(
@@ -289,6 +297,7 @@ _HELP_TEXT = (
     "  /task           Manage background agents\n"
     "  /skill          Manage skill files\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
+    "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
     "  /budget reset  Clear hard-stop budget flag\n"
     "  /memory                  View current context\n"
     "  /memory versions         List all saved snapshots\n"
@@ -610,6 +619,11 @@ def _handle_builtin(line: str, db, session_id: str, config: ShellConfig) -> bool
 
     if cmd in ("/history", "/hist"):
         _show_history(db)
+        return True
+
+    if cmd in ("/bash", "/plain"):
+        from shell.mode import run_plain_subshell
+        run_plain_subshell(os.getcwd())
         return True
 
     if cmd == "/route" or cmd.startswith("/route "):

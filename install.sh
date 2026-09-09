@@ -3,6 +3,21 @@ set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# --wrap-only: install the wrapper and venv but do not touch the login shell.
+# No chsh, no /etc/shells entry, no .bashrc auto-launch. Start it yourself with
+# `sable` or `sable --wrap`. The low-commitment path for a shared server.
+WRAP_ONLY=0
+for arg in "$@"; do
+    case "$arg" in
+        --wrap-only) WRAP_ONLY=1 ;;
+        -h|--help)
+            echo "usage: bash install.sh [--wrap-only]"
+            echo "  --wrap-only  do not change the login shell; run sable manually"
+            exit 0
+            ;;
+    esac
+done
+
 # If run via sudo, use the real user's home not root's
 if [ -n "${SUDO_USER:-}" ]; then
     REAL_USER="$SUDO_USER"
@@ -43,6 +58,11 @@ SESSION="sable-\${USER}"
 STAMP_FILE="\$HOME/.local/share/agentic-shell/install_stamp"
 CURRENT_STAMP="$INSTALL_DIR:$VENV_DIR"
 
+if [ -f "\$HOME/.sable/disabled" ]; then
+    echo "sable is off, run: sable on"
+    exec /bin/bash
+fi
+
 if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     if tmux has-session -t "\$SESSION" 2>/dev/null; then
         # Session exists just reattach (second SSH connection, don't kill it)
@@ -77,7 +97,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
 
     tmux send-keys -t "\$TELE_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
     tmux send-keys -t "\$TASK_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
-    tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash run sable to return'; exec /bin/bash; fi; echo '[shell exited restarting in 2s]'; sleep 2; done" Enter
+    tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do if [ -f \"\$HOME/.sable/disabled\" ]; then echo 'sable is off, run: sable on'; exec /bin/bash; fi; rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash run sable to return'; exec /bin/bash; fi; echo '[shell exited restarting in 2s]'; sleep 2; done" Enter
 
     tmux select-pane -t "\$MAIN_PANE"
     exec tmux attach-session -t "\$SESSION"
@@ -155,6 +175,14 @@ sudo chmod 1777 "$AUDIT_LOG_DIR"
 sudo touch "$AUDIT_LOG_DIR/audit.log"
 sudo chmod 0666 "$AUDIT_LOG_DIR/audit.log"
 
+if [ "$WRAP_ONLY" = "1" ]; then
+    echo ""
+    echo "✓ sable installed for $REAL_USER (wrap-only)."
+    echo "  Login shell unchanged. Start it with: sable"
+    echo "  Or run it inside your current bash with: sable --wrap"
+    exit 0
+fi
+
 if ! grep -q "$WRAPPER" /etc/shells; then
     echo "==> Registering $WRAPPER in /etc/shells"
     echo "$WRAPPER" | sudo tee -a /etc/shells > /dev/null
@@ -172,7 +200,7 @@ if ! grep -q "$MARKER" "$BASHRC" 2>/dev/null; then
     cat >> "$BASHRC" <<'BASHRC_EOF'
 
 # sable auto-launch
-if [ -z "$TMUX" ] && [ -z "$AGENTIC_SHELL_NO_AUTO" ] && command -v sable &>/dev/null; then
+if [ -z "$TMUX" ] && [ -z "$AGENTIC_SHELL_NO_AUTO" ] && [ ! -f "$HOME/.sable/disabled" ]    && command -v sable &>/dev/null; then
     exec sable
 fi
 BASHRC_EOF

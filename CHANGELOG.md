@@ -13,6 +13,10 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `/route why "<line>"` prints the bash score, the NL score, every rule that fired and the decisive reason.
 - Ctrl+B and `[b/a]` answers append `input<TAB>label` rows to `~/.sable/state/router_corrections.tsv`, in the same format as the corpus.
 - `shell/paths.py` resolves the new `~/.sable/` state locations.
+- Mode switch (I13): `/bash` (alias `/plain`, key Ctrl+\) opens a plain bash subshell in the same pane with the sidebar hidden and a `[plain]` prompt; `exit` returns to Sable with session context intact.
+- `sable on|off|status` toggles the agentic layer via `~/.sable/disabled`, honoured by the `.bashrc` launcher, the wrapper and the tmux restart loop, which fall through to bash with "sable is off, run: sable on".
+- `sable` with no arguments re-attaches a running `sable-<user>` tmux session instead of starting a second one; `sable --wrap` runs inside an existing bash; `install.sh --wrap-only` skips chsh and /etc/shells.
+- `sable --version` and `sable --help`.
 - v4 planning: `docs/vision.md`, `docs/roadmap-phases.md`, `docs/structure.md`.
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
