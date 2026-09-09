@@ -52,7 +52,18 @@ def shannon_entropy(s: str) -> float:
 
 
 def looks_like_secret(token: str) -> bool:
-    """Return True if the token looks like a secret based on length and entropy."""
+    """Return True if the token looks like a secret.
+
+    Two independent signals, either is enough:
+    1. The token matches a known secret format (SECRET_PATTERNS). Structured
+       credentials such as AWS access keys are not high-entropy enough to trip
+       the threshold below, so the format check has to come first.
+    2. The token is long and high-entropy, which catches formats we do not
+       have a pattern for.
+    """
+    for pattern in SECRET_PATTERNS:
+        if re.search(pattern, token):
+            return True
     return len(token) >= 20 and shannon_entropy(token) > 4.5
 
 
