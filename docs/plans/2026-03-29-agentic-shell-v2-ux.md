@@ -1,4 +1,4 @@
-# Agentic Shell v2 UX Implementation Plan
+# Sable v2 UX Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -690,9 +690,9 @@ rtk git push
 - [ ] **Step 2: On the Linux server, pull and restart**
 
 ```bash
-cd ~/path/to/AgenticOS && git pull origin main
+cd ~/path/to/Sable && git pull origin main
 tmux kill-server
-agentic-shell
+sable
 ```
 
 - [ ] **Step 3: Verify each feature manually**

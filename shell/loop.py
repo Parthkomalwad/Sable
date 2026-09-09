@@ -241,7 +241,7 @@ def _check_and_enforce_budget(db, config: ShellConfig, session_id: str) -> bool:
 
 
 _HELP_TEXT = (
-    "\nAgentic Shell - Built-in Commands\n"
+    "\nSable - Built-in Commands\n"
     "----------------------------------\n"
     "  /new           Start a fresh tmux session\n"
     "  /clear         Clear the terminal screen\n"
@@ -724,7 +724,7 @@ def _start_new_session() -> None:
     except Exception:
         current_session = ""
 
-    new_name = f"agentic-{int(time.time()) % 10000}"
+    new_name = f"sable-{int(time.time()) % 10000}"
     install_dir = os.environ.get("PYTHONPATH", "")
     venv_python = os.environ.get("AGENTIC_PYTHON", sys.executable)
 

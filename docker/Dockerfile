@@ -1,12 +1,12 @@
-# Agentic Shell Layer production image
+# Sable production image
 # Base: Ubuntu 22.04 LTS (matches target deployment environment)
 #
-# Build:  docker build -t agentic-shell -f docker/Dockerfile .
-# Run:    docker run -it agentic-shell
-# SSH:    docker run -it -e ANTHROPIC_API_KEY=... agentic-shell
+# Build:  docker build -t sable -f docker/Dockerfile .
+# Run:    docker run -it sable
+# SSH:    docker run -it -e ANTHROPIC_API_KEY=... sable
 #
 # On startup the shell runs the first-run wizard if no config is present.
-# Set AGENTIC_BACKEND, AGENTIC_MODEL env vars to skip the wizard.
+# Set SABLE_BACKEND, SABLE_MODEL env vars to skip the wizard.
 
 FROM ubuntu:22.04
 
@@ -47,25 +47,25 @@ RUN mkdir -p \
     && touch /var/log/agentic-shell/audit.log \
     && chmod 0666 /var/log/agentic-shell/audit.log
 
-# Register agentic-shell as a valid login shell
+# Register sable as a valid login shell
 RUN echo "/usr/bin/python3 -m shell.main" >> /etc/shells || true
 
 # Write a thin wrapper so it can be used as a login shell by path
-RUN printf '#!/bin/bash\nexec python3 -m shell.main "$@"\n' > /usr/local/bin/agentic-shell \
-    && chmod +x /usr/local/bin/agentic-shell
+RUN printf '#!/bin/bash\nexec python3 -m shell.main "$@"\n' > /usr/local/bin/sable \
+    && chmod +x /usr/local/bin/sable
 
 # Optional: pre-seed a minimal config via build args (skips wizard)
-ARG AGENTIC_BACKEND=ollama
-ARG AGENTIC_MODEL=llama3.1
-ARG AGENTIC_API_BASE=http://localhost:11434
+ARG SABLE_BACKEND=ollama
+ARG SABLE_MODEL=llama3.1
+ARG SABLE_API_BASE=http://localhost:11434
 RUN python3 -c "\
 import json, pathlib; \
 cfg = pathlib.Path('/root/.config/agentic-shell/config.json'); \
 cfg.parent.mkdir(parents=True, exist_ok=True); \
 cfg.write_text(json.dumps({ \
-  'backend': '${AGENTIC_BACKEND}', \
-  'model': '${AGENTIC_MODEL}', \
-  'api_base': '${AGENTIC_API_BASE}', \
+  'backend': '${SABLE_BACKEND}', \
+  'model': '${SABLE_MODEL}', \
+  'api_base': '${SABLE_API_BASE}', \
   'routing_mode': 'auto', \
   'daily_token_budget': None, \
   'session_token_budget': None, \
@@ -75,5 +75,5 @@ cfg.write_text(json.dumps({ \
 import os, stat; os.chmod(cfg, stat.S_IRUSR | stat.S_IWUSR) \
 "
 
-# Production: launch agentic-shell as the login shell
-CMD ["/usr/local/bin/agentic-shell"]
+# Production: launch sable as the login shell
+CMD ["/usr/local/bin/sable"]

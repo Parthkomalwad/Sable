@@ -1,4 +1,4 @@
-# AgenticOS v4 Repository Structure, Configuration Model & Visibility Principles
+# Sable v4 Repository Structure, Configuration Model & Visibility Principles
 
 > Companion to [roadmap-phases.md](roadmap-phases.md) and [vision.md](vision.md).
 > This doc answers three questions: **how should the code be organised so it scales**, **how is behaviour driven by configuration rather than hard-coding**, and **how does the user always know what is happening**.
@@ -25,18 +25,18 @@ Adding MCP, a daemon, a policy engine, and a Textual UI on top of this layout wo
 
 ## 2. Target layout
 
-Domain-first packages under a single `agentic/` namespace (rename from `shell/` the project is no longer just a shell). Every package has one job, depends only on packages *above* it in this list, and never imports from `ui/` or `app/`.
+Domain-first packages under a single `sable/` namespace (rename from `shell/` the project is no longer just a shell). Every package has one job, depends only on packages *above* it in this list, and never imports from `ui/` or `app/`.
 
 ```
-agentic/
+sable/
   __init__.py
   __main__.py            python -m agentic  → app.main
 
   core/                  ── foundation, zero LLM knowledge ──────────────────
-    paths.py             ~/.agentic/* resolution, XDG compat, first-run mkdir
+    paths.py             ~/.sable/* resolution, XDG compat, first-run mkdir
     config/
       schema.py          ShellConfig + nested sections (dataclasses)
-      loader.py          layered load: defaults → /etc → ~/.agentic → repo → env → CLI
+      loader.py          layered load: defaults → /etc → ~/.sable → repo → env → CLI
       wizard.py          first-run setup
       keyring.py
     events/
@@ -89,7 +89,7 @@ agentic/
   memory/                ── declarative + episodic memory ───────────────────
     session.py           per-session context + token-reducer compression
     task.py              pinned-goal task memory + snapshots
-    knowledge.py         ~/.agentic/knowledge/*.md + FTS5
+    knowledge.py         ~/.sable/knowledge/*.md + FTS5
     user_model.py
 
   mcp/                   ── protocol ────────────────────────────────────────
@@ -98,7 +98,7 @@ agentic/
     registry.py          /mcp search
 
   daemon/                ── unattended work ─────────────────────────────────
-    service.py           agenticd main loop (bus drain, schedules, maintenance)
+    service.py           sabled main loop (bus drain, schedules, maintenance)
     schedule.py          NL cron rows → jobs
     watchers.py          file / log / metric / webhook triggers
     notify.py            ntfy / slack / telegram / email
@@ -130,7 +130,7 @@ agentic/
     intent_stopwords.txt
 
 tests/
-  unit/<package>/        mirrors agentic/ one-to-one
+  unit/<package>/        mirrors sable/ one-to-one
   integration/
   fixtures/mock_llm.py   canned responses per role
   evals/                 Phase 9 task bank
@@ -156,11 +156,11 @@ Lower layers never import higher ones. `agents` never imports `ui`; it **publish
 
 ### 3.1 One home
 ```
-~/.agentic/
+~/.sable/
   config.toml            user config (was config.json; TOML for comments + sections)
   policy.yaml            allow / confirm / deny rules, tiers
   hooks/                 executable scripts by lifecycle name
-  prompts/               overrides for agentic/llm/prompts/*.md (same filename wins)
+  prompts/               overrides for sable/llm/prompts/*.md (same filename wins)
   themes/                user palettes
   skills/<slug>/SKILL.md
   knowledge/*.md
@@ -171,17 +171,17 @@ Lower layers never import higher ones. `agents` never imports `ui`; it **publish
     sessions.db          all tables, WAL
     history
     audit.jsonl          provenance ledger (also mirrored to /var/log when writable)
-  logs/agenticd.log
+  logs/sabled.log
 ```
 `core/paths.py` resolves everything; old XDG paths are symlinked for one release, then removed.
 
 ### 3.2 Layered config, visible provenance
-Precedence (lowest → highest): built-in defaults → `/etc/agentic/config.toml` → `~/.agentic/config.toml` → `./.agentic.toml` in the current repo → `AGENTIC_*` env vars → CLI flags.
+Precedence (lowest → highest): built-in defaults → `/etc/sable/config.toml` → `~/.sable/config.toml` → `./.sable.toml` in the current repo → `AGENTIC_*` env vars → CLI flags.
 `/config show` prints every effective value **with the layer it came from**, e.g.
 ```
 agents.orchestrator.max_turns = 20      (default)
-models.orchestrator          = claude-sonnet-5   (~/.agentic/config.toml)
-policy.default_tier          = confirm  (./.agentic.toml)
+models.orchestrator          = claude-sonnet-5   (~/.sable/config.toml)
+policy.default_tier          = confirm  (./.sable.toml)
 ```
 That single feature answers "why did it do that?" for configuration the same way `/audit` does for actions.
 
@@ -239,7 +239,7 @@ spinner_verbs = "fun"               # fun | plain | off
 Every key has a default in `schema.py`; `docs/config-reference.md` is generated from the dataclass docstrings so the reference can never drift.
 
 ### 3.4 Prompts and rules are files
-System prompts (`llm/prompts/orchestrator.md`, `worker.md`, `skill_writer.md`, `router.md`) and the destructive-pattern list (`policy/defaults/policy.yaml`) ship as data. A user overrides by dropping a same-named file in `~/.agentic/prompts/` or editing `policy.yaml`. `/prompt show orchestrator` prints the effective prompt with its source path.
+System prompts (`llm/prompts/orchestrator.md`, `worker.md`, `skill_writer.md`, `router.md`) and the destructive-pattern list (`policy/defaults/policy.yaml`) ship as data. A user overrides by dropping a same-named file in `~/.sable/prompts/` or editing `policy.yaml`. `/prompt show orchestrator` prints the effective prompt with its source path.
 
 ---
 
@@ -257,7 +257,7 @@ These are UX rules every feature spec must satisfy. They're what turn "an agent 
 5. **Autonomy is opt-in per tier and per surface.** Defaults: interactive = `confirm`; daemon = `allow`-tier only, everything else queued. Changing that is a one-line policy edit that `/config show` and `/policy explain` make visible.
 6. **Cost is always on screen.** Per-block cost, session total in the prompt segment, today's total in the sidebar, per-agent in `/dash`. Budget warnings are blocks, not log lines.
 7. **Nothing swallows errors.** Typed exceptions → an error block with the exception name, the action that failed, and a `/why` pointer. `except Exception: pass` is banned by a lint test.
-8. **Human-readable on disk.** Skills, knowledge, policy, schedules, prompts, audit all plain text under `~/.agentic/`. If the UI is gone, `cat` still explains the system.
+8. **Human-readable on disk.** Skills, knowledge, policy, schedules, prompts, audit all plain text under `~/.sable/`. If the UI is gone, `cat` still explains the system.
 9. **Progressive disclosure.** Default view is calm: one block per action, badges, counts. Detail is one key away (`Tab` expands a block, `/dash` opens lanes, `?` explains). Power users get `--verbose` and `/events tail`.
 10. **Consistent keys and colours across every surface** (REPL, sidebar, dash, palette): green read-only · amber writes · red destructive · purple AI-generated · blue policy/system. Defined once in `ui/theme/`.
 
@@ -268,7 +268,7 @@ These are UX rules every feature spec must satisfy. They're what turn "an agent 
 Mechanical move first, behaviour change later. Every step ends with `pytest tests/unit` green.
 
 1. **Baseline**: Phase 0 tests merged; add `tests/unit/test_layering.py` (import-graph rule from §2) it will fail initially and becomes the migration's finish line.
-2. **`git mv` packages** into the `agentic/` tree per §2 table below; leave `shell/__init__.py` as a **compat shim** that re-exports the old paths with a `DeprecationWarning` for one release so `install.sh`, the Dockerfiles, and tmux `send_keys` commands keep working.
+2. **`git mv` packages** into the `sable/` tree per §2 table below; leave `shell/__init__.py` as a **compat shim** that re-exports the old paths with a `DeprecationWarning` for one release so `install.sh`, the Dockerfiles, and tmux `send_keys` commands keep working.
 3. **Split `loop.py`** into `app/repl.py`, `app/builtins/*.py`, `core/audit.py`, `llm/registry.py`, `ui/prompt/*`. No logic changes pure extraction with tests pinned.
 4. **Extract data**: destructive patterns → `policy/defaults/policy.yaml`; prompts → `llm/prompts/*.md`; verbs/stopwords → `data/`; numeric constants → `config/schema.py` defaults.
 5. **Paths**: `core/paths.py` + symlink migration on first run; update `install.sh`, Dockerfiles, `uninstall.sh`.
@@ -277,26 +277,26 @@ Mechanical move first, behaviour change later. Every step ends with `pytest test
 
 | Current | Target |
 |---|---|
-| `shell/main.py` | `agentic/app/main.py` (bypass stays line 1) |
-| `shell/loop.py` | `agentic/app/repl.py` + `app/builtins/*` + `core/audit.py` + `llm/registry.py` + `ui/prompt/*` |
-| `shell/router.py` | `agentic/agents/router.py` |
-| `shell/executor.py` | `agentic/core/executor.py` + `ui/renderers/{ls,cat}.py` |
-| `shell/safety.py` | `agentic/policy/{engine,secrets}.py` + `policy/defaults/policy.yaml` |
-| `shell/planner.py` | `agentic/agents/planner.py` |
-| `shell/llm/*` | `agentic/llm/*` |
-| `shell/config/*` | `agentic/core/config/*` |
-| `shell/telemetry/db.py, events.py` | `agentic/core/db.py`, `core/migrations/`, `core/events/types.py` |
-| `shell/telemetry/watch.py` | `agentic/ui/sidebar/` |
-| `shell/memory/*` | `agentic/memory/session.py` |
-| `shell/clipboard/*` | `agentic/app/builtins/clip.py` + `ui/palette.py` |
-| `shell/tui/layout.py` | `agentic/ui/tmux/layout.py` |
-| `shell/tui/panel.py` | `agentic/app/builtins/config.py` + `ui/…` |
-| `shell/tasks/orchestrator.py, agent.py` | `agentic/agents/runtime.py` + `agents/roles/*` (Phase 1 merges them) |
-| `shell/tasks/manager.py, reconcile.py, sandbox.py` | `agentic/agents/{manager,reconcile,sandbox}.py` |
-| `shell/tasks/memory.py` | `agentic/memory/task.py` |
-| `shell/tasks/skills.py` | `agentic/skills/loader.py` |
-| `shell/tasks/panel.py` | `agentic/ui/sidebar/agents_panel.py` |
-| `shell/skills/*` | `agentic/skills/{watcher,crystalliser,index}.py` |
+| `shell/main.py` | `sable/app/main.py` (bypass stays line 1) |
+| `shell/loop.py` | `sable/app/repl.py` + `app/builtins/*` + `core/audit.py` + `llm/registry.py` + `ui/prompt/*` |
+| `shell/router.py` | `sable/agents/router.py` |
+| `shell/executor.py` | `sable/core/executor.py` + `ui/renderers/{ls,cat}.py` |
+| `shell/safety.py` | `sable/policy/{engine,secrets}.py` + `policy/defaults/policy.yaml` |
+| `shell/planner.py` | `sable/agents/planner.py` |
+| `shell/llm/*` | `sable/llm/*` |
+| `shell/config/*` | `sable/core/config/*` |
+| `shell/telemetry/db.py, events.py` | `sable/core/db.py`, `core/migrations/`, `core/events/types.py` |
+| `shell/telemetry/watch.py` | `sable/ui/sidebar/` |
+| `shell/memory/*` | `sable/memory/session.py` |
+| `shell/clipboard/*` | `sable/app/builtins/clip.py` + `ui/palette.py` |
+| `shell/tui/layout.py` | `sable/ui/tmux/layout.py` |
+| `shell/tui/panel.py` | `sable/app/builtins/config.py` + `ui/…` |
+| `shell/tasks/orchestrator.py, agent.py` | `sable/agents/runtime.py` + `agents/roles/*` (Phase 1 merges them) |
+| `shell/tasks/manager.py, reconcile.py, sandbox.py` | `sable/agents/{manager,reconcile,sandbox}.py` |
+| `shell/tasks/memory.py` | `sable/memory/task.py` |
+| `shell/tasks/skills.py` | `sable/skills/loader.py` |
+| `shell/tasks/panel.py` | `sable/ui/sidebar/agents_panel.py` |
+| `shell/skills/*` | `sable/skills/{watcher,crystalliser,index}.py` |
 
 ---
 
@@ -304,7 +304,7 @@ Mechanical move first, behaviour change later. Every step ends with `pytest test
 
 - **Scaling**: MCP, daemon, policy, and the Textual UI each get a package with a clear contract instead of being bolted onto `loop.py`. New builtins are one file each. New agent roles are one file each. New renderers are one file each.
 - **Testability**: the layering rule makes `agents/` testable with no terminal, and `ui/` testable with a fake bus.
-- **Config-driven**: anything a user might reasonably want to change is a file under `~/.agentic/` and visible through `/config show` with provenance.
+- **Config-driven**: anything a user might reasonably want to change is a file under `~/.sable/` and visible through `/config show` with provenance.
 - **Visibility**: one event stream, four views, a `/why` for every decision, one INBOX for every approval.
 
 ---

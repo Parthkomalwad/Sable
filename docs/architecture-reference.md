@@ -1,4 +1,4 @@
-# AgenticOS - Full Architecture Document
+# Sable - Full Architecture Document
 
 > This document is intended for generating system diagrams. It describes every component, data flow, and integration point in the system.
 
@@ -6,7 +6,7 @@
 
 ## 1. System Overview
 
-AgenticOS is a Python login shell that replaces `/bin/bash` on a Linux server. When a user SSHs in, they land in this shell instead of bash. The shell intercepts every line of input and routes it either to the operating system (bash) or to a large language model (LLM). The LLM returns a shell command, which is shown to the user for review before execution. A persistent tmux sidebar displays live system stats, token costs, git status, and a snippet clipboard.
+Sable is a Python login shell that replaces `/bin/bash` on a Linux server. When a user SSHs in, they land in this shell instead of bash. The shell intercepts every line of input and routes it either to the operating system (bash) or to a large language model (LLM). The LLM returns a shell command, which is shown to the user for review before execution. A persistent tmux sidebar displays live system stats, token costs, git status, and a snippet clipboard.
 
 **Core loop:**
 ```
@@ -393,7 +393,7 @@ First-run interactive setup. Prompts for backend, model, API key, routing mode. 
 
 ### Session Structure
 ```
-tmux session "agentic-NNNN"
+tmux session "sable-NNNN"
 ├── Window 0
 │   ├── Pane 0 (left, ~80% width)  - shell REPL
 │   └── Pane 1 (right, 48 cols)    - sidebar watch process
@@ -453,8 +453,8 @@ Sidebar (separate process, every 5s)
   exit_requested           - flag file for /exit to drop to bash
   clip_key                 - sidebar key-press state file (UP/DOWN/ENTER)
 
-/usr/local/bin/agentic-shell  - installed launcher script
-/etc/shells                   - agentic-shell registered here
+/usr/local/bin/sable  - installed launcher script
+/etc/shells                   - sable registered here
 /var/log/agentic-shell/
   audit.log                - all commands: timestamp, user, action, exit code
 ```

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** No tests required. Development only.
 
-**Goal:** Add a persistent snippet/clipboard system to AgenticOS a sidebar panel showing saved commands, a `/clip` builtin for managing them, and click-to-run from the sidebar via tmux.
+**Goal:** Add a persistent snippet/clipboard system to Sable a sidebar panel showing saved commands, a `/clip` builtin for managing them, and click-to-run from the sidebar via tmux.
 
 **Architecture:** New `shell/clipboard/` module handles TUI and logic. SQLite DB extended with a `snippets` table. Sidebar gets a new scrollable `◈ clipboard` panel between tokens and shortcuts. Arrow keys in the sidebar pane scroll the panel; Enter sends the selected snippet to the main pane.
 

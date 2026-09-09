@@ -9,13 +9,14 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
 - Public `ROADMAP.md`, `docs/branching.md`, `pyproject.toml`, issue/PR templates, Dependabot, CODEOWNERS.
-- Vision: `C6` Memory Palace (rooms and tiers of agent memory, FTS5 recall, provenance, consolidation; subsumes C1–C5) scheduled in Phase 7; `I13` mode switch (`/bash` subshell, `agentic on|off|status`, re-attach, `--wrap`) scheduled in Phase 0.
+- Vision: `C6` Memory Palace (rooms and tiers of agent memory, FTS5 recall, provenance, consolidation; subsumes C1–C5) scheduled in Phase 7; `I13` mode switch (`/bash` subshell, `sable on|off|status`, re-attach, `--wrap`) scheduled in Phase 0.
 - README and `docs/architecture.md` blocklist count corrected to 11.
 - Vision: Pillar J agent capabilities (tool registry, web search/fetch, structured file tools, verify-after-act, reflect/retry, scratchpad, docs and system introspection tools, sandboxed Python, ask-user tool, parallel reads, per-tool budgets) scheduled as Phase 3.5.
 - Vision: Pillar K everyday intelligence and rehearsal (ghost-text suggestions, explain-last-error, learn from edits, NL aliases, rehearsal mode, filesystem undo, step-up approval, signed skills, incident → runbook, self-evaluation loop, repo-aware context, session sharing) spread across Phases 1, 2, 4, 8 and 9.
 - `docs/architecture-v4.md`: eight Mermaid diagrams tracing the system (layer map, request lifecycle, agent turn state machine, sub-agent spawn, skill loop, Memory Palace, daemon, processes and IPC).
 
 ### Changed
+- **Project renamed to Sable.** Command is `sable`, tmux session `sable-<user>`, image `sable`, package `sable-shell`, target package `sable/`, daemon `sabled`, future home `~/.sable/`. Runtime state paths (`~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `/var/log/agentic-shell`), the keyring id and `AGENTIC_NEW_SESSION` are unchanged until the Phase 0.5 migration, so existing installs keep their data.
 - README rewritten for the public repo: status table, quick start for Linux and the playground, roadmap, docs index.
 - `task.md` archived to `docs/history/tasks-v1-v3.md`; stray `test/` directory and superseded `docs/FABLE_ENTRY_POINT.md` removed.
 - Docs reorganised: `PRD.md` → `docs/specs/prd-v1.md`, `docs/superpowers/{specs,plans}` → `docs/{specs,plans}`, diagrams → `docs/assets/`, lower-case names (`architecture.md`, `vision.md`, `roadmap-phases.md`, `structure.md`, `branching.md`), `docs/README.md` index.

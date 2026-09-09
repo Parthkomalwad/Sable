@@ -807,7 +807,7 @@ git commit -m "feat: add /clip to shortcuts panel"
 - [ ] **Step 1: Pull on the server and restart**
 
 ```bash
-git pull && tmux kill-server && agentic-shell
+git pull && tmux kill-server && sable
 ```
 
 - [ ] **Step 2: Add a snippet**

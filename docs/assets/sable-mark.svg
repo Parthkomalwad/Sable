@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="120" viewBox="0 0 420 120">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151C25"/>
+      <stop offset="1" stop-color="#0B0F14"/>
+    </linearGradient>
+    <linearGradient id="ac" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C4B8FF"/>
+      <stop offset="1" stop-color="#8B7CF6"/>
+    </linearGradient>
+    <style>
+      @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+      #cursor{animation:pulse 1.2s ease-in-out infinite}
+      @media (prefers-reduced-motion:reduce){#cursor{animation:none}}
+    </style>
+  </defs>
+  <rect x="10" y="10" width="100" height="100" rx="22" fill="url(#bg)"/>
+  <path d="M42 38 L70 60 L42 82" fill="none" stroke="url(#ac)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect id="cursor" x="74" y="74" width="16" height="8" rx="2" fill="#8B7CF6"/>
+  <text x="132" y="74" font-family="'Bricolage Grotesque', 'IBM Plex Sans', system-ui, sans-serif" font-size="58" font-weight="700" letter-spacing="-1.5" fill="#E6EAEF">sable</text>
+  <text x="134" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" letter-spacing="2.5" fill="#8B94A0">THE SHELL THAT ASKS FIRST</text>
+</svg>

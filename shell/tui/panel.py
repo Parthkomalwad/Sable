@@ -61,7 +61,7 @@ def render_telemetry_panel(stats: dict) -> None:
         lines.append(Text(f"  {tokens} tok  ${cost:.5f}", style="dim"))
 
     content = Text("\n").join(lines)
-    console.print(Panel(content, title="[bold cyan]agentic-shell[/bold cyan]", border_style="cyan"))
+    console.print(Panel(content, title="[bold cyan]sable[/bold cyan]", border_style="cyan"))
 
 
 def render_settings_panel(config: object) -> object | None:

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# uninstall.sh Remove agentic-shell and restore the user's login shell to bash.
+# uninstall.sh Remove sable and restore the user's login shell to bash.
 #
 # Usage: bash uninstall.sh
 # Must be run as the user whose shell will be restored.
 
 set -euo pipefail
 
-WRAPPER="/usr/local/bin/agentic-shell"
+WRAPPER="/usr/local/bin/sable"
 VENV_DIR="$HOME/.local/share/agentic-shell/venv"
 CURRENT_USER="$(whoami)"
 RESTORE_SHELL="${1:-/bin/bash}"
 
-echo "==> Uninstalling agentic-shell for user: $CURRENT_USER"
+echo "==> Uninstalling sable for user: $CURRENT_USER"
 
 # --- 1. Restore login shell ---
 CURRENT_SHELL="$(getent passwd "$CURRENT_USER" | cut -d: -f7)"
@@ -47,4 +47,4 @@ echo "  Config kept at ~/.config/agentic-shell/ (remove manually if desired)"
 echo "  History kept at ~/.local/share/agentic-shell/history"
 echo "  Database kept at ~/.local/share/agentic-shell/sessions.db"
 echo ""
-echo "✓ agentic-shell uninstalled. Log out and back in to use $RESTORE_SHELL."
+echo "✓ sable uninstalled. Log out and back in to use $RESTORE_SHELL."

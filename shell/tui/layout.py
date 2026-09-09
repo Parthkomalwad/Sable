@@ -1,6 +1,6 @@
 """tmux session and pane layout.
 
-On login, creates a new tmux session named 'agentic-shell-{username}' and splits
+On login, creates a new tmux session named 'sable-{username}' and splits
 the window 80/20 horizontally:
 - Left (80%): shell REPL
 - Right (20%): telemetry watch process
@@ -26,7 +26,7 @@ def _get_terminal_width() -> int:
 
 
 def create_session(username: str) -> None:
-    """Create the agentic-shell tmux session with 80/20 split.
+    """Create the sable tmux session with 80/20 split.
 
     If already inside a tmux session, this is a no-op.
 
@@ -44,7 +44,7 @@ def create_session(username: str) -> None:
         import libtmux
 
         server = libtmux.Server()
-        session_name = f"agentic-shell-{username}"
+        session_name = f"sable-{username}"
 
         # If session already exists, attach and return
         existing = server.find_where({"session_name": session_name})

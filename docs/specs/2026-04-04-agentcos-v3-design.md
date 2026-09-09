@@ -1,4 +1,4 @@
-# AgenticOS v3 Design Document
+# Sable v3 Design Document
 
 **Date:** 2026-04-04  
 **Status:** Approved for implementation  

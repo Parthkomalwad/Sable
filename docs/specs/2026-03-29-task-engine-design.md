@@ -8,7 +8,7 @@
 
 ## Overview
 
-The Task Engine adds autonomous, sandboxed, long-running task agents to AgenticOS. The main shell becomes an orchestrator it spawns named task agents, each running in its own tmux window with an isolated filesystem sandbox, separate LLM context, versioned memory, and access to a shared skills library. Tasks survive SSH disconnects and can be monitored, entered, interrupted, and resumed at any time.
+The Task Engine adds autonomous, sandboxed, long-running task agents to Sable. The main shell becomes an orchestrator it spawns named task agents, each running in its own tmux window with an isolated filesystem sandbox, separate LLM context, versioned memory, and access to a shared skills library. Tasks survive SSH disconnects and can be monitored, entered, interrupted, and resumed at any time.
 
 ---
 

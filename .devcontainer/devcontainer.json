@@ -1,5 +1,5 @@
 {
-  "name": "AgenticOS playground",
+  "name": "Sable playground",
   "build": {
     "dockerfile": "../docker/Dockerfile.playground",
     "context": ".."
@@ -7,7 +7,7 @@
   "workspaceFolder": "/app",
   "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
   "mounts": [
-    "source=agentic-playground-home,target=/root,type=volume"
+    "source=sable-playground-home,target=/root,type=volume"
   ],
   "runArgs": [
     "--cap-add=SYS_ADMIN",
@@ -16,7 +16,7 @@
   ],
   "containerEnv": {
     "PYTHONPATH": "/app",
-    "AGENTIC_API_BASE": "http://host.docker.internal:11434"
+    "SABLE_API_BASE": "http://host.docker.internal:11434"
   },
   "overrideCommand": true,
   "postStartCommand": "/usr/sbin/sshd || true",

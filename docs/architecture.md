@@ -1,4 +1,4 @@
-# AgenticOS - Architecture Overview
+# Sable - Architecture Overview
 
 > A Python login shell that replaces `/bin/bash` on any Linux server. SSH in. Your server understands plain English.
 
@@ -54,7 +54,7 @@ This diagram covers the tmux session structure, the sidebar watch process and it
 
 **Key paths:**
 
-- On login, `layout.py` uses `libtmux` to create a tmux session named `agentic-NNNN` with a single window split into two panes: pane 0 (shell, ~80% width) and pane 1 (sidebar, 44 columns fixed).
+- On login, `layout.py` uses `libtmux` to create a tmux session named `sable-NNNN` with a single window split into two panes: pane 0 (shell, ~80% width) and pane 1 (sidebar, 44 columns fixed).
 - The sidebar is a separate Python process running in pane 1. It polls SQLite every 5 seconds and re-renders seven Rich panels: session stats, system metrics, git status, top processes, 7-day token table, clipboard snippet list, and shortcuts reference.
 - Sidebar width is fixed at 44 columns. Terminal size is not queried dynamically inside tmux (`PROMPT_TOOLKIT_NO_CPR=1` prevents cursor position queries that freeze the prompt).
 - The clipboard picker is a full-screen `prompt_toolkit.Application` launched by `/clip`. It supports live filter, `↑↓` navigation, inline add, delete, and `Enter` to run the selected snippet in pane 0 via `tmux send-keys`.
@@ -131,8 +131,8 @@ Sidebar (separate process, pane 1)
   exit_requested               flag file · /exit drops to bash
   clip_key                     sidebar IPC · UP / DOWN / ENTER
 
-/usr/local/bin/agentic-shell   installed launcher
-/etc/shells                    agentic-shell registered here
+/usr/local/bin/sable   installed launcher
+/etc/shells                    sable registered here
 /var/log/agentic-shell/
   audit.log                    all executed commands · append-only
 ```

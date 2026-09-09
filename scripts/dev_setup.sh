@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# dev_setup.sh sets up a local development environment for agentic-shell
+# dev_setup.sh sets up a local development environment for sable
 # Run once after cloning: bash scripts/dev_setup.sh
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$REPO_ROOT/.venv"
 
-echo "==> Setting up agentic-shell dev environment"
+echo "==> Setting up sable dev environment"
 echo "    repo: $REPO_ROOT"
 
 # --- Python venv ---

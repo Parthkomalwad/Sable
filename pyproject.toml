@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentic-os"
+name = "sable-shell"
 version = "0.3.0"
 description = "A Linux login shell that understands plain English, runs sandboxed agents, and learns your server."
 readme = "README.md"
@@ -41,13 +41,13 @@ dependencies = [
 dev = ["pytest>=8", "pytest-timeout>=2.3"]
 
 [project.urls]
-Homepage = "https://github.com/Parthkomalwad/Agentic_OS"
-Roadmap = "https://github.com/Parthkomalwad/Agentic_OS/blob/main/ROADMAP.md"
-Issues = "https://github.com/Parthkomalwad/Agentic_OS/issues"
-Changelog = "https://github.com/Parthkomalwad/Agentic_OS/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Parthkomalwad/sable"
+Roadmap = "https://github.com/Parthkomalwad/sable/blob/main/ROADMAP.md"
+Issues = "https://github.com/Parthkomalwad/sable/issues"
+Changelog = "https://github.com/Parthkomalwad/sable/blob/main/CHANGELOG.md"
 
 [project.scripts]
-agentic-shell = "shell.main:main"
+sable = "shell.main:main"
 
 [tool.setuptools.packages.find]
 include = ["shell*"]

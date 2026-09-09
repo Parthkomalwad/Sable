@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Writes config from env vars, starts sshd, then drops into tmux + agentic-shell.
+# Writes config from env vars, starts sshd, then drops into tmux + sable.
 set -euo pipefail
 
-BACKEND="${AGENTIC_BACKEND:-ollama}"
-MODEL="${AGENTIC_MODEL:-llama3.1}"
-API_BASE="${AGENTIC_API_BASE:-http://host.docker.internal:11434}"
+BACKEND="${SABLE_BACKEND:-ollama}"
+MODEL="${SABLE_MODEL:-llama3.1}"
+API_BASE="${SABLE_API_BASE:-http://host.docker.internal:11434}"
 
 python3 - <<EOF
 import json, os, pathlib, stat
@@ -30,4 +30,4 @@ fi
 if [ "${1:-}" = "bash" ]; then
     exec bash
 fi
-exec tmux new-session -s playground /usr/local/bin/agentic-shell
+exec tmux new-session -s playground /usr/local/bin/sable

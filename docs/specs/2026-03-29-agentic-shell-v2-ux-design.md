@@ -1,4 +1,4 @@
-# Agentic Shell v2 Conversational UX & Visual Design
+# Sable v2 Conversational UX & Visual Design
 
 **Date:** 2026-03-29
 **Status:** Approved
@@ -16,7 +16,7 @@ Make the shell feel like a smart assistant, not a command translator. Every inte
 Powerline-style colored block segments. No special font required uses Unicode block characters (`\ue0b0` with fallback to plain text if unsupported).
 
 ```
- ~/Agentic_OS   main   11:42 ❯
+ ~/sable   main   11:42 ❯
 ```
 
 **Segments (left to right):**
@@ -74,7 +74,7 @@ Once the LLM responds:
 ```
   ✓ done in 1.2s
 
- ~/Agentic_OS   main   11:43 ❯
+ ~/sable   main   11:43 ❯
 ```
 
 - `✓` in soft green (`\033[38;5;114m`)
@@ -86,7 +86,7 @@ Once the LLM responds:
 ```
   ✗ exit 1  (1.2s)
 
- ~/Agentic_OS   main   11:43 ❯
+ ~/sable   main   11:43 ❯
 ```
 
 - `✗` in soft red (`\033[38;5;203m`)

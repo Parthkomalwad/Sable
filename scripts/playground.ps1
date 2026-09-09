@@ -9,7 +9,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$image = "agentic-playground"
+$image = "sable-playground"
 
 $exists = docker images -q $image
 if ($Rebuild -or -not $exists) {
@@ -18,14 +18,14 @@ if ($Rebuild -or -not $exists) {
 }
 
 $envArgs = @()
-foreach ($name in "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "AGENTIC_BACKEND", "AGENTIC_MODEL", "AGENTIC_API_BASE") {
+foreach ($name in "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "SABLE_BACKEND", "SABLE_MODEL", "SABLE_API_BASE") {
     $val = [Environment]::GetEnvironmentVariable($name)
     if ($val) { $envArgs += @("-e", "$name=$val") }
 }
 
 docker run -it --rm `
     -v "${root}:/app" `
-    -v "agentic-playground-home:/root" `
+    -v "sable-playground-home:/root" `
     --add-host=host.docker.internal:host-gateway `
     --cap-add=SYS_ADMIN --security-opt seccomp=unconfined `
     @envArgs $image $Mode

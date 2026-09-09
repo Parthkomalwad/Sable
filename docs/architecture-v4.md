@@ -1,4 +1,4 @@
-# AgenticOS v4 Architecture: how a request moves through the system
+# Sable v4 Architecture: how a request moves through the system
 
 This document traces the system end to end, one diagram per concern. Solid boxes exist today (v0.3); dashed boxes are v4 targets from [vision.md](vision.md) and [structure.md](structure.md). Feature IDs in parentheses point at the catalog.
 
@@ -80,7 +80,7 @@ flowchart TB
     end
 
     subgraph DAEMON["daemon  (E1)"]
-        SERVICE["service.py agenticd"]
+        SERVICE["service.py sabled"]
         SCHED["schedule.py NL cron"]
         WATCHERS["watchers.py"]
         NOTIFY["notify.py"]
@@ -260,7 +260,7 @@ sequenceDiagram
     O->>M: spawn(name, goal, handoff context)
     M->>DBB: INSERT tasks (status=starting)
     M->>T: new_window("task:name")
-    T->>W: python -m agentic.agents.runtime --role worker --task name
+    T->>W: python -m sable.agents.runtime --role worker --task name
     M->>DBB: UPDATE tasks.tmux_window_id
     W->>DBB: read handoff, goal, task memory snapshot
     W->>SB: wrap every command (bwrap: workspace RW, rest RO, unshare-pid)
@@ -326,7 +326,7 @@ flowchart TB
         PROC["procedural<br/>skills"]
     end
 
-    subgraph ROOMS["rooms (by subject) ~/.agentic/palace/"]
+    subgraph ROOMS["rooms (by subject) ~/.sable/palace/"]
         R1["server/"]
         R2["repos/&lt;name&gt;/"]
         R3["user/"]
@@ -351,7 +351,7 @@ flowchart TB
 
 ## 7. Working while you are away: the daemon
 
-`agenticd` runs as a systemd user service. It never has a terminal, so it can only spawn workers whose every step is `allow`-tier; anything else goes to the INBOX and, if configured, to your phone.
+`sabled` runs as a systemd user service. It never has a terminal, so it can only spawn workers whose every step is `allow`-tier; anything else goes to the INBOX and, if configured, to your phone.
 
 ```mermaid
 flowchart LR
@@ -360,7 +360,7 @@ flowchart LR
         WATCH["watchers (E3)<br/>disk, log pattern,<br/>service down, webhook"]
         MAINT["nightly maintenance<br/>palace consolidate, skill doctor,<br/>self-eval (K10)"]
     end
-    D["agenticd<br/>service.py"]
+    D["sabled<br/>service.py"]
     CRON & WATCH & MAINT --> D
     D --> PLAN["draft plan (orchestrator role, no terminal)"]
     PLAN --> REH["rehearsal (K5)<br/>run against snapshot, diff"]
@@ -386,10 +386,10 @@ There is no central server. Three kinds of processes share one SQLite file in WA
 ```mermaid
 flowchart TB
     subgraph SSHD["sshd"]
-        LOGIN["login shell = agentic-shell"]
+        LOGIN["login shell = sable"]
     end
     LOGIN -->|"SSH_ORIGINAL_COMMAND set"| BASH["/bin/bash -c ...<br/>scp rsync git never see the agent"]
-    LOGIN -->|interactive| TM["tmux session agentic-&lt;user&gt;"]
+    LOGIN -->|interactive| TM["tmux session sable-&lt;user&gt;"]
 
     subgraph TM["tmux session"]
         P0["pane 0: REPL process<br/>prompt, router, orchestrator, blocks"]
@@ -400,10 +400,10 @@ flowchart TB
     end
 
     subgraph SYSTEMD["systemd --user"]
-        AD["agenticd"]
+        AD["sabled"]
     end
 
-    subgraph FS["~/.agentic/"]
+    subgraph FS["~/.sable/"]
         SQL[("state/sessions.db  (WAL)<br/>agent_events, tasks, task_events,<br/>token_events, skill index, palace index")]
         FILES["config.toml policy.yaml hooks/<br/>skills/ palace/ schedules.yaml"]
         FLAGS["exit_requested, disabled, clip_key"]

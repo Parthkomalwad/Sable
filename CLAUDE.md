@@ -1,4 +1,4 @@
-# CLAUDE.md: Agentic Shell Layer
+# CLAUDE.md: Sable
 
 > RTK is installed globally and handles Bash output compression automatically. No RTK-specific instructions needed here.
 
@@ -13,7 +13,7 @@ Full spec: read `docs/specs/prd-v1.md` before starting any task. It contains eve
 **v4 planning docs (September 2026).** Read these before any v4 work, in this order:
 1. `docs/vision.md`: verified current state, external research, feature catalog of ~85 items (IDs A1…K12)
 2. `docs/roadmap-phases.md`: phases -1 to 9, per-phase gates you can test, install/playground instructions
-3. `docs/structure.md`: target `agentic/` package layout, layering rule, config model, visibility principles, migration plan
+3. `docs/structure.md`: target `sable/` package layout, layering rule, config model, visibility principles, migration plan
 `docs/specs/prd-v3.md` documents the task engine + skills that already exist under `shell/tasks/` and `shell/skills/`. The project-structure section below describes the **current** tree; structure.md describes the **target** tree.
 
 Project hygiene in place: `.github/workflows/ci.yml` (unit + integration-in-Docker + convention checks), `.github/` issue/PR templates, `.devcontainer/`, `pyproject.toml`, `LICENSE` (MIT), `CONTRIBUTING.md`, `CHANGELOG.md` (update *Unreleased* in every PR), `SECURITY.md`, `CODE_OF_CONDUCT.md`. Public milestones: `ROADMAP.md`; branch/release model: `docs/branching.md` (trunk-based, `feat/<ID>-<slug>`, squash-merge). Playground for non-Linux hosts: `scripts/playground.ps1` / `.sh`. Old phase checklist archived at `docs/history/tasks-v1-v3.md`.

@@ -87,7 +87,7 @@ def test_bash_guard_no_change_when_shared(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /path/to/AgenticOS
+cd /path/to/Sable
 pytest tests/unit/test_sandbox_shared_read.py -v
 ```
 

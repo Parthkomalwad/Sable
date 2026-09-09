@@ -1,4 +1,4 @@
-# AgenticOS v4 Roadmap, Phase Gates, Playground & Architecture Notes
+# Sable v4 Roadmap, Phase Gates, Playground & Architecture Notes
 
 > Companion to [vision.md](vision.md) (the *what*). This is the *when, in what order, how do I know it works, and how do I run it*.
 > Feature IDs (A1, B2, G1 …) refer to the catalog in the vision brief.
@@ -41,7 +41,7 @@ After a reboot, `wsl` and/or `docker version` must work before anything below.
 # one time
 .\scripts\playground.ps1 -Rebuild
 
-# interactive shell (tmux + agentic-shell, source bind-mounted from this repo)
+# interactive shell (tmux + sable, source bind-mounted from this repo)
 .\scripts\playground.ps1
 
 # run unit tests inside Linux
@@ -55,7 +55,7 @@ What the playground gives you that the production image doesn't: `bubblewrap` (r
 
 Backend selection is by env var before launching:
 ```powershell
-$env:ANTHROPIC_API_KEY="sk-ant-..."; $env:AGENTIC_BACKEND="anthropic"; $env:AGENTIC_MODEL="claude-sonnet-5"
+$env:ANTHROPIC_API_KEY="sk-ant-..."; $env:SABLE_BACKEND="anthropic"; $env:SABLE_MODEL="claude-sonnet-5"
 .\scripts\playground.ps1
 ```
 or leave unset to use Ollama on the host (`ollama serve` + `ollama pull llama3.1` on Windows first).
@@ -65,7 +65,7 @@ Edits you make in VS Code on Windows are live in the container `/exit` then re-r
 ### 1.2 WSL2 Ubuntu closest to production
 ```bash
 sudo apt install tmux bubblewrap python3-venv
-git clone <repo> ~/Agentic_OS && cd ~/Agentic_OS && bash install.sh
+git clone <repo> ~/sable && cd ~/sable && bash install.sh
 ```
 Log out/in. Use this to test `install.sh`, `chsh`, `/etc/shells`, and the restart loop things Docker can't faithfully test.
 
@@ -74,7 +74,7 @@ Only `pytest tests/unit/` runs natively. The shell itself is Linux-only (ptyproc
 
 ### 1.4 Reset the playground
 ```powershell
-docker volume rm agentic-playground-home
+docker volume rm sable-playground-home
 ```
 
 ---
@@ -94,14 +94,14 @@ docker volume rm agentic-playground-home
 **Goal:** Everything that exists is documented, tested, measurably routed, and runnable from Windows in under 5 minutes.
 
 **Deliverables:** H1, H6, I3, I10, **I13**, this playground.
-- **Mode switch (I13)**: `/bash` (`Ctrl+\`) plain subshell that returns on `exit`; `agentic on|off|status` persistent toggle via `~/.agentic/disabled`, honoured by the `.bashrc` launcher and the restart loop; `agentic` re-attaches instead of spawning a second session; `agentic-shell --wrap` non-login mode. Banner on every switch.
-- **Router corpus** `tests/fixtures/router_corpus.tsv` (≥500 labelled lines); `test_router_accuracy.py` asserts ≥99 % bash recall / ≥95 % NL; `/route why "<line>"` explains scores; Ctrl+B and `[b/a]` answers append to `~/.agentic/state/router_corrections.tsv`.
+- **Mode switch (I13)**: `/bash` (`Ctrl+\`) plain subshell that returns on `exit`; `sable on|off|status` persistent toggle via `~/.sable/disabled`, honoured by the `.bashrc` launcher and the restart loop; `sable` re-attaches instead of spawning a second session; `sable --wrap` non-login mode. Banner on every switch.
+- **Router corpus** `tests/fixtures/router_corpus.tsv` (≥500 labelled lines); `test_router_accuracy.py` asserts ≥99 % bash recall / ≥95 % NL; `/route why "<line>"` explains scores; Ctrl+B and `[b/a]` answers append to `~/.sable/state/router_corrections.tsv`.
 - **Onboarding**: `/tour`, wizard explains confirm tiers, no-key demo goal on mock-LLM.
 - `docs/architecture.md` → describe task engine (`shell/tasks/`) and skills (`shell/skills/`) currently missing entirely (zero mentions across its 8 sections). `README.md` was rewritten in `d1e5734` and already covers both; it needs **verification against the vision.md §2 corrections**, not a rewrite.
 - Unit tests for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory`, `reconcile`.
 - Integration test: orchestrator spawns one sub-agent with `mock_llm`, result flows back.
 - `tests/fixtures/mock_llm.py` gains an **orchestrator-mode** canned response set (`run/spawn/done`).
-- A `--mock-llm` flag (or `AGENTIC_MOCK_LLM=1`) so the playground can demo the whole flow with zero API cost.
+- A `--mock-llm` flag (or `SABLE_MOCK_LLM=1`) so the playground can demo the whole flow with zero API cost.
 
 **Prompt for Opus:** "Read `docs/vision.md` §2 and §7, then `docs/roadmap-phases.md` Phase 0. Audit every claim in §2 against source and correct the docs. Add the listed unit/integration tests and a mock-LLM mode. Do not change runtime behaviour."
 
@@ -113,21 +113,21 @@ docker volume rm agentic-playground-home
 > ssh localhost 'echo bypass-ok'          # prints bypass-ok (SSH_ORIGINAL_COMMAND path)
 > scp /etc/hostname localhost:/tmp/h      # works, no hang
 > /task list  /skill list  /stats         # all respond
-> AGENTIC_MOCK_LLM=1 … "create a hello file"   # orchestrator runs canned plan end-to-end
+> SABLE_MOCK_LLM=1 … "create a hello file"   # orchestrator runs canned plan end-to-end
 > git stash pop / make test / docker ps -a     # all routed to bash, no LLM call
 > /route why "list big files"                 # shows NL score > bash score with reasons
 > /tour                                       # walks through routing, confirm, tasks, skills
 > /bash                                       # prompt becomes [plain] $, sidebar hides; `exit` brings the agentic prompt back with context intact
-> agentic off; exit; ssh localhost            # lands in plain bash, banner says "agentic layer off, run: agentic on"
-> agentic on; agentic                         # re-attaches the existing tmux session, no duplicate
+> sable off; exit; ssh localhost            # lands in plain bash, banner says "agentic layer off, run: sable on"
+> sable on; sable                            # re-attaches the existing tmux session, no duplicate
 ```
 
 ---
 
 ### Phase 0.5 Restructure for scale (1 week)
-**Goal:** Code is organised by domain under `agentic/`, behaviour is data-driven, and a layering test prevents regressions.
+**Goal:** Code is organised by domain under `sable/`, behaviour is data-driven, and a layering test prevents regressions.
 
-**Deliverables:** [structure.md](structure.md) §5 steps 1–4: `git mv` into the `agentic/` tree with a `shell/` compat shim, split `loop.py` into `app/repl.py` + `app/builtins/*`, extract prompts / destructive patterns / constants to data files, `tests/unit/test_layering.py` green. No behaviour change.
+**Deliverables:** [structure.md](structure.md) §5 steps 1–4: `git mv` into the `sable/` tree with a `shell/` compat shim, split `loop.py` into `app/repl.py` + `app/builtins/*`, extract prompts / destructive patterns / constants to data files, `tests/unit/test_layering.py` green. No behaviour change.
 
 **Prompt for Opus:** see structure.md §7.
 
@@ -135,8 +135,8 @@ docker volume rm agentic-playground-home
 ```
 .\scripts\playground.ps1 tests                     # green, includes test_layering
 .\scripts\playground.ps1                           # identical behaviour to Phase 0
-wc -l agentic/app/repl.py                          # < 250 lines
-ls agentic/llm/prompts/ agentic/policy/defaults/   # prompts + policy.yaml exist as files
+wc -l sable/app/repl.py                          # < 250 lines
+ls sable/llm/prompts/ sable/policy/defaults/   # prompts + policy.yaml exist as files
 python -W error -c "import shell"                  # DeprecationWarning raised (shim works)
 ```
 
@@ -145,7 +145,7 @@ python -W error -c "import shell"                  # DeprecationWarning raised (
 ### Phase 1 Unified agent runtime + event bus (2 weeks)
 **Goal:** One `Agent` class with roles; agents talk through a bus, not files; conventions from CLAUDE.md hold everywhere.
 
-**Deliverables:** A1, A2, A5, A7, **K11** (repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.agentic.toml` loaded from the repo root as project instructions).
+**Deliverables:** A1, A2, A5, A7, **K11** (repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.sable.toml` loaded from the repo root as project instructions).
 - `shell/agents/runtime.py` `Agent(role=orchestrator|worker|reviewer)`, single `_run_command`, `_call_llm`, Rich output, typed exceptions.
 - Action schema formalised: `run | spawn | wait | ask | done` (+ `mcp` reserved for Phase 6). Documented in `docs/contracts.md` as the one JSON contract, extending `{command, explanation, safe, plan}`.
 - `agent_events` table (`id, ts, agent, kind, payload_json`) + `shell/agents/bus.py` (publish / tail / wait_for). Sub-agent status/result become events; `status.md`/`result.md` files remain as human-readable mirrors.
@@ -198,9 +198,9 @@ cat ~/skills/deploy-api/SKILL.md   → readable, frontmatter valid
 **Deliverables:** F1, F3, F4, F6, **I1, I2, I4** (F2, F5 second wave).
 - **I1 Threat model**: `docs/THREAT_MODEL.md` (assets, actors, trust boundaries, mitigations table). Command output returned to the model is wrapped `<output untrusted="true">…</output>` with a fixed framing line; a *taint* flag set by `curl|wget|cat <outside repo>|mcp` results bumps the next proposed command one tier stricter; `tests/evals/injection/` holds ≥30 hostile outputs that must never yield an executed command.
 - **I2 Circuit breaker**: `[budget] per_job = {tokens, usd, turns, wall_s}`, `daemon_daily_usd`, `breaker.consecutive_failures`; trip = pause all autonomous jobs + INBOX item + notification; `/breaker reset`.
-- **I4 Privilege model**: per-user `~/.agentic/`, admin floor `/etc/agentic/policy.yaml` that user policy cannot loosen, agents refuse to start as uid 0, `sudo` forced to confirm tier, uid in every audit row.
-- `~/.agentic/policy.yaml`: rules `{match: regex|path|tool|role, tier: allow|confirm|deny, when: …}`; the 11-pattern blocklist becomes the shipped default policy.
-- Hooks: `~/.agentic/hooks/{pre_command,post_command,pre_spawn,on_skill_use}` scripts; stdin JSON, exit 2 = block, stdout JSON may inject context. Same model as Claude Code.
+- **I4 Privilege model**: per-user `~/.sable/`, admin floor `/etc/sable/policy.yaml` that user policy cannot loosen, agents refuse to start as uid 0, `sudo` forced to confirm tier, uid in every audit row.
+- `~/.sable/policy.yaml`: rules `{match: regex|path|tool|role, tier: allow|confirm|deny, when: …}`; the 11-pattern blocklist becomes the shipped default policy.
+- Hooks: `~/.sable/hooks/{pre_command,post_command,pre_spawn,on_skill_use}` scripts; stdin JSON, exit 2 = block, stdout JSON may inject context. Same model as Claude Code.
 - Blast-radius tag on every proposed command (cheap model, cached by hash) → colour in the confirm block.
 - `/audit [--since] [--agent] [--export jsonl]` over an extended audit table (who/why/what/outcome).
 - Secret broker: `$SECRET:name` placeholders resolved from keyring at exec time; model never sees values.
@@ -216,7 +216,7 @@ Add hook pre_command that exits 2 on "curl"      → curl blocked, hook output s
    → summary shown; NO rm proposed, or proposed at deny tier with "tainted context" reason
 pytest tests/evals/injection -q                         → 0 executed commands across the corpus
 Set per_job.turns = 3 → a 5-step goal stops at 3 with a breaker block, INBOX item, /breaker reset works
-sudo -i as root → agentic-shell refuses with a clear message; as user, "sudo apt update" → confirm tier always
+sudo -i as root → sable refuses with a clear message; as user, "sudo apt update" → confirm tier always
 ```
 
 ---
@@ -273,7 +273,7 @@ Cold start still < 300 ms (time python -m shell.main --version)
 **Goal:** The server does useful work while you're not logged in and tells you about it.
 
 **Deliverables:** E1, E2, E5, E6, C4.
-- `agenticd` (systemd user unit; in playground, started by entry script): runs scheduled jobs, drains bus, sends notifications, runs Phase-2 skill health pass nightly.
+- `sabled` (systemd user unit; in playground, started by entry script): runs scheduled jobs, drains bus, sends notifications, runs Phase-2 skill health pass nightly.
 - `/schedule "<NL>"` → orchestrator drafts plan → approve once → cron row → daemon spawns worker under policy tier `autonomous` only if every step is `allow`; otherwise it queues to `/inbox`.
 - Notifiers: ntfy/Slack/Telegram webhook; reply `yes <id>` approves.
 - Environment fingerprint cached at login (`/env`).
@@ -289,30 +289,30 @@ Set NTFY_TOPIC → phone gets "task X done" push
 ---
 
 ### Phase 6 MCP client, then server (2 weeks)
-**Goal:** AgenticOS can use the MCP ecosystem, and the MCP ecosystem can use AgenticOS safely.
+**Goal:** Sable can use the MCP ecosystem, and the MCP ecosystem can use Sable safely.
 
 **Deliverables:** D1, D3, D4, then D2.
 - Hand-rolled stateless JSON-RPC client over `httpx` (spec 2026-07-28: `_meta` version/caps, `server/discover`, Streamable HTTP + stdio, MRTR `input_required` → in-shell elicitation).
 - `/mcp add|list|remove|search`; tools exposed to the orchestrator as `action: "mcp"` with per-tool policy tier.
-- Server mode: `agentic-shell --mcp-serve` exposing `run_command` (policy-governed, sandboxed), `spawn_task` (Tasks extension), `list_tasks`, `get_skill`, `search_memory`.
+- Server mode: `sable --mcp-serve` exposing `run_command` (policy-governed, sandboxed), `spawn_task` (Tasks extension), `list_tasks`, `get_skill`, `search_memory`.
 
 **Gate you test:**
 ```
 > /mcp add fs npx @modelcontextprotocol/server-filesystem /app   → tools listed
 > "use the filesystem tool to count markdown files"               → mcp action, result in block
-Point Claude Code at agentic-shell --mcp-serve → run_command "rm -rf /" → denied by policy, audit row written
+Point Claude Code at sable --mcp-serve → run_command "rm -rf /" → denied by policy, audit row written
 ```
 
 ---
 
 ### Phase 7 Memory Palace, knowledge, portability (2.5 weeks)
-**C6** (which subsumes C1, C2, C3, C5), **I6, I8**. Memory Palace under `~/.agentic/palace/` with rooms (`server/`, `repos/<name>/`, `user/`, `incidents/`, `procedures/`) and tiers (working / episodic / semantic / procedural); FTS5 index, optional local embeddings via Ollama; `palace.recall / remember / forget / consolidate`; a budgeted recall block injected into every agent context; `/palace`, `/palace why <fact>`, `/remember`, `/forget`; nightly consolidation runs in the daemon (E1). Gate additions: after one session that discovers a fact, a fresh session answers from the palace with zero commands; `/palace why` shows the session and command that produced it; consolidation merges two near-duplicate facts into one with both sources. **I6**: config-schema version + migrators, skill-format migrator, `agentic doctor`. **I8**: `agentic export` / `agentic import` / `agentic sync <git-remote>` for skills + knowledge + policy (never secrets or state). Gate: ask "where do nginx logs live on this box?" in a fresh session after having discovered it once → answered from memory, no command run; `agentic doctor` on a v3 home dir reports and applies migrations; export on box A, import on box B, `/skill list` matches.
+**C6** (which subsumes C1, C2, C3, C5), **I6, I8**. Memory Palace under `~/.sable/palace/` with rooms (`server/`, `repos/<name>/`, `user/`, `incidents/`, `procedures/`) and tiers (working / episodic / semantic / procedural); FTS5 index, optional local embeddings via Ollama; `palace.recall / remember / forget / consolidate`; a budgeted recall block injected into every agent context; `/palace`, `/palace why <fact>`, `/remember`, `/forget`; nightly consolidation runs in the daemon (E1). Gate additions: after one session that discovers a fact, a fresh session answers from the palace with zero commands; `/palace why` shows the session and command that produced it; consolidation merges two near-duplicate facts into one with both sources. **I6**: config-schema version + migrators, skill-format migrator, `sable doctor`. **I8**: `sable export` / `sable import` / `sable sync <git-remote>` for skills + knowledge + policy (never secrets or state). Gate: ask "where do nginx logs live on this box?" in a fresh session after having discovered it once → answered from memory, no command run; `sable doctor` on a v3 home dir reports and applies migrations; export on box A, import on box B, `/skill list` matches.
 
 ### Phase 8 Deeper orchestration, rehearsal & safety (3 weeks)
 A3 (DAG plans, fan-out/join, nesting ≤ 5), A4 (reviewer agent), A8 (git snapshots per step, `/task diff|undo`), F2 (dry-run diff), F5 (network/cgroup limits), **K5** rehearsal mode (plan runs first against an overlayfs/btrfs/temp-copy snapshot; filesystem diff and per-step exit codes shown; `apply` or `abort`; default on for ≥ 2 state-changing steps and all daemon jobs), **K6** filesystem undo across sessions, **K7** step-up approval for deny-tier (TOTP / FIDO2 / phone push, single-use, never for the daemon), **K8** signed skills and source trust floors. Gate: "migrate the DB and run tests in parallel with linting" → DAG rendered, three lanes, join, reviewer verdict shown; a 3-step plan touching `/etc/nginx` rehearses first and shows the diff before `apply`; `/undo` restores `/etc/nginx` after apply; a `deny`-tier command offers step-up, succeeds with a valid TOTP, is refused from a daemon job; an imported unsigned skill with `run.sh` is rejected.
 
 ### Phase 9 Ecosystem, measurement & sharing (2.5 weeks)
-B4 (skill doctor), B7 (import/publish), H2 (plugins), H3 (eval harness of 50 Docker tasks, results in `/dash`), H4 (OTel), H5 (multi-host), **K9** incident → runbook drafts in the palace `incidents/` room offered as one-key self-heal, **K10** nightly self-evaluation ("skills saved N turns / $X this week", regressions flagged to skill doctor), **K12** `agentic share` read-only / approve-only session sharing with logged remote approvals. Gate: eval harness run per backend produces a comparison table; skill loop on vs off shows a measurable step-count reduction; a watcher-triggered fix produces a runbook and the next identical alert offers it; a shared approve-only link can answer an INBOX item and the audit row names the approver.
+B4 (skill doctor), B7 (import/publish), H2 (plugins), H3 (eval harness of 50 Docker tasks, results in `/dash`), H4 (OTel), H5 (multi-host), **K9** incident → runbook drafts in the palace `incidents/` room offered as one-key self-heal, **K10** nightly self-evaluation ("skills saved N turns / $X this week", regressions flagged to skill doctor), **K12** `sable share` read-only / approve-only session sharing with logged remote approvals. Gate: eval harness run per backend produces a comparison table; skill loop on vs off shows a measurable step-count reduction; a watcher-triggered fix produces a runbook and the next identical alert offers it; a shared approve-only link can answer an INBOX item and the audit row names the approver.
 
 ---
 
@@ -332,13 +332,13 @@ These are things I'd change or lock down early; Opus should treat them as inputs
 
 6. **Skills are folders with contracts.** Frontmatter carries `triggers`, `preconditions`, `validate`, `failure_modes` (SkillOps contract shape). This is what lets Phase 9's skill doctor detect redundancy and staleness without LLM calls, and what makes skills importable from the agentskills.io ecosystem.
 
-7. **Everything human-readable on disk.** Skills, knowledge, policy, hooks, schedules markdown/YAML/JSON under `~/.agentic/`. SQLite holds events, telemetry, indexes. Embeddings are the only opaque blob. This is the trust story for a tool that runs as root-adjacent on a server.
+7. **Everything human-readable on disk.** Skills, knowledge, policy, hooks, schedules markdown/YAML/JSON under `~/.sable/`. SQLite holds events, telemetry, indexes. Embeddings are the only opaque blob. This is the trust story for a tool that runs as root-adjacent on a server.
 
-8. **Consolidate state dirs.** Today: `~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `~/tasks`, `~/skills`, `/var/log/agentic-shell`. Propose `~/.agentic/{config.json,policy.yaml,hooks/,skills/,knowledge/,tasks/,sessions.db}` with the XDG paths kept as symlinks for one release. Fewer surprises for users and for agents.
+8. **Consolidate state dirs.** Today: `~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `~/tasks`, `~/skills`, `/var/log/agentic-shell`. Propose `~/.sable/{config.json,policy.yaml,hooks/,skills/,knowledge/,tasks/,sessions.db}` with the XDG paths kept as symlinks for one release. Fewer surprises for users and for agents.
 
 9. **Sidebar/dashboard must never touch the REPL process.** Keep the separate-process rule. Textual runs in pane 1 / a full-screen window; communication is SQLite + the bus. This is what keeps the shell responsive when an agent floods events.
 
-10. **Keep Linux-only, add a wrapper mode.** Ops people fear a login-shell replacement. Offer `agentic-shell --wrap` that runs *inside* bash as a subshell (no `chsh`, no `/etc/shells`), with a clear `/exit`. Same code, lower adoption barrier. Windows/macOS users get it via SSH or the playground.
+10. **Keep Linux-only, add a wrapper mode.** Ops people fear a login-shell replacement. Offer `sable --wrap` that runs *inside* bash as a subshell (no `chsh`, no `/etc/shells`), with a clear `/exit`. Same code, lower adoption barrier. Windows/macOS users get it via SSH or the playground.
 
 11. **Refuse silently-swallowed errors.** The current code has 72 bare `except Exception` handlers across `shell/` (28 of them in `shell/tasks/` + `shell/skills/`). Phase 1 should replace them with specific exceptions + a `logger.debug` at minimum; unexplained agent silence is the worst UX in this category of tool.
 

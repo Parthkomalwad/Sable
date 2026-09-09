@@ -1,48 +1,38 @@
 <div align="center">
 
-# AgenticOS
+<img src="docs/assets/sable-mark.svg" alt="sable" width="360">
 
-### The Linux login shell that understands plain English, runs sandboxed agents, and learns your server.
+<br>
 
-[![CI](https://github.com/Parthkomalwad/Agentic_OS/actions/workflows/ci.yml/badge.svg)](https://github.com/Parthkomalwad/Agentic_OS/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+### A Linux login shell that understands plain English, runs sandboxed agents, and learns your server.
+
+[![CI](https://github.com/Parthkomalwad/sable/actions/workflows/ci.yml/badge.svg)](https://github.com/Parthkomalwad/sable/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8B7CF6.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#requirements)
-[![Status](https://img.shields.io/badge/status-v0.3%20alpha-orange)](ROADMAP.md)
-[![Backends](https://img.shields.io/badge/LLM-Ollama%20%C2%B7%20OpenAI%20%C2%B7%20Anthropic-8A2BE2)](#configuration)
+[![Status](https://img.shields.io/badge/status-v0.3%20alpha-E7B24B)](ROADMAP.md)
+[![Backends](https://img.shields.io/badge/LLM-Ollama%20%C2%B7%20OpenAI%20%C2%B7%20Anthropic-8B7CF6)](#configuration)
 
 [Quick start](#quick-start) ·
 [See it work](#see-it-work) ·
-[How it is different](#how-it-is-different) ·
+[Why Sable](#why-sable) ·
 [Architecture](#architecture) ·
 [Roadmap](#roadmap) ·
 [Docs](docs/README.md)
+
+<br>
+
+<img src="docs/assets/sable-hero.svg" alt="Sable session: a goal typed in English, a skill picked, commands previewed, a sub-agent spawned, cost shown in the sidebar" width="880">
 
 </div>
 
 <br>
 
-```text
- ┌──────────────────────────────────────────────────┬──────────────────────┐
- │ ~/api  main ✓  14:02 ❯ deploy the api and run     │ ✦ session            │
- │                        the smoke tests            │   claude-sonnet-5    │
- │                                                   │   $0.41 today · 12   │
- │  ✦ Using skill deploy-backend (confidence 0.85)   │                      │
- │    Plan: build → migrate → restart → verify       │ ◈ agents             │
- │                                                   │   ● orchestrator run │
- │  $ docker compose build api          34s · exit 0 │   ● smoke-tests  ▓▓░ │
- │                                                   │                      │
- │  ⚠ alembic upgrade head       touches DB · YES?   │ ⎇ git  main  +2 ~1   │
- │    ↵ run   e edit   q cancel  ›                   │ ⬡ cpu 12%  ram 41%   │
- │                                                   │                      │
- │  ◈ spawning agent: smoke-tests → task:smoke-tests │ ◈ clipboard          │
- │  ✓ done in 2m 11s · $0.004 · 1,930 tok            │   docker ps -a       │
- └──────────────────────────────────────────────────┴──────────────────────┘
-```
+SSH into a box running Sable and every line you type is either **bash** (runs as-is) or **a goal**. A goal goes to an orchestrator agent that plans it, shows you every command before running it, hands long work to sandboxed sub-agents in their own tmux windows, and keeps the procedure as a skill it will reuse next time. A sidebar shows agents, cost, git and system load, live.
 
-SSH into a box running AgenticOS and every line you type is either **bash** (runs as-is) or **a goal** (an orchestrator agent plans it, shows every command before running it, spawns sandboxed sub-agents for long work, and remembers the procedure as a reusable skill). A tmux sidebar shows agents, cost, git, system load and a snippet clipboard, live.
+Sable is the shell that asks first. Nothing runs that you did not see; anything destructive needs the word `YES`; `scp`, `rsync` and `git push` never touch the agent path.
 
-> **Alpha.** This runs as your *login shell*. The SSH bypass and `/exit` are bulletproof; the rest is evolving. Read [SECURITY.md](SECURITY.md) before installing on a machine you care about.
+> **Alpha.** Sable runs as your *login shell*. The SSH bypass and `/exit` are bulletproof; the rest is evolving. Read [SECURITY.md](SECURITY.md) before installing on a machine you care about.
 
 <br>
 
@@ -55,12 +45,12 @@ SSH into a box running AgenticOS and every line you type is either **bash** (run
 **Linux server** (Ubuntu / Debian)
 
 ```bash
-git clone https://github.com/Parthkomalwad/Agentic_OS ~/Agentic_OS
-cd ~/Agentic_OS && bash install.sh
+git clone https://github.com/Parthkomalwad/sable ~/sable
+cd ~/sable && bash install.sh
 # log out, log in. The wizard picks a backend.
 ```
 
-`install.sh` creates a venv, registers the shell in `/etc/shells`, runs `chsh`, creates the audit log and launches the tmux layout. `bash uninstall.sh` puts `/bin/bash` back.
+`install.sh` creates a venv, registers `sable` in `/etc/shells`, runs `chsh`, creates the audit log and launches the tmux layout. `bash uninstall.sh` puts `/bin/bash` back.
 
 </td>
 <td width="50%" valign="top">
@@ -77,7 +67,7 @@ Full Ubuntu with tmux, `bubblewrap` sandbox and a local `sshd`, source bind-moun
 </tr>
 </table>
 
-**No API key?** Run a local model: `ollama pull llama3.1` (the default backend), or set `AGENTIC_MOCK_LLM=1` for the canned demo (v0.4).
+**No API key?** Run a local model: `ollama pull llama3.1` (the default backend), or set `SABLE_MOCK_LLM=1` for the canned demo (v0.4).
 
 <br>
 
@@ -176,11 +166,11 @@ Skills are plain markdown you can read and edit. Confidence moves +0.05 on succe
 
 <br>
 
-## How it is different
+## Why Sable
 
-Most 2026 terminal AI tools are **clients you run on your laptop**. AgenticOS is the **server side**: it lives where the work happens, owns the safety layer, and accumulates knowledge about *that machine*.
+Most 2026 terminal AI tools are **clients you run on your laptop**. Sable is the **server side**: it lives where the work happens, owns the safety layer, and accumulates knowledge about *that machine*, so the tenth deploy takes one line and zero babysitting.
 
-| | AgenticOS | Warp / Claude Code / Codex CLI | Aider / Goose |
+| | Sable | Warp / Claude Code / Codex CLI | Aider / Goose |
 |---|:-:|:-:|:-:|
 | Runs as the login shell on the server | ✅ | ❌ client | ❌ client |
 | `scp` / `rsync` / `git push` unaffected (SSH bypass) | ✅ | n/a | n/a |
@@ -230,24 +220,24 @@ Deeper: [docs/architecture-v4.md](docs/architecture-v4.md) (request lifecycle, a
 
 ## Roadmap
 
-v4 turns the shell into a full agent runtime. Milestones (full plan with test gates in [ROADMAP.md](ROADMAP.md)):
+v4 turns Sable into a full agent runtime. Milestones (full plan with test gates in [ROADMAP.md](ROADMAP.md)):
 
 | | Milestone | What you will notice |
 |---|---|---|
 | ✅ | v0.1 – v0.3 | shell, safety, three backends, sub-agents, first skills |
-| 🔧 | **v0.4 Foundations** | CI, playground, router accuracy, `/tour`, clean package layout |
-| ⏳ | v0.5 Agent runtime | one `Agent` with roles, event bus, steer with `Ctrl+G`, `/task replay` |
-| ⏳ | v0.6 Skills that learn | confidence-ranked retrieval, skills right after a task, folder skills |
-| ⏳ | v0.7 Policy & trust | `policy.yaml` tiers, hooks, output-injection defence, cost breaker |
-| ⏳ | v0.8 Command center | Warp-style blocks, Textual dashboard, approval inbox, `Ctrl+P` |
-| ⏳ | v0.9 Autonomy | daemon, natural-language cron, approve from your phone |
-| ⏳ | v1.0 Ecosystem | MCP client and server, server knowledge base, evals, plugins |
+| 🔧 | **v0.4 Foundations** | CI, playground, router accuracy, `/tour`, `/bash` to drop to plain Linux and back, clean package layout |
+| ⏳ | v0.5 Agent runtime | one `Agent` with roles, event bus, steer with `Ctrl+G`, `/task replay`, repo-aware context |
+| ⏳ | v0.6 Skills that learn | confidence-ranked retrieval, skills right after a task, folder skills, learn from your edits |
+| ⏳ | v0.7 Policy, trust and tools | `policy.yaml` tiers, hooks, output-injection defence, web search, structured file edits, verify-after-act |
+| ⏳ | v0.8 Command center | Warp-style blocks, Textual dashboard, approval inbox, ghost-text, explain-last-error |
+| ⏳ | v0.9 Autonomy | `sabled` daemon, natural-language cron, approve from your phone |
+| ⏳ | v1.0 Ecosystem | MCP client and server, Memory Palace, rehearsal mode, evals, plugins |
 
 <br>
 
 ## Configuration
 
-`~/.config/agentic-shell/config.json` (mode 600), editable live with `/config` or `Ctrl+X`.
+`~/.config/agentic-shell/config.json` (mode 600, moves to `~/.sable/` in v0.4), editable live with `/config` or `Ctrl+X`.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -277,12 +267,14 @@ Issues and PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/
 | [ROADMAP.md](ROADMAP.md) · [docs/roadmap-phases.md](docs/roadmap-phases.md) | milestones, phase gates, playground setup |
 | [docs/vision.md](docs/vision.md) | verified current state, research, feature catalog (pillars A to K) |
 | [docs/structure.md](docs/structure.md) | target layout, config model, visibility principles |
-| [docs/architecture.md](docs/architecture.md) · [docs/specs/](docs/specs/) · [docs/plans/](docs/plans/) | architecture, design docs, build plans |
+| [docs/architecture-v4.md](docs/architecture-v4.md) · [docs/architecture.md](docs/architecture.md) · [docs/specs/](docs/specs/) · [docs/plans/](docs/plans/) | architecture, design docs, build plans |
 | [CHANGELOG.md](CHANGELOG.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | project hygiene |
 
 <br>
 
 <div align="center">
+
+<sub>sable · the shell that asks first</sub>
 
 [MIT](LICENSE) © 2026 Parth Komalwad
 

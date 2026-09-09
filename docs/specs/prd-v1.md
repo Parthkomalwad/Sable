@@ -1,4 +1,4 @@
-# Agentic Shell Layer Product Requirements Document
+# Sable Product Requirements Document
 
 > An intelligent login shell for any Linux server. SSH in. Your server understands plain English.
 
@@ -29,7 +29,7 @@ This document is the single source of truth for building the agentic shell layer
 ## Repository structure
 
 ```
-agentic-shell/
+sable/
 ├── CLAUDE.md                    ← this document, symlinked or duplicated
 ├── PRD.md                       ← product requirements (this file)
 ├── README.md                    ← public-facing, fill at launch
@@ -150,8 +150,8 @@ This ensures `scp`, `rsync`, `git push over SSH`, and all non-interactive SSH co
 Installation at OS level:
 
 ```bash
-echo "/usr/local/bin/agentic-shell" | sudo tee -a /etc/shells
-chsh -s /usr/local/bin/agentic-shell $USER
+echo "/usr/local/bin/sable" | sudo tee -a /etc/shells
+chsh -s /usr/local/bin/sable $USER
 ```
 
 ---
@@ -428,7 +428,7 @@ Execute steps sequentially. After each step, update the tree: `○` becomes `✓
 
 On login, check if already inside a tmux session. If not, use `libtmux` to:
 
-1. Create a new tmux session named `agentic-shell-{username}`
+1. Create a new tmux session named `sable-{username}`
 2. Split the window 80/20 horizontally: left pane is the shell, right pane runs `axon-watch`
 3. The left pane starts the shell loop
 4. The right pane runs `python -m shell.telemetry.watch`
@@ -773,8 +773,8 @@ Phase 3 only. The install script:
 #!/usr/bin/env bash
 set -euo pipefail
 
-INSTALL_DIR="/usr/local/lib/agentic-shell"
-BIN_PATH="/usr/local/bin/agentic-shell"
+INSTALL_DIR="/usr/local/lib/sable"
+BIN_PATH="/usr/local/bin/sable"
 
 # Copy files
 sudo mkdir -p "$INSTALL_DIR"
@@ -791,7 +791,7 @@ sudo python3 -c "import tiktoken; tiktoken.get_encoding('o200k_base'); tiktoken.
 sudo tee "$BIN_PATH" > /dev/null << 'EOF'
 #!/usr/bin/env python3
 import sys
-sys.path.insert(0, "/usr/local/lib/agentic-shell")
+sys.path.insert(0, "/usr/local/lib/sable")
 from shell.main import main
 main()
 EOF

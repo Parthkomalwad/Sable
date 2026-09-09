@@ -1,4 +1,4 @@
-"""Entry point for the agentic shell.
+"""Entry point for Sable.
 
 SSH_ORIGINAL_COMMAND bypass MUST remain the first executable code.
 Handles startup, config loading, session resume, and launches the REPL.
@@ -93,7 +93,7 @@ def main() -> None:
     from shell import loop  # lazy import to avoid circular imports
 
     # Welcome banner (screen already cleared by wrapper before Python starts)
-    sys.stdout.write("\n\033[38;5;141m  ✦ Agentic Shell\033[0m\n")
+    sys.stdout.write("\n\033[38;5;141m  ✦ Sable\033[0m\n")
     sys.stdout.write(f"\033[2;37m  {config.backend} · {config.model}  |  type naturally or use bash directly\033[0m\n\n")
     sys.stdout.flush()
 

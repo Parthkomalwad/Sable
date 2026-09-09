@@ -63,9 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build playground image
-        run: docker build -t agentic-playground -f docker/Dockerfile.playground .
+        run: docker build -t sable-playground -f docker/Dockerfile.playground .
       - name: Run integration tests in Linux with tmux + bwrap
         run: |
           docker run --rm -v "$PWD:/app" \
             --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
-            agentic-playground bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q"
+            sable-playground bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q"

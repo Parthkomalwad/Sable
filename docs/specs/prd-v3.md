@@ -1,14 +1,14 @@
-# AgenticOS v3 Product Requirements Document
+# Sable v3 Product Requirements Document
 
 > Task Engine + Adaptive Skill Learning: autonomous background agents and a system that gets smarter the more you use it.
 
-This document specifies every change and addition required to upgrade AgenticOS from v2 to v3. It is written for direct implementation by Claude Code. Read the entire document before writing any code. Implement strictly in the phase order defined below.
+This document specifies every change and addition required to upgrade Sable from v2 to v3. It is written for direct implementation by Claude Code. Read the entire document before writing any code. Implement strictly in the phase order defined below.
 
 ---
 
 ## Baseline: what v2 already has
 
-AgenticOS v2 is a Python login shell that replaces `/bin/bash` on Linux servers. The following structure is the starting point. Do not modify any file listed here unless this document explicitly says to.
+Sable v2 is a Python login shell that replaces `/bin/bash` on Linux servers. The following structure is the starting point. Do not modify any file listed here unless this document explicitly says to.
 
 ```
 shell/

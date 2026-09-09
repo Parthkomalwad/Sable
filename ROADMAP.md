@@ -2,7 +2,7 @@
 
 Public milestones. Each links to the detailed phase in [docs/roadmap-phases.md](docs/roadmap-phases.md), which carries deliverables, the test gate that closes the phase, and the prompt used to build it. Feature IDs come from [docs/vision.md](docs/vision.md).
 
-Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agentic_OS/projects) and milestone labels `v0.4` … `v1.0`.
+Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/projects) and milestone labels `v0.4` … `v1.0`.
 
 ## Shipped
 
@@ -16,8 +16,8 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] Docs & tests parity for the task engine and skills; mock-LLM mode (`H1`)
 - [ ] Router accuracy corpus (≥99 % bash recall) and `/route why` (`I3`)
 - [ ] Onboarding `/tour` (`I10`)
-- [ ] Mode switch: `/bash` to drop to plain Linux and back, `agentic on|off`, `--wrap` non-login mode (`I13`)
-- [ ] Restructure into the `agentic/` package with an enforced layering rule [structure.md](docs/structure.md)
+- [ ] Mode switch: `/bash` to drop to plain Linux and back, `sable on|off`, `--wrap` non-login mode (`I13`)
+- [ ] Restructure into the `sable/` package with an enforced layering rule [structure.md](docs/structure.md)
 
 ## v0.5: Agent runtime
 
@@ -25,7 +25,7 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] SQLite event bus; sidebar and agents share one stream (`A1`)
 - [ ] Per-role model routing (cheap for routing/summaries, strong for reasoning) (`A5`)
 - [ ] Steer a running agent (`Ctrl+G`), prompt replay, visible degraded modes (`A7 I9 I7`)
-- [ ] Repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.agentic.toml` loaded from the repo root (`K11`)
+- [ ] Repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.sable.toml` loaded from the repo root (`K11`)
 ## v0.6: Skills that learn
 
 - [ ] Confidence-ranked skill retrieval and success/failure feedback (`B1`)
@@ -48,13 +48,13 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] Ghost-text suggestions as you type; `? explain  ! fix` after any failed command (`K1 K2`)
 ## v0.9: Autonomy
 
-- [ ] `agenticd` daemon, natural-language cron, watchers (`E1 E2 E3`)
+- [ ] `sabled` daemon, natural-language cron, watchers (`E1 E2 E3`)
 - [ ] Notifications and approvals from your phone (`E5 E6`)
 ## v1.0: Ecosystem
 
 - [ ] MCP client (spec 2026-07-28) and server mode (`D1 D2 D4`)
 - [ ] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
-- [ ] Export / import / sync of skills and knowledge; upgrade migrations and `agentic doctor` (`I8 I6`)
+- [ ] Export / import / sync of skills and knowledge; upgrade migrations and `sable doctor` (`I8 I6`)
 - [ ] Eval harness, plugin system, OpenTelemetry (`H3 H2 H4`)
 - [ ] Incident → runbook drafts, nightly self-evaluation, session sharing with approve-only links (`K9 K10 K12`)
 ## Later

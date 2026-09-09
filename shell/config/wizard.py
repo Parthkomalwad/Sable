@@ -138,5 +138,5 @@ def run_wizard() -> None:
 
     console.print()
     console.print(f"[green]✓ Config saved to {CONFIG_PATH}[/green]")
-    console.print("[dim]Run 'agentic-shell' again to start.[/dim]")
+    console.print("[dim]Run 'sable' again to start.[/dim]")
     console.print()

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE_NAME="agentic-shell-dev"
+IMAGE_NAME="sable-dev"
 
 echo "==> Building Docker image: $IMAGE_NAME"
 docker build -t "$IMAGE_NAME" "$REPO_ROOT/docker" -f "$REPO_ROOT/docker/Dockerfile" --build-arg REPO_ROOT="$REPO_ROOT"

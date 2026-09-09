@@ -1,10 +1,10 @@
 # Security Policy
 
-AgenticOS runs as a login shell and can execute commands proposed by a language model. Treat every report seriously.
+Sable runs as a login shell and can execute commands proposed by a language model. Treat every report seriously.
 
 ## Reporting a vulnerability
 
-Email **parthkomalwad99@gmail.com** with the subject `AgenticOS security`. Include reproduction steps, affected version/commit, and impact. You will get an acknowledgement within 72 hours. Please do not open a public issue.
+Email **parthkomalwad99@gmail.com** with the subject `Sable security`. Include reproduction steps, affected version/commit, and impact. You will get an acknowledgement within 72 hours. Please do not open a public issue.
 
 ## Scope: what we consider a vulnerability
 
@@ -13,7 +13,7 @@ Email **parthkomalwad99@gmail.com** with the subject `AgenticOS security`. Inclu
 - Policy bypass: a `deny`-tier command executing, or a `confirm`-tier command executing without confirmation.
 - Secret leakage: API keys or `$SECRET:` values appearing in model requests, audit logs, telemetry, or sub-agent hand-offs.
 - SSH bypass failures that let `SSH_ORIGINAL_COMMAND` reach the agentic path.
-- Privilege escalation between Linux users via shared state (`/etc/agentic`, `/var/log/agentic-shell`).
+- Privilege escalation between Linux users via shared state (`/etc/sable`, `/var/log/agentic-shell`).
 
 ## Out of scope
 

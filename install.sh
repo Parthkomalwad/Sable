@@ -13,10 +13,10 @@ else
 fi
 
 VENV_DIR="$REAL_HOME/.local/share/agentic-shell/venv"
-WRAPPER="/usr/local/bin/agentic-shell"
+WRAPPER="/usr/local/bin/sable"
 AUDIT_LOG_DIR="/var/log/agentic-shell"
 
-echo "==> Installing agentic-shell for user: $REAL_USER"
+echo "==> Installing sable for user: $REAL_USER"
 echo "    Install dir: $INSTALL_DIR"
 echo "    Venv dir:    $VENV_DIR"
 
@@ -39,7 +39,7 @@ export TERM=xterm-256color
 export PROMPT_TOOLKIT_NO_CPR=1
 export AGENTIC_PYTHON="$VENV_DIR/bin/python"
 PYTHON="$VENV_DIR/bin/python"
-SESSION="agentic-shell-\${USER}"
+SESSION="sable-\${USER}"
 STAMP_FILE="\$HOME/.local/share/agentic-shell/install_stamp"
 CURRENT_STAMP="$INSTALL_DIR:$VENV_DIR"
 
@@ -77,7 +77,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
 
     tmux send-keys -t "\$TELE_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.telemetry.watch; sleep 2; done" Enter
     tmux send-keys -t "\$TASK_PANE" "trap '' INT; clear; while true; do PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 $VENV_DIR/bin/python -m shell.tasks.panel; sleep 2; done" Enter
-    tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash run agentic-shell to return'; exec /bin/bash; fi; echo '[shell exited restarting in 2s]'; sleep 2; done" Enter
+    tmux send-keys -t "\$MAIN_PANE" "trap '' INT; EXIT_FLAG=\$HOME/.local/share/agentic-shell/exit_requested; while true; do rm -f \"\$EXIT_FLAG\"; clear; PYTHONPATH=$INSTALL_DIR PROMPT_TOOLKIT_NO_CPR=1 NO_TMUX=1 $VENV_DIR/bin/python -m shell.main; if [ -f \"\$EXIT_FLAG\" ]; then rm -f \"\$EXIT_FLAG\"; echo 'dropping to bash run sable to return'; exec /bin/bash; fi; echo '[shell exited restarting in 2s]'; sleep 2; done" Enter
 
     tmux select-pane -t "\$MAIN_PANE"
     exec tmux attach-session -t "\$SESSION"
@@ -141,7 +141,7 @@ bind -n WheelDownPane if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" 
 TMUX_EOF
 
 echo "==> Enabling unprivileged user namespaces (required for bwrap sandbox)"
-SYSCTL_CONF="/etc/sysctl.d/99-agentic-shell.conf"
+SYSCTL_CONF="/etc/sysctl.d/99-sable.conf"
 if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" != "1" ]; then
     sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
 fi
@@ -166,19 +166,19 @@ echo "==> Restoring login shell to /bin/bash for $REAL_USER"
 sudo chsh -s /bin/bash "$REAL_USER" 2>/dev/null || true
 
 BASHRC="$REAL_HOME/.bashrc"
-MARKER="# agentic-shell auto-launch"
+MARKER="# sable auto-launch"
 if ! grep -q "$MARKER" "$BASHRC" 2>/dev/null; then
-    echo "==> Adding agentic-shell auto-launch to $BASHRC"
+    echo "==> Adding sable auto-launch to $BASHRC"
     cat >> "$BASHRC" <<'BASHRC_EOF'
 
-# agentic-shell auto-launch
-if [ -z "$TMUX" ] && [ -z "$AGENTIC_SHELL_NO_AUTO" ] && command -v agentic-shell &>/dev/null; then
-    exec agentic-shell
+# sable auto-launch
+if [ -z "$TMUX" ] && [ -z "$AGENTIC_SHELL_NO_AUTO" ] && command -v sable &>/dev/null; then
+    exec sable
 fi
 BASHRC_EOF
 fi
 
 echo ""
-echo "✓ agentic-shell installed successfully for $REAL_USER."
+echo "✓ sable installed successfully for $REAL_USER."
 echo "  Venv: $VENV_DIR"
-echo "  SSH in to start automatically, or run: agentic-shell"
+echo "  SSH in to start automatically, or run: sable"

@@ -1,4 +1,4 @@
-# task.md Agentic Shell Layer Implementation Tasks
+# task.md Sable Implementation Tasks
 
 ---
 
