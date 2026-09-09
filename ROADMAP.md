@@ -16,6 +16,7 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] Docs & tests parity for the task engine and skills; mock-LLM mode (`H1`)
 - [ ] Router accuracy corpus (≥99 % bash recall) and `/route why` (`I3`)
 - [ ] Onboarding `/tour` (`I10`)
+- [ ] Mode switch: `/bash` to drop to plain Linux and back, `agentic on|off`, `--wrap` non-login mode (`I13`)
 - [ ] Restructure into the `agentic/` package with an enforced layering rule [structure.md](docs/structure.md)
 
 ## v0.5: Agent runtime
@@ -48,7 +49,7 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 ## v1.0: Ecosystem
 
 - [ ] MCP client (spec 2026-07-28) and server mode (`D1 D2 D4`)
-- [ ] Server knowledge base with full-text memory (`C1 C2 C3`)
+- [ ] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
 - [ ] Export / import / sync of skills and knowledge; upgrade migrations and `agentic doctor` (`I8 I6`)
 - [ ] Eval harness, plugin system, OpenTelemetry (`H3 H2 H4`)
 ## Later

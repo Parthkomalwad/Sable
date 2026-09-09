@@ -113,7 +113,7 @@ Ambiguous lines ask `[b]ash or [a]gentic?`. Force either way: `>> text` sends to
   Type YES to run, anything else to cancel › YES
 ```
 
-Thirteen destructive patterns (`rm -rf`, `dd`, `mkfs`, `curl | bash`, …) always require the literal word `YES`. The model's own `safe: false` flag is honoured too. Every executed command lands in an append-only audit log.
+Eleven destructive patterns (`rm -rf`, `dd`, `mkfs`, `curl | bash`, …) always require the literal word `YES`. The model's own `safe: false` flag is honoured too. Every executed command lands in an append-only audit log.
 </details>
 
 <details>
@@ -218,7 +218,7 @@ flowchart LR
 | Layer | Modules | Notes |
 |---|---|---|
 | Entry & loop | `main.py` `loop.py` `router.py` | SSH bypass is the first executable line; REPL, builtins, routing |
-| Execution | `executor.py` `safety.py` `planner.py` | everything through a pty; `cd` intercepted in-process; 13-pattern blocklist |
+| Execution | `executor.py` `safety.py` `planner.py` | everything through a pty; `cd` intercepted in-process; 11-pattern blocklist |
 | Agents | `tasks/orchestrator.py` `agent.py` `manager.py` `sandbox.py` | multi-turn loop, sub-agents, bwrap with bash-wrapper fallback |
 | Skills | `skills/pattern_watcher.py` `crystalliser.py` `index.py` | audit-log clustering, LLM-written skills, confidence index |
 | Models | `llm/base.py` `ollama.py` `openai.py` `anthropic.py` | one `LLMBackend` ABC, streaming, JSON fallback chain |

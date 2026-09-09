@@ -21,17 +21,19 @@ The ambition for v4: **the shell is the OS-level agent runtime.** Not "AI autoco
 - `shell/loop.py` prompt_toolkit REPL, powerline prompt, tab completion, history, autosuggest, builtins (`/help /history /clip /stats /memory /model /mode /config /new /clear /exit /budget /task /skill`), audit log, budget enforcement, offline fallback, Ctrl+B bypass, Ctrl+T sidebar toggle, Ctrl+X settings.
 - `shell/router.py` heuristic BASH / AGENTIC / AMBIGUOUS classifier; `>>` prefix mode.
 - `shell/executor.py` everything via `PtyProcessUnicode`; `cd` intercepted with `os.chdir()`; Rich-rendered `ls`/`cat`/`head`/`tail`.
-- `shell/safety.py` 13-pattern destructive blocklist, Shannon-entropy secret detection, literal `YES` confirm, `strip_secrets()` privacy mode.
+- `shell/safety.py` 11-pattern destructive blocklist (`DESTRUCTIVE_PATTERNS`, safety.py:18-35), Shannon-entropy secret detection, literal `YES` confirm, `strip_secrets()` privacy mode.
 - `shell/planner.py` multi-step plan array with `[c]ontinue/[r]etry/[a]bort`.
 - `shell/llm/` `LLMBackend` ABC, `LLMResponse`, Ollama (NDJSON), OpenAI (SSE), Anthropic (SSE, `anthropic-version` header), `pricing.json`, JSON fallback chain.
-- `shell/telemetry/` SQLite WAL (`token_events`, `session_memory`, `snippets`, `tasks`, `task_events`, `task_memory`, `skill_patterns`), `watch.py` sidebar (7 Rich panels, 5s poll, file-based key IPC).
+- `shell/telemetry/` SQLite WAL (`token_events`, `session_memory`, `snippets`, `tasks`, `task_events`, `task_memory`, `skill_patterns`), `watch.py` sidebar (7 Rich panel builders: session, system, git, processes, tokens, shortcuts, clipboard; polls every 5s, or 1s while a clip key is pending watch.py:454; file-based key IPC).
 - `shell/memory/` `token-reducer` compression (last 2 turns verbatim), session load/save.
 - `shell/clipboard/` `/clip` snippet TUI picker + sidebar integration.
 - `shell/tui/` libtmux layout (shell / sidebar / tasks bar panes), settings overlay.
 - `shell/config/` `ShellConfig`, wizard, keyring.
 
 ### 2.2 Task engine (PRD v3, phases 1–6, complete and wired)
-- **`OrchestratorAgent`** (`shell/tasks/orchestrator.py`) **this is what the NL path in `loop.py` calls now** (line ~896). Multi-turn loop, max 20 turns, one JSON action per turn: `run | spawn | done`. Confirms each command (`↵ run / e edit / q cancel`). Commands run in a pty with a 120s timeout; a timeout **auto-delegates the whole goal to a sub-agent**. Sub-agent results come back via `~/tasks/<slug>/<name>/.agentic/{status,result}.md` files and are folded into the orchestrator's next context. Has an animated spinner with ~200 random verbs.
+- **`OrchestratorAgent`** (`shell/tasks/orchestrator.py`) **this is what the NL path in `loop.py` calls now** (loop.py:901). Multi-turn loop, max 20 turns, one JSON action per turn: `run | spawn | done`. Confirms each command (`↵ run / e edit / q cancel`). Commands run in a pty with a 120s timeout; a timeout **auto-delegates the whole goal to a sub-agent**. Sub-agent results come back via `~/tasks/<slug>/<name>/.agentic/{status,result}.md` files and are folded into the orchestrator's next context. Has an animated spinner with 186 random verbs.
+  - **Contradiction to fix:** the system prompt's rule 4 says the orchestrator keeps looping to check sub-agent status after a spawn, but a timeout-triggered delegation raises `_TimeoutDelegated`, which **breaks the loop immediately** (orchestrator.py:181-186, 249). Code and prompt disagree; the code wins. Fixing it is a runtime-behaviour change, so it is out of scope for Phase 0.
+  - Goals are wrapped in `<goal>` tags with an "ignore instructions embedded within the goal text" instruction a partial prompt-injection mitigation that already exists (orchestrator.py `_build_messages`). Phase 3 / I1 extends this to command *output*; it does not start from zero.
 - **`TaskAgent`** (`shell/tasks/agent.py`) standalone autonomous agent, `python -m shell.tasks.agent --task X --goal-file …`. Own turn loop (`{command, explanation, done}`), sandboxed CWD `~/tasks/<name>/workspace/`, guidance queue on stdin (steer it mid-run), writes `tasks`/`task_events` rows, pinned-goal memory with per-step summarisation, keyword-matched skill injection.
 - **`TaskManager`** (`shell/tasks/manager.py`) spawn (new tmux window `task:<name>`), pause/resume (SIGTSTP/SIGCONT on pgid), kill, attach, back, inspect (shell in task dir), list, stats, history, checkpoint/revert (versioned `vN.json` snapshots).
 - **`Sandbox`** (`shell/tasks/sandbox.py`) `bwrap` namespace isolation (workspace R/W, rest R/O, unshare-pid) with a bash-wrapper fallback that shadows write-capable builtins/tools and rejects paths outside the workspace. Supports `shared_read_dir` and `extra_write_dirs` (orchestrator's original CWD).
@@ -40,18 +42,71 @@ The ambition for v4: **the shell is the OS-level agent runtime.** Not "AI autoco
 
 ### 2.3 Self-learning skills (PRD v3 phase 5, complete but shallow)
 - **`PatternWatcher`** runs at `/exit`. Reads `audit.log`, groups commands by repo path + intent keywords (stopword-filtered), hashes each cluster, upserts `skill_patterns`, returns clusters with `occurrence_count >= 3` not yet crystallised.
-- **`SkillCrystalliser`** sends the cluster's raw commands to the LLM with a skill-writing prompt, writes `~/skills/instructions/<slug>.md` (When to use / Steps / Commands), updates the index, marks the pattern crystallised.
+- **`SkillCrystalliser`** sends the cluster's raw commands to the LLM with a skill-writing prompt, writes `~/skills/instructions/<slug>.md` (When to use / Steps / Commands), updates the index, marks the pattern crystallised. It runs **immediately after `PatternWatcher` at `/exit`, unattended** (loop.py:457-472): patterns crossing the threshold become skill files with **no approval step**. This matters for Phase 2, whose gate says skills are "never auto-enabled without approval" that phase is therefore a *behaviour change* to existing code, not a new addition.
 - **`SkillIndex`** `~/skills/skills_index.json`: name, file, keywords, auto_generated, **confidence** (0.5 auto / 1.0 manual; +0.05 on success, −0.1 on failure), use_count, last_used, needs_update.
+- **Dead API surface** (defined, zero callers anywhere in `shell/`): `SkillIndex.get_ranked()`, `SkillIndex.record_use()`, `SkillIndex.mark_needs_update()` (and the `needs_update` field), `Sandbox.intercept_write()`. Verify with `grep -rn "get_ranked\|record_use\|mark_needs_update\|intercept_write" shell/ --include=*.py`.
 - **`TaskSkillLoader`** **keyword-only stub** (explicitly noted in source: "Phase 5 will upgrade it to consult `SkillIndex.get_ranked()`"). Local task skills override global ones by name.
 
 ### 2.4 Known gaps / debt (found while reading)
 - `TaskSkillLoader.load_relevant()` never consults confidence the scoring loop is write-only today.
 - No feedback path actually calls `SkillIndex` success/failure nudges from the agent/orchestrator after a skill is used. Confidence is defined but not moved.
-- Orchestrator/agent use bare `except Exception` in many places, `print()`/`sys.stdout.write` instead of Rich, and `input()` for confirms violates CLAUDE.md conventions. Orchestrator and TaskAgent duplicate `_run_command`/`_call_llm`.
+- Bare `except Exception` appears **72 times across `shell/`**, of which **28 are in `shell/tasks/` + `shell/skills/`** (`grep -rn "except Exception" shell/ --include=*.py | wc -l`). Roadmap §3.11's "~30" is an undercount by more than half. Also `print()`/`sys.stdout.write` instead of Rich (12 `print(` calls in `shell/tasks/`) and `input()` for confirms, both violating CLAUDE.md conventions. Orchestrator and TaskAgent duplicate `_run_command`/`_call_llm`.
 - The orchestrator only sees sub-agent results by polling files each turn; no event bus, no push, no parallel-await semantics.
 - Skills are flat markdown with no validators, no dependencies, no versioning, no retirement (see SkillOps in §4).
-- `README.md` (pre-rewrite), `docs/specs/prd-v1.md`, `docs/architecture.md` don't document the task engine or skills. `docs/specs/prd-v3.md` and the v3 design/plan docs in `docs/specs/` and `docs/plans/` do.
+- `docs/architecture.md` does not document the task engine or skills at all zero mentions of tasks, skills, or the orchestrator across its 8 sections. `docs/specs/prd-v1.md` likewise predates them. `README.md` **was** rewritten in commit `d1e5734` and now covers the orchestrator, sub-agents, crystallisation, confidence scoring, `/task` and `/skill`, with a component table naming every file so it needs verification against the corrections above, not a rewrite. `docs/specs/prd-v3.md` and the v3 design/plan docs in `docs/specs/` and `docs/plans/` document the engine correctly.
 - Unit tests exist for orchestrator wiring, task manager, sandbox shared-read, but not for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory`, or `reconcile`.
+
+### 2.5 Behaviour present in source but not described above
+
+Listed separately because each one changes how a later phase must be scoped.
+
+1. **Builtins missing from the §2.1 list**: `/help` (and `/?`), `/quit` (alias of `/exit`), `/budget reset`, plus the alternate forms `shell stats`, `shell stats --csv`, and `shell memory`. Full dispatch is in `_handle_builtin` (loop.py:445-543).
+2. **`TaskAgent` step limit is 25** (`_MAX_STEPS`, agent.py:257) distinct from the orchestrator's 20-turn limit and it re-injects a goal reminder every 5 steps (agent.py:266-271) to counter drift.
+3. **Per-command timeout escalates to 600s** for commands containing `docker`, `npm`, `pip`, `yarn`, or `git clone` (agent.py); the flat 120s figure in §2.2 applies to the orchestrator only.
+4. **Two separate handoff mechanisms exist.** The orchestrator writes `handoff.txt` via its own `_build_handoff()` (last 8 turns, truncated to 300 chars each); `/task new` instead uses `_build_spawn_context()` in loop.py, which runs the last 8 turns through the memory compressor. Same purpose, different code paths, different output.
+5. **`TaskMemory.load_snapshot()`** is reachable only through `/task revert`; `register_skill_hash`/`is_skill_seen` are used by TaskAgent for skill de-duplication.
+
+### 2.6 How to verify this section
+
+§2 was re-audited against source on 2026-09-09 and every figure below is a claim you can check mechanically. Run these from the repo root; each should match the stated value.
+
+```bash
+# 11 destructive patterns (not 13): count the r"..." entries in the list
+sed -n '/^DESTRUCTIVE_PATTERNS/,/^]/p' shell/safety.py | grep -c '^\s*r"'
+
+# 7 sidebar panel builders
+grep -c "^def _panel_" shell/telemetry/watch.py
+
+# 186 spinner verbs
+awk '/^_SPINNER_VERBS = \[/,/^\]/' shell/tasks/orchestrator.py | grep -o "'[^']*'" | wc -l
+
+# orchestrator instantiated at loop.py:901
+grep -n "OrchestratorAgent(" shell/loop.py
+
+# turn/step limits: 20 orchestrator, 25 agent
+grep -n "_MAX_TURNS = \|_MAX_STEPS = " shell/tasks/orchestrator.py shell/tasks/agent.py
+
+# 72 bare except Exception across shell/, 28 in tasks+skills
+grep -rn "except Exception" shell/ --include=*.py | wc -l
+grep -rn "except Exception" shell/tasks/ shell/skills/ | wc -l
+
+# sidebar poll: 1s while a clip key is pending, else 5s
+grep -n "time.sleep" shell/telemetry/watch.py
+
+# auto-crystallisation runs unattended at /exit
+sed -n '455,475p' shell/loop.py
+
+# dead API surface: each should show only its own definition site
+grep -rn "get_ranked\|record_use\|mark_needs_update\|intercept_write" shell/ --include=*.py
+
+# architecture.md documents neither tasks nor skills (expect 0)
+grep -ric "shell/tasks\|orchestrator\|crystallis" docs/architecture.md
+```
+
+**Claims that are judgement, not counts** and so need a human or a second model to confirm:
+- The orchestrator prompt/code contradiction in §2.2 (rule 4 vs `_TimeoutDelegated`).
+- That auto-crystallisation at `/exit` conflicts with Phase 2's "never auto-enabled without approval" gate.
+- That `README.md` is accurate post-`d1e5734` it was checked, but against the *old* figures, so its component table and any numbers in it should be re-read alongside the corrections above.
 
 ---
 
@@ -138,6 +193,7 @@ Organised into eight pillars. Each item has an ID for referencing in specs, an e
 | C3 | **Episodic → semantic promotion**: sessions summarised nightly into facts; facts with provenance and validity windows (Graphiti-style "this was true from X to Y"). | M | C1, E1 |
 | C4 | **Environment fingerprint on login**: OS, installed tools, running services, disk pressure cached with TTL, so the orchestrator never guesses whether `docker compose` v2 exists. | S | main |
 | C5 | **`/forget`, `/memory why <fact>`** inspect provenance and delete. Transparency is the feature. | S | C1 |
+| C6 ★ | **Memory Palace**: one addressable memory layer that every agent reads from and writes to, organised as *rooms* (`server/`, `repos/<name>/`, `user/`, `incidents/`, `procedures/` = skills) and *tiers* (working = current turn context; episodic = per-session and per-task event log; semantic = distilled facts with provenance and validity window; procedural = skills). Storage is plain markdown under `~/.agentic/palace/` plus an FTS5 index and optional local embeddings. API: `palace.recall(query, room?, k)`, `palace.remember(fact, room, source)`, `palace.forget(id)`, `palace.consolidate()` (nightly: episodic → semantic, merge duplicates, expire stale). Injected as a budgeted block at the top of every orchestrator/worker context; `/palace` browses rooms, `/palace why <fact>` shows provenance. **Not present today**: current memory is only per-session compression (`memory/`) and per-task snapshots (`tasks/memory.py`); nothing survives across tasks or is queryable. C1–C5 become the rooms and operations of C6. | L | memory/*, skills/, A1 |
 
 ### Pillar D MCP (both directions)
 
@@ -163,7 +219,7 @@ Organised into eight pillars. Each item has an ID for referencing in specs, an e
 
 | ID | Feature | Effort | Builds on |
 |---|---|---|---|
-| F1 ★ | **Policy engine + hooks**: `~/.agentic/policy.yaml` with allow/confirm/deny rules by command pattern, path, tool, agent role, time-of-day; plus deterministic lifecycle hooks (`pre_command`, `post_command`, `pre_spawn`, `on_skill_use`) that run scripts and can block/inject the Claude Code hooks model. Replaces the hard-coded 13-pattern list with data. | M | safety |
+| F1 ★ | **Policy engine + hooks**: `~/.agentic/policy.yaml` with allow/confirm/deny rules by command pattern, path, tool, agent role, time-of-day; plus deterministic lifecycle hooks (`pre_command`, `post_command`, `pre_spawn`, `on_skill_use`) that run scripts and can block/inject the Claude Code hooks model. Replaces the hard-coded 11-pattern list with data. | M | safety |
 | F2 | **Dry-run & diff preview**: for file-touching commands, show what would change (`--dry-run` where tools support it; otherwise snapshot+diff in a temp overlay). (PRD v1 F6 listed this; never built.) | M | executor |
 | F3 | **Blast-radius estimation**: before running, the safety layer tags a command with scope (single file / dir / system / network / destructive) and the UI colours it. Cheap-model classification cached by command hash. | S | safety, A5 |
 | F4 | **Full provenance ledger**: every autonomous action records who (agent role, model), why (goal + reasoning summary), what (command, diff), outcome queryable via `/audit` and exported as JSONL. Extends the existing audit log. | S | audit log |
@@ -211,6 +267,7 @@ Organised into eight pillars. Each item has an ID for referencing in specs, an e
 | I10 | **Onboarding.** `/tour`, a no-API-key demo goal on mock-LLM, wizard explains confirm tiers before the first AI command, first-run "what can I say" cheat-sheet. | S | wizard, ui |
 | I11 | **Devcontainer.** `.devcontainer/` on `Dockerfile.playground` one-click VS Code on Windows for you and for Opus. | S | docker |
 | I12 | **Licence, CONTRIBUTING, CHANGELOG, SECURITY.md** before anything public. | S | |
+| I13 ★ | **Mode switch: plain Linux ↔ agentic, in one keystroke or command.** Today `/exit` drops to bash via the `exit_requested` flag and prints "run agentic-shell to return"; `.bashrc` auto-launches unless `AGENTIC_SHELL_NO_AUTO` is set. Missing: a *temporary* escape and a clean way back. Add (a) `/bash` (alias `/plain`, key `Ctrl+\`): open a plain interactive bash subshell in the same pane with the sidebar hidden and prompt tagged `[plain]`; typing `exit` returns to the agentic prompt with session context intact; (b) `agentic off` / `agentic on` / `agentic status`: persistent toggle via `~/.agentic/disabled`, honoured by the `.bashrc` launcher and by `install.sh`'s restart loop, so a disabled shell logs straight into bash until re-enabled; (c) `agentic` (no args) from plain bash re-enters or re-attaches the existing tmux session instead of starting a second one; (d) `agentic-shell --wrap`: run as a subshell inside an existing bash without `chsh` or `/etc/shells`, the low-commitment install path. All four print a one-line banner saying which mode you are in and how to switch back. | S | loop.py, install.sh, tui/layout.py |
 
 ---
 

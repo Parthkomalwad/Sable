@@ -37,7 +37,7 @@ This diagram covers the LLM backends, safety guard, multi-step planner, telemetr
 - All three backends (Ollama, OpenAI, Anthropic) implement the same `LLMBackend` abstract interface. The router calls `backend.complete()` without knowing which backend is active.
 - Every backend streams via SSE using `httpx` and `httpx-sse`. Tokens are extracted from the final SSE chunk.
 - The JSON response contract is `{command, explanation, safe, plan}`. A four-step fallback chain handles malformed responses: strip fences, parse, re-ask, show raw.
-- The safety guard runs on every command regardless of route (bash or agentic). Thirteen regex patterns plus a Shannon entropy check for unknown secret formats.
+- The safety guard runs on every command regardless of route (bash or agentic). Eleven regex patterns plus a Shannon entropy check for unknown secret formats.
 - Multi-step plans from the `plan` array are executed by `planner.py` step by step, with `○ → ✓ / ✗` status rendered live in a Rich panel.
 - Every LLM call writes a `TokenEvent` to SQLite. `tiktoken` counts tokens client-side for budget checks before the call; actual API response counts are used for logging.
 - Session memory is compressed with `token-reducer` after every N turns exceeding a token threshold. The last 2 turns are always kept verbatim. On next login, the compressed context is loaded as prior messages.
@@ -72,7 +72,7 @@ This diagram covers the tmux session structure, the sidebar watch process and it
 | REPL loop | `shell/loop.py` | purple | `prompt_toolkit` PromptSession, builtin handling, routing pipeline |
 | Router | `shell/router.py` | magenta | Classifies input as BASH, AGENTIC, or AMBIGUOUS |
 | Executor | `shell/executor.py` | amber | PtyProcessUnicode for all commands, `cd` interception, Rich-rendered `ls` and `cat` |
-| Safety | `shell/safety.py` | red | 13-pattern blocklist, entropy redaction, destructive confirm flow |
+| Safety | `shell/safety.py` | red | 11-pattern blocklist, entropy redaction, destructive confirm flow |
 | Planner | `shell/planner.py` | amber | Multi-step plan execution with per-step status |
 | LLM base | `shell/llm/base.py` | green | Abstract `LLMBackend`, `LLMResponse` dataclass, system prompt builder, JSON fallback chain |
 | Ollama backend | `shell/llm/ollama.py` | olive | NDJSON streaming, local inference |

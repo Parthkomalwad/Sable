@@ -9,12 +9,16 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
 - Public `ROADMAP.md`, `docs/branching.md`, `pyproject.toml`, issue/PR templates, Dependabot, CODEOWNERS.
+- Vision: `C6` Memory Palace (rooms and tiers of agent memory, FTS5 recall, provenance, consolidation; subsumes C1–C5) scheduled in Phase 7; `I13` mode switch (`/bash` subshell, `agentic on|off|status`, re-attach, `--wrap`) scheduled in Phase 0.
+- README and `docs/architecture.md` blocklist count corrected to 11.
 
 ### Changed
 - README rewritten for the public repo: status table, quick start for Linux and the playground, roadmap, docs index.
 - `task.md` archived to `docs/history/tasks-v1-v3.md`; stray `test/` directory and superseded `docs/FABLE_ENTRY_POINT.md` removed.
 - Docs reorganised: `PRD.md` → `docs/specs/prd-v1.md`, `docs/superpowers/{specs,plans}` → `docs/{specs,plans}`, diagrams → `docs/assets/`, lower-case names (`architecture.md`, `vision.md`, `roadmap-phases.md`, `structure.md`, `branching.md`), `docs/README.md` index.
 - `.gitattributes` enforces LF for all text files.
+- `docs/vision.md` §2 re-audited against source and corrected: destructive blocklist is 11 patterns (was "13"), spinner has 186 verbs (was "~200"), sidebar poll is 5s / 1s-while-clip-key-pending, orchestrator call site is `loop.py:901`. New §2.5 records behaviour previously undocumented (extra builtins, TaskAgent's 25-step limit and goal reminders, 600s timeout escalation, two distinct handoff paths, dead API surface). New §2.6 gives copy-pasteable commands to re-verify every figure.
+- `docs/roadmap-phases.md`: blocklist count corrected to 11; "~30 `except Exception: pass`" corrected to 72 across `shell/` (28 in `tasks/` + `skills/`); Phase 0 docs deliverable narrowed to `docs/architecture.md`, since `README.md` was already rewritten in `d1e5734` and needs verification rather than a rewrite.
 
 ## [0.3.0] - 2026-04 (v3: task engine + adaptive skills)
 

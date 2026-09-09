@@ -93,10 +93,11 @@ docker volume rm agentic-playground-home
 ### Phase 0 Baseline: docs, tests, playground, router accuracy (1 week)
 **Goal:** Everything that exists is documented, tested, measurably routed, and runnable from Windows in under 5 minutes.
 
-**Deliverables:** H1, H6, I3, I10, this playground.
+**Deliverables:** H1, H6, I3, I10, **I13**, this playground.
+- **Mode switch (I13)**: `/bash` (`Ctrl+\`) plain subshell that returns on `exit`; `agentic on|off|status` persistent toggle via `~/.agentic/disabled`, honoured by the `.bashrc` launcher and the restart loop; `agentic` re-attaches instead of spawning a second session; `agentic-shell --wrap` non-login mode. Banner on every switch.
 - **Router corpus** `tests/fixtures/router_corpus.tsv` (≥500 labelled lines); `test_router_accuracy.py` asserts ≥99 % bash recall / ≥95 % NL; `/route why "<line>"` explains scores; Ctrl+B and `[b/a]` answers append to `~/.agentic/state/router_corrections.tsv`.
 - **Onboarding**: `/tour`, wizard explains confirm tiers, no-key demo goal on mock-LLM.
-- `README.md` + `docs/architecture.md` → describe task engine (`shell/tasks/`) and skills (`shell/skills/`) currently missing.
+- `docs/architecture.md` → describe task engine (`shell/tasks/`) and skills (`shell/skills/`) currently missing entirely (zero mentions across its 8 sections). `README.md` was rewritten in `d1e5734` and already covers both; it needs **verification against the vision.md §2 corrections**, not a rewrite.
 - Unit tests for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory`, `reconcile`.
 - Integration test: orchestrator spawns one sub-agent with `mock_llm`, result flows back.
 - `tests/fixtures/mock_llm.py` gains an **orchestrator-mode** canned response set (`run/spawn/done`).
@@ -116,6 +117,9 @@ docker volume rm agentic-playground-home
 > git stash pop / make test / docker ps -a     # all routed to bash, no LLM call
 > /route why "list big files"                 # shows NL score > bash score with reasons
 > /tour                                       # walks through routing, confirm, tasks, skills
+> /bash                                       # prompt becomes [plain] $, sidebar hides; `exit` brings the agentic prompt back with context intact
+> agentic off; exit; ssh localhost            # lands in plain bash, banner says "agentic layer off, run: agentic on"
+> agentic on; agentic                         # re-attaches the existing tmux session, no duplicate
 ```
 
 ---
@@ -193,7 +197,7 @@ cat ~/skills/deploy-api/SKILL.md   → readable, frontmatter valid
 - **I1 Threat model**: `docs/THREAT_MODEL.md` (assets, actors, trust boundaries, mitigations table). Command output returned to the model is wrapped `<output untrusted="true">…</output>` with a fixed framing line; a *taint* flag set by `curl|wget|cat <outside repo>|mcp` results bumps the next proposed command one tier stricter; `tests/evals/injection/` holds ≥30 hostile outputs that must never yield an executed command.
 - **I2 Circuit breaker**: `[budget] per_job = {tokens, usd, turns, wall_s}`, `daemon_daily_usd`, `breaker.consecutive_failures`; trip = pause all autonomous jobs + INBOX item + notification; `/breaker reset`.
 - **I4 Privilege model**: per-user `~/.agentic/`, admin floor `/etc/agentic/policy.yaml` that user policy cannot loosen, agents refuse to start as uid 0, `sudo` forced to confirm tier, uid in every audit row.
-- `~/.agentic/policy.yaml`: rules `{match: regex|path|tool|role, tier: allow|confirm|deny, when: …}`; the 13-pattern blocklist becomes the shipped default policy.
+- `~/.agentic/policy.yaml`: rules `{match: regex|path|tool|role, tier: allow|confirm|deny, when: …}`; the 11-pattern blocklist becomes the shipped default policy.
 - Hooks: `~/.agentic/hooks/{pre_command,post_command,pre_spawn,on_skill_use}` scripts; stdin JSON, exit 2 = block, stdout JSON may inject context. Same model as Claude Code.
 - Blast-radius tag on every proposed command (cheap model, cached by hash) → colour in the confirm block.
 - `/audit [--since] [--agent] [--export jsonl]` over an extended audit table (who/why/what/outcome).
@@ -273,8 +277,8 @@ Point Claude Code at agentic-shell --mcp-serve → run_command "rm -rf /" → de
 
 ---
 
-### Phase 7 Memory, knowledge, portability (2 weeks)
-C1, C2, C3, C5, **I6, I8**. Server knowledge base in `~/.agentic/knowledge/*.md` + FTS5 over knowledge and session history; `/remember`, `/forget`, `/memory why`. **I6**: config-schema version + migrators, skill-format migrator, `agentic doctor`. **I8**: `agentic export` / `agentic import` / `agentic sync <git-remote>` for skills + knowledge + policy (never secrets or state). Gate: ask "where do nginx logs live on this box?" in a fresh session after having discovered it once → answered from memory, no command run; `agentic doctor` on a v3 home dir reports and applies migrations; export on box A, import on box B, `/skill list` matches.
+### Phase 7 Memory Palace, knowledge, portability (2.5 weeks)
+**C6** (which subsumes C1, C2, C3, C5), **I6, I8**. Memory Palace under `~/.agentic/palace/` with rooms (`server/`, `repos/<name>/`, `user/`, `incidents/`, `procedures/`) and tiers (working / episodic / semantic / procedural); FTS5 index, optional local embeddings via Ollama; `palace.recall / remember / forget / consolidate`; a budgeted recall block injected into every agent context; `/palace`, `/palace why <fact>`, `/remember`, `/forget`; nightly consolidation runs in the daemon (E1). Gate additions: after one session that discovers a fact, a fresh session answers from the palace with zero commands; `/palace why` shows the session and command that produced it; consolidation merges two near-duplicate facts into one with both sources. **I6**: config-schema version + migrators, skill-format migrator, `agentic doctor`. **I8**: `agentic export` / `agentic import` / `agentic sync <git-remote>` for skills + knowledge + policy (never secrets or state). Gate: ask "where do nginx logs live on this box?" in a fresh session after having discovered it once → answered from memory, no command run; `agentic doctor` on a v3 home dir reports and applies migrations; export on box A, import on box B, `/skill list` matches.
 
 ### Phase 8 Deeper orchestration & safety (2 weeks)
 A3 (DAG plans, fan-out/join, nesting ≤ 5), A4 (reviewer agent), A8 (git snapshots per step, `/task diff|undo`), F2 (dry-run diff), F5 (network/cgroup limits). Gate: "migrate the DB and run tests in parallel with linting" → DAG rendered, three lanes, join, reviewer verdict shown.
@@ -308,7 +312,7 @@ These are things I'd change or lock down early; Opus should treat them as inputs
 
 10. **Keep Linux-only, add a wrapper mode.** Ops people fear a login-shell replacement. Offer `agentic-shell --wrap` that runs *inside* bash as a subshell (no `chsh`, no `/etc/shells`), with a clear `/exit`. Same code, lower adoption barrier. Windows/macOS users get it via SSH or the playground.
 
-11. **Refuse silently-swallowed errors.** The current code has ~30 `except Exception: pass`. Phase 1 should replace them with specific exceptions + a `logger.debug` at minimum; unexplained agent silence is the worst UX in this category of tool.
+11. **Refuse silently-swallowed errors.** The current code has 72 bare `except Exception` handlers across `shell/` (28 of them in `shell/tasks/` + `shell/skills/`). Phase 1 should replace them with specific exceptions + a `logger.debug` at minimum; unexplained agent silence is the worst UX in this category of tool.
 
 12. **Measure from Phase 0.** Record per-goal step count, tokens, cost, and success in `task_events`. Phase 2's "does the skill loop help?" is then a SQL query, and Phase 9's eval harness reuses the same schema.
 

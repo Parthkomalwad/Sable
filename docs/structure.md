@@ -15,7 +15,7 @@ The current `shell/` tree grew phase-by-phase and shows it:
 | `loop.py` is a god-module (~950 lines): REPL, routing dispatch, 15 builtins, audit log, budget checks, backend factory, orchestrator hand-off | `_handle_builtin`, `_build_backend`, `_write_audit_log` all live there and are imported *back* by `tasks/orchestrator.py` and `tasks/agent.py` (circular dependency) |
 | Two agent implementations with 70 % shared code | `tasks/orchestrator.py` and `tasks/agent.py` each own `_run_command`, `_call_llm`, spinner, JSON parsing |
 | Domain concepts split across unrelated packages | skills live in `tasks/skills.py` **and** `skills/`; memory in `memory/` **and** `tasks/memory.py`; panels in `tui/`, `telemetry/watch.py`, **and** `tasks/panel.py` |
-| Behaviour hard-coded that should be data | 13 destructive regexes in `safety.py`, spinner verbs, system prompts, 120 s timeouts, 20-turn limit, 3× pattern threshold, confidence nudges, sidebar width 44, poll interval 5 s |
+| Behaviour hard-coded that should be data | 11 destructive regexes in `safety.py`, spinner verbs, system prompts, 120 s timeouts, 20-turn limit, 3× pattern threshold, confidence nudges, sidebar width 44, poll interval 5 s |
 | Five state directories | `~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `~/tasks`, `~/skills`, `/var/log/agentic-shell` |
 | No single place to see "what is the system doing right now" | status is scattered across tmux windows, `status.md` files, sqlite rows, and stdout |
 
@@ -63,7 +63,7 @@ agentic/
     hooks.py             pre_command / post_command / pre_spawn / on_skill_use runners
     blast_radius.py      scope tagging (cheap model, cached)
     secrets.py           entropy check, redaction, $SECRET: broker
-    defaults/policy.yaml the shipped 13 destructive patterns, as data
+    defaults/policy.yaml the shipped 11 destructive patterns, as data
 
   agents/                ── the runtime ─────────────────────────────────────
     runtime.py           Agent(role=…): one turn loop, one _run_command, one _call_llm
