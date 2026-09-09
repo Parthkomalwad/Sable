@@ -176,16 +176,27 @@ def _full_text(messages: list[dict]) -> str:
 def _turns_taken(messages: list[dict]) -> int:
     """How many actions the agent has already emitted in this conversation.
 
-    Each past turn leaves one assistant message holding the action JSON, so
-    counting them recovers the script position even when the caller builds a
-    new backend for every turn. The orchestrator's two priming messages include
-    one fixed assistant line ("Understood...") and each folded sub-agent status
-    adds another ("Noted."), so only JSON-shaped assistant content counts.
+    The script position has to be recovered from the conversation, because
+    OrchestratorAgent builds a fresh backend on every turn; instance state
+    would reset each time and replay step one forever.
+
+    Two kinds of message mark a completed turn:
+
+    - an assistant message holding the action JSON, for a command that ran.
+      The orchestrator's priming line ("Understood...") and its per-status
+      acknowledgements ("Noted.") are not JSON, so they do not count.
+    - a "[user cancelled command: ...]" line. A cancelled command appends only
+      a user message, so without this the script would stall whenever a
+      confirm is declined, including on EOF when stdin is a pipe.
     """
     return sum(
         1
         for m in messages
-        if m.get("role") == "assistant" and str(m.get("content", "")).lstrip().startswith("{")
+        if (
+            m.get("role") == "assistant"
+            and str(m.get("content", "")).lstrip().startswith("{")
+        )
+        or str(m.get("content", "")).startswith("[user cancelled command:")
     )
 
 

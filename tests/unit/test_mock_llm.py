@@ -105,6 +105,18 @@ class TestOrchestratorMode:
 
         assert actions == ["run", "run", "spawn", "run", "done"]
 
+    def test_a_cancelled_command_still_advances_the_script(self):
+        """A cancelled confirm appends only a user message, so counting
+        assistant JSON alone would stall. That happens for real whenever stdin
+        is a pipe: input() raises EOF and every command is cancelled."""
+        backend = MockLLMBackend(mode="orchestrator")
+        conversation = [
+            {"role": "user", "content": "create a hello file"},
+            {"role": "user", "content": "[user cancelled command: echo hello > hello.txt]"},
+        ]
+
+        assert asyncio.run(backend.complete(conversation, "system")).command == "cat hello.txt"
+
     def test_priming_messages_do_not_advance_the_script(self):
         """The orchestrator seeds two fixed messages plus a "Noted." per folded
         sub-agent status. None of those are actions."""
