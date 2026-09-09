@@ -31,6 +31,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `docs/architecture-v4.md`: eight Mermaid diagrams tracing the system (layer map, request lifecycle, agent turn state machine, sub-agent spawn, skill loop, Memory Palace, daemon, processes and IPC).
 
 ### Fixed
+- **The playground had no telemetry sidebar or tasks bar.** `docker/playground-entry.sh` launched a single bare tmux pane, while `install.sh` builds three on a real machine, so the Phase 0 gate item "sidebar visible" could not be met. It now creates the same layout: shell, a 48-column telemetry sidebar and a tasks bar. Panes are sized by a `client-attached` / `client-resized` hook, because tmux resizes the session to the attaching client and would otherwise squeeze splits made beforehand; the sidebar collapses under 120 columns and returns above it. The hook addresses panes by id, since tmux renumbers indices as panes are created.
 - **The SSH bypass did not fire for `ssh host cmd`, `scp` or `rsync`.** sshd runs the login shell as `sable -c "<command>"` and leaves `SSH_ORIGINAL_COMMAND` unset; that variable is only populated behind `ForceCommand` or an `authorized_keys` `command=`. The guard checked the env var alone, so a non-interactive SSH command landed in the interactive REPL instead of bash. It now takes the command from `argv` when invoked as `-c`, falling back to the env var. Found by running the Phase 0 gate in the playground, covered by `tests/unit/test_ssh_bypass.py` (6 of its 8 tests fail against the old guard).
 
 ### Changed
