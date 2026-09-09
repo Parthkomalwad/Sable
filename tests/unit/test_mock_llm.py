@@ -88,6 +88,36 @@ class TestOrchestratorMode:
 
         assert extra.action == "done"
 
+    def test_script_advances_across_freshly_built_backends(self):
+        """OrchestratorAgent builds a new backend every turn, so the script
+        position has to come from the conversation, not from instance state.
+        A counter on the object would replay step one forever."""
+        conversation = [{"role": "user", "content": "create a hello file"}]
+        actions = []
+
+        for _ in range(5):
+            backend = MockLLMBackend(mode="orchestrator")  # new instance each turn
+            response = asyncio.run(backend.complete(conversation, "system"))
+            actions.append(response.action)
+            # The agent records its action, then the command output.
+            conversation.append({"role": "assistant", "content": '{"action": "x"}'})
+            conversation.append({"role": "user", "content": "(output)"})
+
+        assert actions == ["run", "run", "spawn", "run", "done"]
+
+    def test_priming_messages_do_not_advance_the_script(self):
+        """The orchestrator seeds two fixed messages plus a "Noted." per folded
+        sub-agent status. None of those are actions."""
+        backend = MockLLMBackend(mode="orchestrator")
+        primed = [
+            {"role": "user", "content": "<goal>create a hello file</goal>"},
+            {"role": "assistant", "content": "Understood. I will accomplish this goal step by step."},
+            {"role": "user", "content": "[agent 'w' COMPLETED]"},
+            {"role": "assistant", "content": "Noted."},
+        ]
+
+        assert asyncio.run(backend.complete(primed, "system")).action == "run"
+
     def test_each_instance_starts_at_the_beginning(self):
         messages = [{"role": "user", "content": "create a hello file"}]
         first = MockLLMBackend(mode="orchestrator")

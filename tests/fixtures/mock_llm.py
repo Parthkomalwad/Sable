@@ -173,6 +173,22 @@ def _full_text(messages: list[dict]) -> str:
     return " ".join(str(m.get("content", "")) for m in messages).lower()
 
 
+def _turns_taken(messages: list[dict]) -> int:
+    """How many actions the agent has already emitted in this conversation.
+
+    Each past turn leaves one assistant message holding the action JSON, so
+    counting them recovers the script position even when the caller builds a
+    new backend for every turn. The orchestrator's two priming messages include
+    one fixed assistant line ("Understood...") and each folded sub-agent status
+    adds another ("Noted."), so only JSON-shaped assistant content counts.
+    """
+    return sum(
+        1
+        for m in messages
+        if m.get("role") == "assistant" and str(m.get("content", "")).lstrip().startswith("{")
+    )
+
+
 class MockLLMBackend(LLMBackend):
     """Mock LLM backend that returns canned responses for known inputs.
 
@@ -204,13 +220,16 @@ class MockLLMBackend(LLMBackend):
         """Return the next canned response.
 
         In single mode this is keyed by the last user message. In orchestrator
-        and worker mode the script advances one step per call, and holds on the
-        final step so an over-running loop still sees a terminal action.
+        and worker mode the script position is derived from the conversation
+        itself, not from a counter on this object: OrchestratorAgent builds a
+        fresh backend every turn, so instance state would reset each time and
+        the same first action would repeat forever.
         """
         if self.mode in ("orchestrator", "worker"):
             script = self._select_script(messages)
-            response = script[min(self._step, len(script) - 1)]
-            self._step += 1
+            step = max(self._step, _turns_taken(messages))
+            response = script[min(step, len(script) - 1)]
+            self._step = step + 1
             return response
 
         last_user = _last_user_message(messages)

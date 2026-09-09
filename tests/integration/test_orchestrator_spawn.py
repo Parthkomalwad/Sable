@@ -103,7 +103,12 @@ def _run(orchestrator, commands_seen: list[str]):
         commands_seen.append(command)
         return f"[output of {command}]"
 
-    with patch("shell.loop._build_backend", return_value=MockLLMBackend(mode="orchestrator")), \
+    # A new backend per call, exactly as OrchestratorAgent._call_llm does it.
+    # Returning one shared instance would hide any dependence on instance state.
+    def fresh_backend(*args, **kwargs):
+        return MockLLMBackend(mode="orchestrator")
+
+    with patch("shell.loop._build_backend", side_effect=fresh_backend), \
          patch.object(orchestrator, "_confirm_command", side_effect=lambda c, e: c), \
          patch.object(orchestrator, "_run_command", side_effect=fake_run_command):
         orchestrator.run()

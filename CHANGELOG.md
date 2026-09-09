@@ -6,7 +6,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ### Added
 - Unit tests for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory` and `reconcile` (H1), all offline: LLM, libtmux and tmux are mocked.
-- `tests/fixtures/mock_llm.py` gains orchestrator-mode (run, run, spawn, done) and worker-mode (`{command, explanation, done}`) canned scripts.
+- `tests/fixtures/mock_llm.py` gains orchestrator-mode (run, run, spawn, run, done) and worker-mode (`{command, explanation, done}`) canned scripts. Script position is derived from the conversation, because `OrchestratorAgent` builds a fresh backend on every turn.
 - `SABLE_MOCK_LLM=1` runs the whole shell against the mock backend with zero API calls, documented in the README "No API key?" section.
 - `tests/integration/test_orchestrator_spawn.py`: the orchestrator spawns one sub-agent through the mock backend and folds its result back into the next turn's context. Runs without Docker, tmux or an API key.
 - Router accuracy programme (I3): `tests/fixtures/router_corpus.tsv` (539 labelled lines) and `tests/unit/test_router_accuracy.py`, gating bash recall at 0.99 and agentic at 0.95.
