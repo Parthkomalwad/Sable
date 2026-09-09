@@ -224,7 +224,7 @@ flowchart LR
 | Models | `llm/base.py` `ollama.py` `openai.py` `anthropic.py` | one `LLMBackend` ABC, streaming, JSON fallback chain |
 | State & UI | `telemetry/` `memory/` `clipboard/` `tui/` | SQLite WAL, token-reducer compression, sidebar, tmux layout |
 
-Deeper: [docs/architecture.md](docs/architecture.md) (diagrams) · [docs/specs/prd-v3.md](docs/specs/prd-v3.md) (task engine & skills) · [docs/structure.md](docs/structure.md) (where v4 is going).
+Deeper: [docs/architecture-v4.md](docs/architecture-v4.md) (request lifecycle, agent turn, spawn, skills, memory, daemon, processes) · [docs/architecture.md](docs/architecture.md) (v0.3 diagrams) · [docs/specs/prd-v3.md](docs/specs/prd-v3.md) (task engine & skills) · [docs/structure.md](docs/structure.md) (where v4 is going).
 
 <br>
 
@@ -275,7 +275,7 @@ Issues and PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/
 |---|---|
 | [docs/README.md](docs/README.md) | index of everything below |
 | [ROADMAP.md](ROADMAP.md) · [docs/roadmap-phases.md](docs/roadmap-phases.md) | milestones, phase gates, playground setup |
-| [docs/vision.md](docs/vision.md) | verified current state, research, 60-feature catalog |
+| [docs/vision.md](docs/vision.md) | verified current state, research, feature catalog (pillars A to K) |
 | [docs/structure.md](docs/structure.md) | target layout, config model, visibility principles |
 | [docs/architecture.md](docs/architecture.md) · [docs/specs/](docs/specs/) · [docs/plans/](docs/plans/) | architecture, design docs, build plans |
 | [CHANGELOG.md](CHANGELOG.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | project hygiene |

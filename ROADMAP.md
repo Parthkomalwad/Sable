@@ -25,12 +25,14 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] SQLite event bus; sidebar and agents share one stream (`A1`)
 - [ ] Per-role model routing (cheap for routing/summaries, strong for reasoning) (`A5`)
 - [ ] Steer a running agent (`Ctrl+G`), prompt replay, visible degraded modes (`A7 I9 I7`)
+- [ ] Repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.agentic.toml` loaded from the repo root (`K11`)
 ## v0.6: Skills that learn
 
 - [ ] Confidence-ranked skill retrieval and success/failure feedback (`B1`)
 - [ ] Folder skills (`SKILL.md` + scripts, agentskills.io compatible) (`B2`)
 - [ ] Crystallise a skill right after a multi-step task, approve from the inbox (`B3`)
 - [ ] Validators that auto-grade a skill run (`B5`)
+- [ ] Learn from your edits and routing answers; natural-language aliases (`K3 K4`)
 ## v0.7: Policy & trust
 
 - [ ] Policy engine (`policy.yaml`: allow / confirm / deny) and lifecycle hooks (`F1`)
@@ -43,6 +45,7 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] Warp-style blocks in the main pane (`G2`)
 - [ ] Textual sidebar and full-screen `/dash` with agent lanes and approval inbox (`G1`)
 - [ ] Streaming reasoning, `Ctrl+P` palette, themes (`G3 G5 G6`)
+- [ ] Ghost-text suggestions as you type; `? explain  ! fix` after any failed command (`K1 K2`)
 ## v0.9: Autonomy
 
 - [ ] `agenticd` daemon, natural-language cron, watchers (`E1 E2 E3`)
@@ -53,6 +56,9 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/Agenti
 - [ ] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
 - [ ] Export / import / sync of skills and knowledge; upgrade migrations and `agentic doctor` (`I8 I6`)
 - [ ] Eval harness, plugin system, OpenTelemetry (`H3 H2 H4`)
+- [ ] Incident → runbook drafts, nightly self-evaluation, session sharing with approve-only links (`K9 K10 K12`)
 ## Later
 
-DAG plans and reviewer agents (`A3 A4`), git-snapshot undo per agent step (`A8`), skill doctor (`B4`), semantic skill search (`B6`), self-healing runbooks (`E4`), multi-host (`H5`), web companion (`G9`).
+- [ ] Rehearsal mode: plans run against a snapshot first, show the filesystem diff, then `apply` (`K5`)
+- [ ] Filesystem undo across sessions; step-up approval (TOTP / FIDO2 / phone) for deny-tier; signed skills (`K6 K7 K8`)
+- [ ] DAG plans and reviewer agents (`A3 A4`), git-snapshot undo per agent step (`A8`), skill doctor (`B4`), semantic skill search (`B6`), self-healing runbooks (`E4`), multi-host (`H5`), web companion (`G9`)

@@ -145,7 +145,7 @@ python -W error -c "import shell"                  # DeprecationWarning raised (
 ### Phase 1 Unified agent runtime + event bus (2 weeks)
 **Goal:** One `Agent` class with roles; agents talk through a bus, not files; conventions from CLAUDE.md hold everywhere.
 
-**Deliverables:** A1, A2, A5, A7.
+**Deliverables:** A1, A2, A5, A7, **K11** (repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.agentic.toml` loaded from the repo root as project instructions).
 - `shell/agents/runtime.py` `Agent(role=orchestrator|worker|reviewer)`, single `_run_command`, `_call_llm`, Rich output, typed exceptions.
 - Action schema formalised: `run | spawn | wait | ask | done` (+ `mcp` reserved for Phase 6). Documented in `docs/contracts.md` as the one JSON contract, extending `{command, explanation, safe, plan}`.
 - `agent_events` table (`id, ts, agent, kind, payload_json`) + `shell/agents/bus.py` (publish / tail / wait_for). Sub-agent status/result become events; `status.md`/`result.md` files remain as human-readable mirrors.
@@ -173,7 +173,9 @@ Run in a container without userns → banner "sandbox: bash-wrapper fallback (bw
 ### Phase 2 Self-learning skills that actually learn (2 weeks)
 **Goal:** The shell gets measurably better at a task the second and third time you do it.
 
-**Deliverables:** B1, B2, B3, B5, (B6 optional).
+**Deliverables:** B1, B2, B3, B5, **K3, K4**, (B6 optional).
+- **Learn from your edits (K3)**: `e`-edits and `[b/a]` answers stored as corrections; fed to router corpus, user model and skill confidence; `/corrections`; sidebar counter.
+- **NL aliases (K4)**: `/alias "<phrase>" = <command>` matched before the router; promotion to skill after 3 uses.
 - `SkillIndex.get_ranked(goal)` = confidence × recency × use_count × match; `TaskSkillLoader` uses it.
 - Success/failure feedback: after a run that used skill S, `SkillIndex.nudge(S, success)` success decided by exit codes + optional validator (B5).
 - Skill format → folder: `~/skills/<slug>/SKILL.md` (frontmatter: name, description, triggers, preconditions, validate) + optional `run.sh`. Migration for existing `instructions/*.md`.
@@ -244,7 +246,8 @@ sudo -i as root → agentic-shell refuses with a clear message; as user, "sudo a
 
 ---
 
-### Phase 4 UI: blocks + command center (2.5 weeks) the "proud to show" milestone
+### Phase 4 UI: blocks + command center (3 weeks) the "proud to show" milestone
+Also ships **K1** ghost-text suggestions and **K2** explain-last-error (`? explain  ! fix` after any non-zero exit), both rendered as blocks. Gate additions: type `git sta` → dim `tus` appears within 150 ms and `→` accepts; run a failing command → the `? !` line appears; `!` produces a confirm block with a plausible fix.
 **Goal:** The screen is the product. Approvals, agent status, and cost are visible at a glance.
 
 **Deliverables:** G1, G2, G3, G5, G6. Requires the `textual` dependency Opus must write the argument in the design doc; approve it.
@@ -305,11 +308,11 @@ Point Claude Code at agentic-shell --mcp-serve → run_command "rm -rf /" → de
 ### Phase 7 Memory Palace, knowledge, portability (2.5 weeks)
 **C6** (which subsumes C1, C2, C3, C5), **I6, I8**. Memory Palace under `~/.agentic/palace/` with rooms (`server/`, `repos/<name>/`, `user/`, `incidents/`, `procedures/`) and tiers (working / episodic / semantic / procedural); FTS5 index, optional local embeddings via Ollama; `palace.recall / remember / forget / consolidate`; a budgeted recall block injected into every agent context; `/palace`, `/palace why <fact>`, `/remember`, `/forget`; nightly consolidation runs in the daemon (E1). Gate additions: after one session that discovers a fact, a fresh session answers from the palace with zero commands; `/palace why` shows the session and command that produced it; consolidation merges two near-duplicate facts into one with both sources. **I6**: config-schema version + migrators, skill-format migrator, `agentic doctor`. **I8**: `agentic export` / `agentic import` / `agentic sync <git-remote>` for skills + knowledge + policy (never secrets or state). Gate: ask "where do nginx logs live on this box?" in a fresh session after having discovered it once → answered from memory, no command run; `agentic doctor` on a v3 home dir reports and applies migrations; export on box A, import on box B, `/skill list` matches.
 
-### Phase 8 Deeper orchestration & safety (2 weeks)
-A3 (DAG plans, fan-out/join, nesting ≤ 5), A4 (reviewer agent), A8 (git snapshots per step, `/task diff|undo`), F2 (dry-run diff), F5 (network/cgroup limits). Gate: "migrate the DB and run tests in parallel with linting" → DAG rendered, three lanes, join, reviewer verdict shown.
+### Phase 8 Deeper orchestration, rehearsal & safety (3 weeks)
+A3 (DAG plans, fan-out/join, nesting ≤ 5), A4 (reviewer agent), A8 (git snapshots per step, `/task diff|undo`), F2 (dry-run diff), F5 (network/cgroup limits), **K5** rehearsal mode (plan runs first against an overlayfs/btrfs/temp-copy snapshot; filesystem diff and per-step exit codes shown; `apply` or `abort`; default on for ≥ 2 state-changing steps and all daemon jobs), **K6** filesystem undo across sessions, **K7** step-up approval for deny-tier (TOTP / FIDO2 / phone push, single-use, never for the daemon), **K8** signed skills and source trust floors. Gate: "migrate the DB and run tests in parallel with linting" → DAG rendered, three lanes, join, reviewer verdict shown; a 3-step plan touching `/etc/nginx` rehearses first and shows the diff before `apply`; `/undo` restores `/etc/nginx` after apply; a `deny`-tier command offers step-up, succeeds with a valid TOTP, is refused from a daemon job; an imported unsigned skill with `run.sh` is rejected.
 
-### Phase 9 Ecosystem & measurement (2 weeks)
-B4 (skill doctor), B7 (import/publish), H2 (plugins), H3 (eval harness of 50 Docker tasks, results in `/dash`), H4 (OTel), H5 (multi-host). Gate: eval harness run per backend produces a comparison table; skill loop on vs off shows a measurable step-count reduction.
+### Phase 9 Ecosystem, measurement & sharing (2.5 weeks)
+B4 (skill doctor), B7 (import/publish), H2 (plugins), H3 (eval harness of 50 Docker tasks, results in `/dash`), H4 (OTel), H5 (multi-host), **K9** incident → runbook drafts in the palace `incidents/` room offered as one-key self-heal, **K10** nightly self-evaluation ("skills saved N turns / $X this week", regressions flagged to skill doctor), **K12** `agentic share` read-only / approve-only session sharing with logged remote approvals. Gate: eval harness run per backend produces a comparison table; skill loop on vs off shows a measurable step-count reduction; a watcher-triggered fix produces a runbook and the next identical alert offers it; a shared approve-only link can answer an INBOX item and the audit row names the approver.
 
 ---
 
