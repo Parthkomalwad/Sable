@@ -165,7 +165,36 @@ def _make_key_bindings(db=None) -> KeyBindings:
     return kb
 
 
-def _build_backend(config: ShellConfig):
+def _mock_backend_or_none(mode: str = "orchestrator"):
+    """Return a MockLLMBackend when SABLE_MOCK_LLM is set, else None.
+
+    Lets the whole shell run with zero API calls for demos and the playground.
+    The fixture lives under tests/, which is not importable from an installed
+    copy, so an ImportError here falls back to the real backend rather than
+    breaking startup.
+    """
+    if os.environ.get("SABLE_MOCK_LLM", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        return None
+    try:
+        from tests.fixtures.mock_llm import MockLLMBackend
+    except ImportError:
+        _out("[sable] SABLE_MOCK_LLM is set but the mock backend is unavailable")
+        return None
+    return MockLLMBackend(mode=mode)
+
+
+def _build_backend(config: ShellConfig, mock_mode: str = "orchestrator"):
+    """Return the configured LLM backend, or the mock when SABLE_MOCK_LLM is set.
+
+    mock_mode selects which canned script the mock plays: "orchestrator" for
+    the REPL's reasoning loop, "worker" for a TaskAgent.
+    """
+    # Checked before importing the real backends so the mock path does not
+    # need httpx installed.
+    mock = _mock_backend_or_none(mock_mode)
+    if mock is not None:
+        return mock
+
     from shell.llm.ollama import OllamaBackend
     from shell.llm.openai import OpenAIBackend
     from shell.llm.anthropic import AnthropicBackend

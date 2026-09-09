@@ -67,7 +67,14 @@ Full Ubuntu with tmux, `bubblewrap` sandbox and a local `sshd`, source bind-moun
 </tr>
 </table>
 
-**No API key?** Run a local model: `ollama pull llama3.1` (the default backend), or set `SABLE_MOCK_LLM=1` for the canned demo (v0.4).
+**No API key?** Two options, both free:
+
+```bash
+ollama pull llama3.1            # local model, the default backend
+SABLE_MOCK_LLM=1 sable          # canned responses, zero API calls
+```
+
+`SABLE_MOCK_LLM=1` swaps in a scripted backend, so routing, the confirm block, sub-agent spawning and `/tour` all work end to end without a key or a local model. Goals it does not have a script for run one placeholder command and finish, so the loop always terminates. Use it for demos, for the playground, and for trying the shell before committing to a backend.
 
 <br>
 
