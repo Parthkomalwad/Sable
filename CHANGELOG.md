@@ -11,6 +11,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - Public `ROADMAP.md`, `docs/branching.md`, `pyproject.toml`, issue/PR templates, Dependabot, CODEOWNERS.
 - Vision: `C6` Memory Palace (rooms and tiers of agent memory, FTS5 recall, provenance, consolidation; subsumes C1–C5) scheduled in Phase 7; `I13` mode switch (`/bash` subshell, `agentic on|off|status`, re-attach, `--wrap`) scheduled in Phase 0.
 - README and `docs/architecture.md` blocklist count corrected to 11.
+- Vision: Pillar J agent capabilities (tool registry, web search/fetch, structured file tools, verify-after-act, reflect/retry, scratchpad, docs and system introspection tools, sandboxed Python, ask-user tool, parallel reads, per-tool budgets) scheduled as Phase 3.5.
 
 ### Changed
 - README rewritten for the public repo: status table, quick start for Linux and the playground, roadmap, docs index.

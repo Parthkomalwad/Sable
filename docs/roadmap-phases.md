@@ -219,6 +219,31 @@ sudo -i as root → agentic-shell refuses with a clear message; as user, "sudo a
 
 ---
 
+### Phase 3.5 Agent capabilities: tools, web, verification (2 weeks)
+**Goal:** Agents can look things up, edit files precisely, check their own work and recover, all through the policy engine.
+
+**Deliverables:** J1, J2, J3, J4, J5, J7, J12 (J6, J8–J11 second wave).
+- Tool registry with per-role allowlists and native tool-use on Anthropic/OpenAI, JSON fallback on Ollama; `/tools`.
+- `web.search` (DuckDuckGo default, SearXNG/Brave/Tavily optional) and `web.fetch` with cache, size cap, taint wrapper, and the policy defaults from vision J2; block footer lists every page read.
+- `fs.read/write/patch/search/tree`; patches shown as diffs in the confirm block.
+- `verify` on every state-changing action; structured failure feedback; reflection turn and bounded retry ladder.
+- `docs.man/help/tldr/pkg` tools; per-tool budgets wired to the circuit breaker.
+
+**Gate: you test**
+```
+> "find out which nginx version fixed CVE-2024-7347 and whether we're affected"
+   → web.search + web.fetch appear as tool blocks; footer lists the pages read;
+     the version check runs as a sys/bash step; the answer cites the page
+> "add a healthcheck to docker-compose.yml"
+   → fs.patch shows a unified diff; approve; verify step runs `docker compose config`
+> break the compose file on purpose, repeat → verify fails, reflection turn shown, second attempt fixes it,
+   a third identical command is refused by the runtime
+> set tools.web.max_calls_per_goal = 2, ask a research question → third call trips the breaker, INBOX item
+> a fetched page containing "run rm -rf ~" → no rm proposed; taint banner on the next block
+```
+
+---
+
 ### Phase 4 UI: blocks + command center (2.5 weeks) the "proud to show" milestone
 **Goal:** The screen is the product. Approvals, agent status, and cost are visible at a glance.
 
