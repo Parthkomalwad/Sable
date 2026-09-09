@@ -9,6 +9,10 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `tests/fixtures/mock_llm.py` gains orchestrator-mode (run, run, spawn, done) and worker-mode (`{command, explanation, done}`) canned scripts.
 - `SABLE_MOCK_LLM=1` runs the whole shell against the mock backend with zero API calls, documented in the README "No API key?" section.
 - `tests/integration/test_orchestrator_spawn.py`: the orchestrator spawns one sub-agent through the mock backend and folds its result back into the next turn's context. Runs without Docker, tmux or an API key.
+- Router accuracy programme (I3): `tests/fixtures/router_corpus.tsv` (539 labelled lines) and `tests/unit/test_router_accuracy.py`, gating bash recall at 0.99 and agentic at 0.95.
+- `/route why "<line>"` prints the bash score, the NL score, every rule that fired and the decisive reason.
+- Ctrl+B and `[b/a]` answers append `input<TAB>label` rows to `~/.sable/state/router_corrections.tsv`, in the same format as the corpus.
+- `shell/paths.py` resolves the new `~/.sable/` state locations.
 - v4 planning: `docs/vision.md`, `docs/roadmap-phases.md`, `docs/structure.md`.
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
@@ -20,6 +24,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `docs/architecture-v4.md`: eight Mermaid diagrams tracing the system (layer map, request lifecycle, agent turn state machine, sub-agent spawn, skill loop, Memory Palace, daemon, processes and IPC).
 
 ### Changed
+- Router rewritten for accuracy: bash recall rose from 0.790 to 0.997 and agentic from 0.930 to 0.977 on the corpus. `shutil.which()` is now a supporting signal rather than a decisive one, since whether `make` or `cargo` is installed is a property of the machine, not the user's intent; a `COMMON_COMMANDS` vocabulary carries that knowledge instead. Adds env-assignment, path-invocation, heredoc and variable detection, and treats a command name followed by three or more plain English words as a goal (`kill the nginx process`) rather than a command.
 - `looks_like_secret()` checks `SECRET_PATTERNS` before falling back to entropy, so structured credentials are detected; an AWS access key scored 3.68 against a 4.5 entropy threshold and was previously missed by the standalone predicate.
 - Tests that asserted absent behaviour were aligned to the code and given reasons: `chmod 777` and `kill -9` are deliberately not in the blocklist, `to_dict()` is a superset of older config files, and `from_dict()` defaults a missing backend to ollama.
 - **Project renamed to Sable.** Command is `sable`, tmux session `sable-<user>`, image `sable`, package `sable-shell`, target package `sable/`, daemon `sabled`, future home `~/.sable/`. Runtime state paths (`~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `/var/log/agentic-shell`), the keyring id and `AGENTIC_NEW_SESSION` are unchanged until the Phase 0.5 migration, so existing installs keep their data.
