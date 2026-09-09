@@ -5,6 +5,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- Unit tests for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory` and `reconcile` (H1), all offline: LLM, libtmux and tmux are mocked.
+- `tests/fixtures/mock_llm.py` gains orchestrator-mode (run, run, spawn, done) and worker-mode (`{command, explanation, done}`) canned scripts.
+- `SABLE_MOCK_LLM=1` runs the whole shell against the mock backend with zero API calls, documented in the README "No API key?" section.
 - v4 planning: `docs/vision.md`, `docs/roadmap-phases.md`, `docs/structure.md`.
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.
@@ -16,6 +19,8 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - `docs/architecture-v4.md`: eight Mermaid diagrams tracing the system (layer map, request lifecycle, agent turn state machine, sub-agent spawn, skill loop, Memory Palace, daemon, processes and IPC).
 
 ### Changed
+- `looks_like_secret()` checks `SECRET_PATTERNS` before falling back to entropy, so structured credentials are detected; an AWS access key scored 3.68 against a 4.5 entropy threshold and was previously missed by the standalone predicate.
+- Tests that asserted absent behaviour were aligned to the code and given reasons: `chmod 777` and `kill -9` are deliberately not in the blocklist, `to_dict()` is a superset of older config files, and `from_dict()` defaults a missing backend to ollama.
 - **Project renamed to Sable.** Command is `sable`, tmux session `sable-<user>`, image `sable`, package `sable-shell`, target package `sable/`, daemon `sabled`, future home `~/.sable/`. Runtime state paths (`~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `/var/log/agentic-shell`), the keyring id and `AGENTIC_NEW_SESSION` are unchanged until the Phase 0.5 migration, so existing installs keep their data.
 - README rewritten for the public repo: status table, quick start for Linux and the playground, roadmap, docs index.
 - `task.md` archived to `docs/history/tasks-v1-v3.md`; stray `test/` directory and superseded `docs/FABLE_ENTRY_POINT.md` removed.
