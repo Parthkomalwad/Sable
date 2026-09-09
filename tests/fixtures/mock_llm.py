@@ -125,6 +125,10 @@ def _worker_step(command: str, explanation: str) -> LLMResponse:
 
 # Orchestrator scripts: run, run, spawn, done.
 ORCHESTRATOR_SCRIPTS: dict[str, list[LLMResponse]] = {
+    # run, run, spawn, run, done. The run after the spawn matters: the
+    # orchestrator only folds a sub-agent's result.md into its context while
+    # building the next turn's messages, so a script that finished straight
+    # after spawning would never observe the worker's result.
     "hello file": [
         _run("echo hello > hello.txt", "Write the hello file."),
         _run("cat hello.txt", "Check what the file contains."),
@@ -133,6 +137,7 @@ ORCHESTRATOR_SCRIPTS: dict[str, list[LLMResponse]] = {
             "Verify hello.txt exists and report its contents.",
             "Delegating verification to a sub-agent.",
         ),
+        _run("ls -l hello.txt", "Confirm the file while the sub-agent reports."),
         _done("Created hello.txt and verified it with a sub-agent."),
     ],
 }

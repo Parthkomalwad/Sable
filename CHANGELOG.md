@@ -8,6 +8,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - Unit tests for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory` and `reconcile` (H1), all offline: LLM, libtmux and tmux are mocked.
 - `tests/fixtures/mock_llm.py` gains orchestrator-mode (run, run, spawn, done) and worker-mode (`{command, explanation, done}`) canned scripts.
 - `SABLE_MOCK_LLM=1` runs the whole shell against the mock backend with zero API calls, documented in the README "No API key?" section.
+- `tests/integration/test_orchestrator_spawn.py`: the orchestrator spawns one sub-agent through the mock backend and folds its result back into the next turn's context. Runs without Docker, tmux or an API key.
 - v4 planning: `docs/vision.md`, `docs/roadmap-phases.md`, `docs/structure.md`.
 - Playground for Windows/macOS hosts: `docker/Dockerfile.playground`, `scripts/playground.ps1`, `scripts/playground.sh`.
 - Devcontainer, CI workflow, LICENSE (MIT), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `.editorconfig`.

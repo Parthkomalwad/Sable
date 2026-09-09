@@ -36,15 +36,15 @@ class TestSingleMode:
 
 
 class TestOrchestratorMode:
-    def test_plays_run_run_spawn_done_in_order(self):
+    def test_plays_run_run_spawn_run_done_in_order(self):
         backend = MockLLMBackend(mode="orchestrator")
         messages = [{"role": "user", "content": "create a hello file"}]
 
         actions = [
-            asyncio.run(backend.complete(messages, "system")).action for _ in range(4)
+            asyncio.run(backend.complete(messages, "system")).action for _ in range(5)
         ]
 
-        assert actions == ["run", "run", "spawn", "done"]
+        assert actions == ["run", "run", "spawn", "run", "done"]
 
     def test_spawn_step_carries_a_name_and_goal(self):
         backend = MockLLMBackend(mode="orchestrator")
@@ -82,7 +82,7 @@ class TestOrchestratorMode:
         backend = MockLLMBackend(mode="orchestrator")
         messages = [{"role": "user", "content": "create a hello file"}]
 
-        for _ in range(4):
+        for _ in range(5):
             asyncio.run(backend.complete(messages, "system"))
         extra = asyncio.run(backend.complete(messages, "system"))
 
