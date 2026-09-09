@@ -13,7 +13,7 @@ VALID_ROUTING_MODES = {"auto", "prefix"}
 
 @dataclass
 class ShellConfig:
-    """Runtime configuration for the agentic shell."""
+    """Runtime configuration for Sable."""
     backend: str                        # "ollama" | "openai" | "anthropic" | "custom"
     model: str                          # e.g. "llama3.1", "gpt-4o", "claude-3-5-haiku-20241022"
     api_base: str | None                # None for cloud backends, URL for Ollama/custom

@@ -46,7 +46,7 @@ def run_wizard() -> None:
     """
     console.print()
     console.print(Panel(
-        "[bold]Welcome to Agentic Shell![/bold]\n\n"
+        "[bold]Welcome to Sable![/bold]\n\n"
         "Let's configure your AI backend. This takes about 30 seconds.\n"
         "[dim]Config will be saved to ~/.config/agentic-shell/config.json[/dim]",
         title="[bold cyan]First-Run Setup[/bold cyan]",

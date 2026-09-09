@@ -71,7 +71,7 @@ if command -v tmux &>/dev/null && [ -z "\$TMUX" ]; then
     TASK_PANE=\$(tmux split-window -v -t "\$MAIN_PANE" -l "\$_TASK_LINES" -P -F "#{pane_id}")
 
     # Layout:
-    #  MAIN_PANE = top-left  → agentic shell
+    #  MAIN_PANE = top-left  -> sable shell
     #  TELE_PANE = right     → telemetry sidebar
     #  TASK_PANE = bottom-left → tasks panel
 

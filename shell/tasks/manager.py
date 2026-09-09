@@ -173,7 +173,7 @@ class TaskManager:
                 window.select()
 
     def back(self) -> None:
-        """Switch back to the main agentic-shell window (window index 0)."""
+        """Switch back to the main sable window (window index 0)."""
         session = self._session()
         if not session:
             return

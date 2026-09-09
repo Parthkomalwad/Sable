@@ -1,1 +1,1 @@
-"""Agentic Shell Layer top-level package."""
+"""Sable top-level package."""
