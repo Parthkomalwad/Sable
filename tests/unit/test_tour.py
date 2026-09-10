@@ -112,9 +112,11 @@ class TestTourRunsWithoutABackend:
         def _explode(*args, **kwargs):
             raise AssertionError("the tour must not build a backend")
 
-        import sable.app.repl
+        # Patched at its real home since Phase 0.5 step 3 moved it out of
+        # the REPL; repl.py no longer builds a backend at all.
+        import sable.llm.registry
 
-        monkeypatch.setattr(sable.app.repl, "_build_backend", _explode)
+        monkeypatch.setattr(sable.llm.registry, "build_backend", _explode)
         run_tour(interactive=False)
 
         assert "7 of 7" in _text(capsys)
