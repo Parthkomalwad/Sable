@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 
-from shell.llm.base import LLMBackend, LLMResponse
+from sable.llm.base import LLMBackend, LLMResponse
 
 # Canned responses keyed by nl_input substring
 CANNED_RESPONSES: dict[str, LLMResponse] = {

@@ -8,7 +8,7 @@ Tests:
 No LLM calls, no subprocess, no file I/O.
 """
 import pytest
-from shell.config.schema import ShellConfig
+from sable.core.config.schema import ShellConfig
 from tests.fixtures.sample_configs import (
     OLLAMA_CONFIG,
     OPENAI_CONFIG,

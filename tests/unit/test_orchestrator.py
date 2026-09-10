@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def _make_orchestrator(tmp_path, goal="list files here"):
-    from shell.tasks.orchestrator import OrchestratorAgent
+    from sable.agents.orchestrator import OrchestratorAgent
     config = MagicMock()
     config.tasks_base_dir = str(tmp_path / "tasks")
     config.backend = "ollama"
@@ -90,7 +90,7 @@ def test_collect_agent_status_empty(tmp_path):
 
 def test_extract_raw_with_action_field(tmp_path):
     """When LLMResponse has action field set, _extract_raw uses it directly."""
-    from shell.llm.base import LLMResponse
+    from sable.llm.base import LLMResponse
     orch = _make_orchestrator(tmp_path)
     response = LLMResponse(
         command="ls -la", explanation="list files", safe=True, plan=None,
@@ -105,7 +105,7 @@ def test_extract_raw_with_action_field(tmp_path):
 
 def test_extract_raw_spawn_action(tmp_path):
     """_extract_raw correctly handles spawn action."""
-    from shell.llm.base import LLMResponse
+    from sable.llm.base import LLMResponse
     orch = _make_orchestrator(tmp_path)
     response = LLMResponse(
         command="", explanation="delegating", safe=True, plan=None,
@@ -122,7 +122,7 @@ def test_extract_raw_spawn_action(tmp_path):
 
 def test_extract_raw_fallback_to_done(tmp_path):
     """_extract_raw falls back to done when no meaningful fields set."""
-    from shell.llm.base import LLMResponse
+    from sable.llm.base import LLMResponse
     orch = _make_orchestrator(tmp_path)
     response = LLMResponse(
         command="", explanation="", safe=True, plan=None,

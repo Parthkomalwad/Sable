@@ -175,8 +175,8 @@ class TestMockLlmEnabled:
 
 class TestBuildBackendWiring:
     def test_build_backend_returns_mock_when_enabled(self, monkeypatch):
-        from shell.config.schema import ShellConfig
-        from shell.loop import _build_backend
+        from sable.core.config.schema import ShellConfig
+        from sable.app.repl import _build_backend
 
         monkeypatch.setenv("SABLE_MOCK_LLM", "1")
 
@@ -186,17 +186,17 @@ class TestBuildBackendWiring:
         assert backend.mode == "orchestrator"
 
     def test_worker_mode_is_passed_through(self, monkeypatch):
-        from shell.config.schema import ShellConfig
-        from shell.loop import _build_backend
+        from sable.core.config.schema import ShellConfig
+        from sable.app.repl import _build_backend
 
         monkeypatch.setenv("SABLE_MOCK_LLM", "1")
 
         assert _build_backend(ShellConfig.defaults(), mock_mode="worker").mode == "worker"
 
     def test_real_backend_when_disabled(self, monkeypatch):
-        from shell.config.schema import ShellConfig
-        from shell.llm.ollama import OllamaBackend
-        from shell.loop import _build_backend
+        from sable.core.config.schema import ShellConfig
+        from sable.llm.ollama import OllamaBackend
+        from sable.app.repl import _build_backend
 
         monkeypatch.delenv("SABLE_MOCK_LLM", raising=False)
 

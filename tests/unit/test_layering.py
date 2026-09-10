@@ -9,11 +9,18 @@ current `tasks -> loop` circular import and what lets the daemon run agents
 with no terminal attached.
 
 This test is the finish line for the Phase 0.5 migration (structure.md §5
-step 1). It is written against the TARGET `sable/` tree and skips itself
-while that tree does not exist yet, so it goes green as the migration lands
-rather than blocking every commit in between. The `shell/` violations it is
-meant to catch are asserted separately below, against whichever tree is
-present, so this file always tests something real.
+step 1). Step 2 moved the tree, so the rule is now live and reporting the
+violations that steps 3 and 4 are there to remove:
+
+  - `agents` and `skills` import `app` for `_build_backend` and
+    `_write_audit_log`. Step 3 extracts those to `llm/registry.py` and
+    `core/audit.py`, both below `agents`.
+  - `agents` imports `memory` and `skills`, which sit one layer above it.
+    Step 3 inverts those through the events bus.
+
+Until then `test_no_package_imports_its_own_layer_or_higher` fails, on
+purpose: it is the migration's progress bar, and it turns green when the
+work is done.
 """
 from __future__ import annotations
 
@@ -42,6 +49,13 @@ LAYERS: list[tuple[str, ...]] = [
 DEPTH: dict[str, int] = {
     pkg: i for i, line in enumerate(LAYERS) for pkg in line
 }
+
+# A package importing its own siblings (llm/openai.py importing llm.base) is
+# ordinary cohesion, not a layering violation. The rule is about crossing
+# package boundaries, so same-package imports are skipped entirely. Peers on
+# the same LAYERS line are still forbidden from importing each other: nothing
+# on that line sits below the others, so an edge between them has no defined
+# direction and is exactly the kind of tangle the rule exists to prevent.
 
 # `data/` is inert files and `__init__` / `__main__` sit outside the layering.
 EXEMPT_TOP_LEVEL = {"data", "__init__.py", "__main__.py"}
@@ -95,7 +109,7 @@ def _violations(root: pathlib.Path, namespace: str) -> list[str]:
         if package in EXEMPT_TOP_LEVEL or package not in DEPTH:
             continue
         for imported in sorted(_imports_of(path, namespace)):
-            if imported not in DEPTH:
+            if imported not in DEPTH or imported == package:
                 continue
             if DEPTH[imported] >= DEPTH[package]:
                 relation = "its own layer" if DEPTH[imported] == DEPTH[package] else "a higher layer"
@@ -116,6 +130,14 @@ requires_sable = pytest.mark.skipif(
 
 @requires_sable
 class TestSableLayering:
+    # Expected to fail until migration steps 3 and 4 land, and marked strict
+    # so that the moment they do, this XPASSes and fails the build until the
+    # marker comes off. That is the point: the finish line has to announce
+    # itself rather than sit here quietly passing as an xfail forever.
+    @pytest.mark.xfail(
+        reason="steps 3 and 4 remove the remaining agents/skills -> app edges",
+        strict=True,
+    )
     def test_no_package_imports_its_own_layer_or_higher(self):
         problems = _violations(sable_root, "sable")
         assert not problems, (
@@ -156,39 +178,4 @@ class TestSableLayering:
         assert not unplaced, (
             f"packages with no layer in LAYERS: {unplaced}. Add them to "
             f"docs/structure.md §2 and to LAYERS in this file."
-        )
-
-
-class TestLegacyShellCycle:
-    """The concrete violation Phase 0.5 exists to remove.
-
-    `shell/tasks/*` and `shell/skills/*` reach back into `shell/loop.py` for
-    `_build_backend` and `_write_audit_log`, while `loop.py` imports both
-    packages. The cycle is survivable today only because every one of those
-    imports is deferred to function scope.
-
-    structure.md §5 step 3 breaks it by extracting `_build_backend` to
-    `llm/registry.py` and `_write_audit_log` to `core/audit.py`, both of
-    which sit below `agents` in the layering.
-
-    This test PASSES while the cycle exists and fails once it is gone, at
-    which point delete it: the rule above covers the same ground on the new
-    tree. It is here so this file asserts something real during the
-    migration rather than skipping entirely.
-    """
-
-    shell_root = REPO_ROOT / "shell"
-
-    @pytest.mark.skipif(not (REPO_ROOT / "shell").is_dir(), reason="shell/ already removed")
-    def test_the_documented_cycle_is_still_present(self):
-        importers = sorted(
-            path.relative_to(REPO_ROOT).as_posix()
-            for path in _iter_python_files(REPO_ROOT / "shell")
-            if _package_of(path, REPO_ROOT / "shell") in {"tasks", "skills"}
-            and "loop" in _imports_of(path, "shell")
-        )
-        assert importers, (
-            "shell/tasks and shell/skills no longer import shell.loop. The "
-            "Phase 0.5 cycle is broken, so delete TestLegacyShellCycle and "
-            "rely on TestSableLayering."
         )

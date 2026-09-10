@@ -1,4 +1,4 @@
-"""The non-interactive bypass in shell/main.py.
+"""The non-interactive bypass in sable/app/main.py.
 
 If this breaks, `ssh host cmd`, `scp`, `rsync` and `git push` all hang or drop
 the user into an interactive REPL, so it is worth testing at the source level:
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-MAIN = Path(__file__).resolve().parents[2] / "shell" / "main.py"
+MAIN = Path(__file__).resolve().parents[2] / "sable" / "app" / "main.py"
 
 
 class TestGuardIsFirst:
@@ -49,17 +49,18 @@ class TestGuardIsFirst:
 
 
 def _run_main(args: list[str], env_extra: dict | None = None) -> subprocess.CompletedProcess:
-    """Run shell.main in a subprocess, since the guard execs over the process."""
+    """Run sable.app.main in a subprocess, since the guard execs over the process."""
     import os
 
-    env = {**os.environ, "PYTHONPATH": str(MAIN.parents[1])}
+    # MAIN is sable/app/main.py, so the repo root is three levels up.
+    env = {**os.environ, "PYTHONPATH": str(MAIN.parents[2])}
     if env_extra:
         env.update(env_extra)
     env.pop("SSH_ORIGINAL_COMMAND", None)
     if env_extra:
         env.update(env_extra)
     return subprocess.run(
-        [sys.executable, "-m", "shell.main", *args],
+        [sys.executable, "-m", "sable.app.main", *args],
         capture_output=True,
         text=True,
         env=env,

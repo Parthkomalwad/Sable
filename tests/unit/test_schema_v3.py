@@ -1,5 +1,5 @@
 # tests/unit/test_schema_v3.py
-from shell.config.schema import ShellConfig
+from sable.core.config.schema import ShellConfig
 
 
 def test_tasks_base_dir_default():

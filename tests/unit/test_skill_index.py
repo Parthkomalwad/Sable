@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from shell.skills.index import SkillIndex
+from sable.skills.index import SkillIndex
 
 
 def _index(tmp_path) -> SkillIndex:

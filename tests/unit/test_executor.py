@@ -13,7 +13,7 @@ import sys
 
 import pytest
 from unittest.mock import patch, MagicMock
-from shell.executor import execute_bash
+from sable.core.executor import execute_bash
 
 
 class TestCdInterception:
@@ -80,7 +80,7 @@ def _fake_pty(mock_pty_class):
 class TestPtyProcessRouting:
     def test_non_cd_uses_ptyprocess(self, real_stdin):
         """Non-cd commands must go through PtyProcessUnicode, not subprocess."""
-        with patch("shell.executor.PtyProcessUnicode") as mock_pty_class:
+        with patch("sable.core.executor.PtyProcessUnicode") as mock_pty_class:
             _fake_pty(mock_pty_class)
 
             execute_bash("grep -r TODO src/", cwd="/tmp")
@@ -92,7 +92,7 @@ class TestPtyProcessRouting:
     def test_ls_is_rendered_by_rich_not_ptyprocess(self, tmp_path, real_stdin):
         """`ls` is intercepted and rendered with Rich, so it never spawns a pty.
         Anything with shell syntax falls through to the pty instead."""
-        with patch("shell.executor.PtyProcessUnicode") as mock_pty_class:
+        with patch("sable.core.executor.PtyProcessUnicode") as mock_pty_class:
             _fake_pty(mock_pty_class)
 
             execute_bash("ls -la", cwd=str(tmp_path))
@@ -103,7 +103,7 @@ class TestPtyProcessRouting:
 
     def test_echo_command_not_intercepted_as_cd(self, real_stdin):
         """'echo cd' must not trigger the cd interceptor."""
-        with patch("shell.executor.PtyProcessUnicode") as mock_pty_class:
+        with patch("sable.core.executor.PtyProcessUnicode") as mock_pty_class:
             _fake_pty(mock_pty_class)
 
             execute_bash("echo cd /tmp", cwd="/tmp")

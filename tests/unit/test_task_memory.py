@@ -10,7 +10,7 @@ import sqlite3
 
 import pytest
 
-from shell.tasks.memory import TaskMemory
+from sable.memory.task import TaskMemory
 
 _CREATE_TASK_MEMORY = """
 CREATE TABLE IF NOT EXISTS task_memory (
