@@ -108,7 +108,7 @@ def _run(orchestrator, commands_seen: list[str]):
     def fresh_backend(*args, **kwargs):
         return MockLLMBackend(mode="orchestrator")
 
-    with patch("sable.app.repl._build_backend", side_effect=fresh_backend), \
+    with patch("sable.llm.registry.build_backend", side_effect=fresh_backend), \
          patch.object(orchestrator, "_confirm_command", side_effect=lambda c, e: c), \
          patch.object(orchestrator, "_run_command", side_effect=fake_run_command):
         orchestrator.run()

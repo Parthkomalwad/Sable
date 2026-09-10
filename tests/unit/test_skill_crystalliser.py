@@ -89,7 +89,7 @@ def _mock_backend(explanation: str = "# deploy-api\n\n## When to use\nDeploying.
 
 
 def _crystallise(pattern, db_path, backend):
-    with patch("sable.app.repl._build_backend", return_value=backend):
+    with patch("sable.llm.registry.build_backend", return_value=backend):
         return SkillCrystalliser(config=MagicMock(), db_path=db_path).crystallise(pattern)
 
 
@@ -180,7 +180,7 @@ class TestUpdate:
     def test_update_reruns_generation_and_recrystallises(self, db_path, skills_dir):
         _crystallise(PATTERN, db_path, _mock_backend("# first\n"))
 
-        with patch("sable.app.repl._build_backend", return_value=_mock_backend("# second\n")):
+        with patch("sable.llm.registry.build_backend", return_value=_mock_backend("# second\n")):
             path = SkillCrystalliser(config=MagicMock(), db_path=db_path).update(PATTERN)
 
         assert path.read_text() == "# second\n"

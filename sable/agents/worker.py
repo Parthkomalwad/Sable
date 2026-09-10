@@ -149,9 +149,9 @@ class TaskAgent:
         conn.close()
 
     def _call_llm(self, messages: list[dict]):
-        from sable.app.repl import _build_backend
+        from sable.llm.registry import build_backend
         import asyncio
-        backend = _build_backend(self._config, mock_mode="worker")
+        backend = build_backend(self._config, mock_mode="worker")
         print("[agent] calling LLM...", flush=True)
         try:
             loop = asyncio.new_event_loop()

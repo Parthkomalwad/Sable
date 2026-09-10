@@ -215,8 +215,8 @@ class OrchestratorAgent:
         self._history.append({"role": "user", "content": output or "(no output)"})
 
         try:
-            from sable.app.repl import _write_audit_log
-            _write_audit_log("orchestrator", self._cwd, confirmed_cmd)
+            from sable.core.audit import write_command
+            write_command("orchestrator", self._cwd, confirmed_cmd)
         except Exception:
             pass
 
@@ -355,8 +355,8 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
 
     def _call_llm(self, messages: list[dict]):
-        from sable.app.repl import _build_backend
-        backend = _build_backend(self._config)
+        from sable.llm.registry import build_backend
+        backend = build_backend(self._config)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
