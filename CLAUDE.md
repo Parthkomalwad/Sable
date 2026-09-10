@@ -14,7 +14,7 @@ Full spec: read `docs/specs/prd-v1.md` before starting any task. It contains eve
 1. `docs/vision.md`: verified current state, external research, feature catalog of ~85 items (IDs A1…K12)
 2. `docs/roadmap-phases.md`: phases -1 to 9, per-phase gates you can test, install/playground instructions
 3. `docs/structure.md`: target `sable/` package layout, layering rule, config model, visibility principles, migration plan
-`docs/specs/prd-v3.md` documents the task engine + skills that already exist under `shell/tasks/` and `shell/skills/`. The project-structure section below describes the **current** tree; structure.md describes the **target** tree.
+`docs/specs/prd-v3.md` documents the task engine + skills, which live under `sable/agents/` and `sable/skills/` since the Phase 0.5 move (they were `shell/tasks/` and `shell/skills/`). The project-structure section below is the current tree, which now matches structure.md's target apart from the packages Phase 1 adds (`core/events/bus.py`, `mcp/`, `daemon/`).
 
 Project hygiene in place: `.github/workflows/ci.yml` (unit + integration-in-Docker + convention checks), `.github/` issue/PR templates, `.devcontainer/`, `pyproject.toml`, `LICENSE` (MIT), `CONTRIBUTING.md`, `CHANGELOG.md` (update *Unreleased* in every PR), `SECURITY.md`, `CODE_OF_CONDUCT.md`. Public milestones: `ROADMAP.md`; branch/release model: `docs/branching.md` (trunk-based, `feat/<ID>-<slug>`, squash-merge). Playground for non-Linux hosts: `scripts/playground.ps1` / `.sh`. Old phase checklist archived at `docs/history/tasks-v1-v3.md`.
 
@@ -23,32 +23,38 @@ Project hygiene in place: `.github/workflows/ci.yml` (unit + integration-in-Dock
 ## Project structure (read this before reading any files)
 
 ```
-shell/
-  main.py        entry point, SSH bypass, startup
-  loop.py        prompt_toolkit REPL
-  router.py      NL vs bash classifier
-  executor.py    subprocess + ptyprocess, cd interception
-  safety.py      blocklist, entropy check, confirm flow
-  planner.py     multi-step plan execution
-  llm/
-    base.py      abstract LLMBackend + LLMResponse dataclass
-    ollama.py    Ollama backend
-    openai.py    OpenAI backend
-    anthropic.py Anthropic backend
-  config/
-    wizard.py    first-run setup
-    schema.py    ShellConfig dataclass
-    keyring.py   secretstorage integration (phase 2)
-  telemetry/
-    db.py        SQLite WAL init + writes
-    events.py    TokenEvent dataclass
-    watch.py     sidebar process
-  memory/
-    compressor.py  token-reducer trigger + call
-    store.py       session context load/save
-  tui/
-    layout.py    libtmux session + pane split
-    panel.py     Rich telemetry panel
+sable/
+  app/           composition root
+    main.py        entry point, non-interactive bypass (first statement), startup
+    repl.py        the read / route / dispatch loop + _handle_builtin
+    builtins/      one module per command family: task, skill, route,
+                   history, stats, memory, session
+    mode.py        sable on|off|status, re-attach
+    tour.py        /tour walkthrough
+  core/          foundation, no LLM knowledge
+    paths.py       ~/.sable/* resolution
+    db.py          SQLite WAL + schema
+    audit.py       the audit ledger (write_command, write_action)
+    executor.py    ptyprocess runner, cd interception
+    events/types.py  TokenEvent and friends
+    config/        schema.py, wizard.py, keyring.py
+  llm/           base.py (ABC + LLMResponse), ollama, openai, anthropic,
+                 registry.py (build_backend), pricing.json
+  policy/        engine.py  (blocklist, entropy check, confirm flow)
+  agents/        orchestrator.py, worker.py, manager.py, reconcile.py,
+                 sandbox.py, router.py, planner.py
+  skills/        index.py, watcher.py, crystalliser.py, loader.py
+  memory/        session.py, task.py, compressor.py
+  ui/            everything a human sees
+    console.py     shared out() helper
+    prompt/        completer, powerline prompt, key bindings
+    sidebar/       watch.py (telemetry pane), agents_panel.py (tasks bar)
+    tmux/          layout.py
+    clipboard/     manager.py
+    settings_panel.py
+
+shell/           compat shim only: re-exports sable.* under the old names
+                 with a DeprecationWarning. Removed one release from now.
 
 tests/
   unit/          no LLM calls, no subprocess, no I/O
@@ -63,13 +69,13 @@ tests/
 
 Build in this exact sequence. Do not skip ahead.
 
-1. `main.py`: SSH_ORIGINAL_COMMAND bypass only
-2. `executor.py`: bash path + cd interception
-3. `loop.py`: prompt_toolkit REPL with cwd prompt
-4. `router.py`: classifier + prefix mode
+1. `app/main.py`: SSH_ORIGINAL_COMMAND bypass only
+2. `core/executor.py`: bash path + cd interception
+3. `app/repl.py`: prompt_toolkit REPL with cwd prompt
+4. `agents/router.py`: classifier + prefix mode
 5. `llm/base.py` + `llm/ollama.py`: Ollama streaming only
-6. `safety.py`: blocklist + confirm flow
-7. `planner.py`: plan array execution
+6. `policy/engine.py`: blocklist + confirm flow
+7. `agents/planner.py`: plan array execution
 
 ---
 
