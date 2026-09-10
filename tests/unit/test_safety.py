@@ -9,7 +9,7 @@ Tests:
 No LLM calls, no subprocess, no file I/O.
 """
 import pytest
-from shell.safety import (
+from sable.policy.engine import (
     DESTRUCTIVE_PATTERNS,
     is_destructive,
     looks_like_secret,

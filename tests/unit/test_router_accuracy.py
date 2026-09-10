@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from shell.router import Route, classify
+from sable.agents.router import Route, classify
 
 CORPUS_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "router_corpus.tsv"
 
@@ -107,6 +107,6 @@ class TestAccuracy:
 class TestExplanationsAgreeWithClassify:
     @pytest.mark.parametrize("text,label", CORPUS[::37])
     def test_explain_route_matches_classify(self, text, label):
-        from shell.router import explain
+        from sable.agents.router import explain
 
         assert explain(text).route is classify(text)

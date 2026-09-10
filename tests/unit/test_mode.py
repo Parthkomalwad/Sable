@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shell import mode
+from sable.app import mode
 
 
 @pytest.fixture
 def sable_home(tmp_path, monkeypatch):
     """Redirect ~/.sable/ into tmp_path."""
-    import shell.paths as paths
+    import sable.core.paths as paths
 
     home = tmp_path / ".sable"
     monkeypatch.setattr(paths, "SABLE_HOME", home)
@@ -56,7 +56,7 @@ class TestToggle:
         assert "on" in mode.status()
 
     def test_round_trip(self, sable_home):
-        from shell import paths
+        from sable.core import paths
 
         assert paths.is_disabled() is False
         mode.disable()
@@ -168,7 +168,7 @@ class TestPlainSubshell:
 
 class TestCli:
     def _capture(self, argv, capsys):
-        from shell.main import _handle_cli
+        from sable.app.main import _handle_cli
 
         handled = _handle_cli(argv)
         return handled, capsys.readouterr().out

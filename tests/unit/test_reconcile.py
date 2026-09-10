@@ -64,7 +64,7 @@ def _status(db_path: str, name: str) -> str:
 
 def _run_reconcile(db_path: str, live_window_ids: list[str], session_found: bool = True):
     """Call reconcile() with a fake tmux session exposing live_window_ids."""
-    from shell.tasks import reconcile as reconcile_module
+    from sable.agents import reconcile as reconcile_module
 
     session = MagicMock()
     session.session_name = "sable-test"

@@ -11,10 +11,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shell.llm.base import LLMResponse
-from shell.skills import crystalliser as crystalliser_module
-from shell.skills.crystalliser import SkillCrystalliser, _slugify
-from shell.skills.index import SkillIndex
+from sable.llm.base import LLMResponse
+from sable.skills import crystalliser as crystalliser_module
+from sable.skills.crystalliser import SkillCrystalliser, _slugify
+from sable.skills.index import SkillIndex
 
 _CREATE_SKILL_PATTERNS = """
 CREATE TABLE IF NOT EXISTS skill_patterns (
@@ -89,7 +89,7 @@ def _mock_backend(explanation: str = "# deploy-api\n\n## When to use\nDeploying.
 
 
 def _crystallise(pattern, db_path, backend):
-    with patch("shell.loop._build_backend", return_value=backend):
+    with patch("sable.app.repl._build_backend", return_value=backend):
         return SkillCrystalliser(config=MagicMock(), db_path=db_path).crystallise(pattern)
 
 
@@ -180,7 +180,7 @@ class TestUpdate:
     def test_update_reruns_generation_and_recrystallises(self, db_path, skills_dir):
         _crystallise(PATTERN, db_path, _mock_backend("# first\n"))
 
-        with patch("shell.loop._build_backend", return_value=_mock_backend("# second\n")):
+        with patch("sable.app.repl._build_backend", return_value=_mock_backend("# second\n")):
             path = SkillCrystalliser(config=MagicMock(), db_path=db_path).update(PATTERN)
 
         assert path.read_text() == "# second\n"

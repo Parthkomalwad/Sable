@@ -8,7 +8,7 @@ Tests:
 No LLM calls, no subprocess, no file I/O.
 """
 import pytest
-from shell.memory.compressor import should_compress
+from sable.memory.compressor import should_compress
 
 
 SAMPLE_TURNS = [

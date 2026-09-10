@@ -4,13 +4,13 @@ from unittest.mock import MagicMock, patch
 
 def test_orchestrator_agent_importable():
     """OrchestratorAgent can be imported without errors."""
-    from shell.tasks.orchestrator import OrchestratorAgent
+    from sable.agents.orchestrator import OrchestratorAgent
     assert OrchestratorAgent is not None
 
 
 def test_orchestrator_run_called_on_nl_input(tmp_path):
     """OrchestratorAgent.run() is invoked when NL input is processed."""
-    from shell.tasks.orchestrator import OrchestratorAgent
+    from sable.agents.orchestrator import OrchestratorAgent
 
     config = MagicMock()
     config.tasks_base_dir = str(tmp_path / "tasks")

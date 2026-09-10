@@ -35,6 +35,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base'); tiktoken.get_encoding('o200k_base')"
 
 # Copy project source
+COPY sable/ ./sable/
 COPY shell/ ./shell/
 COPY tests/ ./tests/
 

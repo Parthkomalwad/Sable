@@ -5,15 +5,15 @@ import io
 
 import pytest
 
-from shell.config.schema import ShellConfig
-from shell.loop import _handle_route_builtin, _record_router_correction
-from shell.router import Route, explain
+from sable.core.config.schema import ShellConfig
+from sable.app.repl import _handle_route_builtin, _record_router_correction
+from sable.agents.router import Route, explain
 
 
 @pytest.fixture
 def corrections_file(tmp_path, monkeypatch):
     """Redirect ~/.sable/state/ into tmp_path."""
-    import shell.paths as paths
+    import sable.core.paths as paths
 
     state = tmp_path / ".sable" / "state"
     target = state / "router_corrections.tsv"

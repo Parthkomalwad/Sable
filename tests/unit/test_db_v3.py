@@ -10,8 +10,8 @@ def _make_db():
     """Create a Database instance pointing at a temp file."""
     fd, tmp = tempfile.mkstemp(suffix=".db")
     os.close(fd)
-    with patch("shell.telemetry.db.DB_PATH", Path(tmp)):
-        from shell.telemetry.db import Database
+    with patch("sable.core.db.DB_PATH", Path(tmp)):
+        from sable.core.db import Database
         return Database(), tmp
 
 

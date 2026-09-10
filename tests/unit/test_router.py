@@ -10,7 +10,7 @@ Tests the classify() function with 30+ inputs covering:
 No LLM calls, no subprocess, no file I/O.
 """
 import pytest
-from shell.router import Route, classify
+from sable.agents.router import Route, classify
 
 
 class TestPrefixMode:

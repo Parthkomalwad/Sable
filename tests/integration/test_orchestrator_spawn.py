@@ -81,8 +81,8 @@ class _RecordingTaskManager:
 
 
 def _make_orchestrator(tmp_path, db_path, task_manager, goal="create a hello file"):
-    from shell.config.schema import ShellConfig
-    from shell.tasks.orchestrator import OrchestratorAgent
+    from sable.core.config.schema import ShellConfig
+    from sable.agents.orchestrator import OrchestratorAgent
 
     config = ShellConfig.defaults()
     config.tasks_base_dir = str(tmp_path / "tasks")
@@ -108,7 +108,7 @@ def _run(orchestrator, commands_seen: list[str]):
     def fresh_backend(*args, **kwargs):
         return MockLLMBackend(mode="orchestrator")
 
-    with patch("shell.loop._build_backend", side_effect=fresh_backend), \
+    with patch("sable.app.repl._build_backend", side_effect=fresh_backend), \
          patch.object(orchestrator, "_confirm_command", side_effect=lambda c, e: c), \
          patch.object(orchestrator, "_run_command", side_effect=fake_run_command):
         orchestrator.run()

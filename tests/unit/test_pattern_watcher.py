@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from shell.skills.pattern_watcher import (
+from sable.skills.watcher import (
     THRESHOLD,
     PatternWatcher,
     compute_pattern_hash,

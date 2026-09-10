@@ -1,6 +1,6 @@
 import os
 import pytest
-from shell.tasks.sandbox import Sandbox
+from sable.agents.sandbox import Sandbox
 
 
 def test_shared_read_dir_stored(tmp_path):

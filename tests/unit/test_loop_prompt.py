@@ -18,7 +18,7 @@ def test_render_prompt_no_git(monkeypatch, tmp_path):
     monkeypatch.setattr(_sp, "run", fake_run)
 
     # Reload to pick up monkeypatch
-    import shell.loop as loop_mod
+    import sable.app.repl as loop_mod
     importlib.reload(loop_mod)
 
     result = loop_mod._render_prompt("/home/user/project", 0)
@@ -38,7 +38,7 @@ def test_render_prompt_with_git(monkeypatch):
         return R()
     monkeypatch.setattr(sp, "run", fake_run)
 
-    import shell.loop as loop_mod
+    import sable.app.repl as loop_mod
     importlib.reload(loop_mod)
 
     result = loop_mod._render_prompt("/home/user/project", 0)
@@ -56,7 +56,7 @@ def test_render_prompt_red_cursor_on_failure(monkeypatch):
         return R()
     monkeypatch.setattr(sp, "run", fake_run)
 
-    import shell.loop as loop_mod
+    import sable.app.repl as loop_mod
     importlib.reload(loop_mod)
 
     result = loop_mod._render_prompt("/home/user", 1)

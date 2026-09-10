@@ -14,40 +14,44 @@ jobs:
 
       # Blocking. This rule holds today (zero matches), so anything new that
       # trips it is a fresh violation and belongs in the PR that added it.
-      - name: No bare `print(` in shell/ (Rich Console only)
+      # Paths are sable/ since Phase 0.5 step 2 moved the package. shell/ is
+      # now only the compat shim, so grepping it would scan one file and pass
+      # vacuously. The agent.py exemption moved with the file: it is
+      # sable/agents/worker.py now.
+      - name: No bare `print(` in sable/ (Rich Console only)
         run: |
           set -euo pipefail
-          matches=$(grep -rnE "^\s*print\(" shell/ --include='*.py' \
-                    | grep -v "shell/tasks/agent.py" || true)
+          matches=$(grep -rnE "^\s*print\(" sable/ --include='*.py' \
+                    | grep -v "sable/agents/worker.py" || true)
           if [ -n "$matches" ]; then
             echo "$matches"
             echo "::error::CLAUDE.md: user-facing output goes through Rich's Console, not print()."
             exit 1
           fi
-          echo "OK: no bare print() outside shell/tasks/agent.py"
+          echo "OK: no bare print() outside sable/agents/worker.py"
 
-      # Non-blocking on purpose: there are 72 of these in shell/ today and they
+      # Non-blocking on purpose: there are 72 of these in sable/ today and they
       # are cleaned up in Phase 1. Making it blocking now would just fail every
       # PR. The count is printed so the number is visible in the log and the
       # Phase 1 cleanup has a baseline to measure against.
-      - name: Report bare `except Exception` in shell/ (non-blocking until Phase 1)
+      - name: Report bare `except Exception` in sable/ (non-blocking until Phase 1)
         run: |
           set -uo pipefail
-          count=$(grep -rcn "except Exception" shell/ --include='*.py' \
+          count=$(grep -rcn "except Exception" sable/ --include='*.py' \
                   | awk -F: '{s+=$2} END {print s+0}')
-          echo "bare 'except Exception' in shell/: $count"
+          echo "bare 'except Exception' in sable/: $count"
           if [ "$count" -gt 0 ]; then
-            echo "::warning::$count bare 'except Exception' remain in shell/, scheduled for cleanup in Phase 1"
+            echo "::warning::$count bare 'except Exception' remain in sable/, scheduled for cleanup in Phase 1"
           fi
 
       # Blocking. This is the rule CLAUDE.md calls non-negotiable, and it was
       # broken in main while CI stayed green.
-      - name: SSH bypass is the first executable statement in main.py
+      - name: SSH bypass is the first executable statement in app/main.py
         run: |
           python3 - <<'EOF'
           import ast, sys
 
-          src = open("shell/main.py").read()
+          src = open("sable/app/main.py").read()
           tree = ast.parse(src)
 
           for node in tree.body:
@@ -60,11 +64,11 @@ jobs:
                   print("OK: first executable statement is the SSH bypass")
                   sys.exit(0)
               print("::error::CLAUDE.md: the non-interactive bypass must be the first "
-                    "executable statement of shell/main.py. Found instead:")
+                    "executable statement of sable/app/main.py. Found instead:")
               print(seg[:300])
               sys.exit(1)
 
-          print("::error::no executable statement found in shell/main.py")
+          print("::error::no executable statement found in sable/app/main.py")
           sys.exit(1)
           EOF
 
@@ -78,7 +82,7 @@ jobs:
           python3 - <<'EOF'
           import ast, sys
 
-          src = open("shell/main.py").read()
+          src = open("sable/app/main.py").read()
           guard = next(
               n for n in ast.parse(src).body
               if not isinstance(n, (ast.Import, ast.ImportFrom))

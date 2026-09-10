@@ -15,7 +15,7 @@ def mock_libtmux():
 
 def _make_manager(tmp_path):
     # Defer import to after libtmux is mocked (via autouse fixture)
-    from shell.tasks.manager import TaskManager
+    from sable.agents.manager import TaskManager
     config = MagicMock()
     config.tasks_base_dir = str(tmp_path / "tasks")
     db = MagicMock()

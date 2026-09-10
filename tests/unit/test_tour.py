@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from shell.tour import _STEPS, run_tour
+from sable.app.tour import _STEPS, run_tour
 
 _ANSI = re.compile(chr(27) + r"\[[0-9;]*m")
 
@@ -18,8 +18,8 @@ def wide_console(monkeypatch):
     enough to truncate panel titles, so assertions on content would fail for
     reasons that have nothing to do with the tour.
     """
-    import shell.config.wizard as wizard
-    import shell.tour as tour
+    import sable.core.config.wizard as wizard
+    import sable.app.tour as tour
     from rich.console import Console
 
     for module in (tour, wizard):
@@ -112,9 +112,9 @@ class TestTourRunsWithoutABackend:
         def _explode(*args, **kwargs):
             raise AssertionError("the tour must not build a backend")
 
-        import shell.loop
+        import sable.app.repl
 
-        monkeypatch.setattr(shell.loop, "_build_backend", _explode)
+        monkeypatch.setattr(sable.app.repl, "_build_backend", _explode)
         run_tour(interactive=False)
 
         assert "7 of 7" in _text(capsys)
@@ -122,7 +122,7 @@ class TestTourRunsWithoutABackend:
 
 class TestWizardConfirmTiers:
     def test_explains_all_three_tiers(self, capsys):
-        from shell.config.wizard import _explain_confirm_tiers
+        from sable.core.config.wizard import _explain_confirm_tiers
 
         _explain_confirm_tiers()
         out = _text(capsys)
@@ -132,14 +132,14 @@ class TestWizardConfirmTiers:
         assert "YES" in out
 
     def test_says_nothing_runs_unseen(self, capsys):
-        from shell.config.wizard import _explain_confirm_tiers
+        from sable.core.config.wizard import _explain_confirm_tiers
 
         _explain_confirm_tiers()
 
         assert "never runs a command you have not seen" in _text(capsys)
 
     def test_points_at_the_tour(self, capsys):
-        from shell.config.wizard import _explain_confirm_tiers
+        from sable.core.config.wizard import _explain_confirm_tiers
 
         _explain_confirm_tiers()
 

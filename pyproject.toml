@@ -47,13 +47,15 @@ Issues = "https://github.com/Parthkomalwad/sable/issues"
 Changelog = "https://github.com/Parthkomalwad/sable/blob/main/CHANGELOG.md"
 
 [project.scripts]
-sable = "shell.main:main"
+sable = "sable.app.main:main"
 
 [tool.setuptools.packages.find]
-include = ["shell*"]
+# Both: sable* is the real package, shell* is the compat shim kept for one
+# release so installed machines keep working (docs/structure.md §5 step 2).
+include = ["sable*", "shell*"]
 
 [tool.setuptools.package-data]
-"shell.llm" = ["pricing.json"]
+"sable.llm" = ["pricing.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
