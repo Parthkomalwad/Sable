@@ -5,6 +5,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- `tests/integration/test_ssh_bypass_live.py` (I5): the SSH bypass exercised end to end against a real sshd, with the real login shell, using the real `ssh` and `scp` clients. Asserts exact remote output, no REPL banner leaking into a non-interactive session, exit-code propagation, stream separation, piped stdin, an scp round trip in both the SFTP and legacy (`-O`) modes, and the `SSH_ORIGINAL_COMMAND` branch. Verified to be a real gate: with the argv branch of the guard reverted to env-only, 7 of its 8 tests fail.
 - Unit tests for `PatternWatcher`, `SkillCrystalliser`, `SkillIndex`, `TaskMemory` and `reconcile` (H1), all offline: LLM, libtmux and tmux are mocked.
 - `tests/fixtures/mock_llm.py` gains orchestrator-mode (run, run, spawn, run, done) and worker-mode (`{command, explanation, done}`) canned scripts. Script position is derived from the conversation, because `OrchestratorAgent` builds a fresh backend on every turn.
 - `SABLE_MOCK_LLM=1` runs the whole shell against the mock backend with zero API calls, documented in the README "No API key?" section.
