@@ -11,21 +11,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: No bare `except Exception` or `print(` in shell/
+
+      # Blocking. This rule holds today (zero matches), so anything new that
+      # trips it is a fresh violation and belongs in the PR that added it.
+      - name: No bare `print(` in shell/ (Rich Console only)
         run: |
-          set -e
-          bad=0
-          if grep -rnE "except Exception\b" shell/ --include='*.py'; then bad=1; fi
-          if grep -rnE "^\s*print\(" shell/ --include='*.py' | grep -v "shell/tasks/agent.py"; then bad=1; fi
-          if [ "$bad" = "1" ]; then
-            echo "::warning::Convention violations found (non-blocking until Phase 1 refactor lands)"
+          set -euo pipefail
+          matches=$(grep -rnE "^\s*print\(" shell/ --include='*.py' \
+                    | grep -v "shell/tasks/agent.py" || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "::error::CLAUDE.md: user-facing output goes through Rich's Console, not print()."
+            exit 1
           fi
+          echo "OK: no bare print() outside shell/tasks/agent.py"
+
+      # Non-blocking on purpose: there are 72 of these in shell/ today and they
+      # are cleaned up in Phase 1. Making it blocking now would just fail every
+      # PR. The count is printed so the number is visible in the log and the
+      # Phase 1 cleanup has a baseline to measure against.
+      - name: Report bare `except Exception` in shell/ (non-blocking until Phase 1)
+        run: |
+          set -uo pipefail
+          count=$(grep -rcn "except Exception" shell/ --include='*.py' \
+                  | awk -F: '{s+=$2} END {print s+0}')
+          echo "bare 'except Exception' in shell/: $count"
+          if [ "$count" -gt 0 ]; then
+            echo "::warning::$count bare 'except Exception' remain in shell/, scheduled for cleanup in Phase 1"
+          fi
+
+      # Blocking. This is the rule CLAUDE.md calls non-negotiable, and it was
+      # broken in main while CI stayed green.
       - name: SSH bypass is the first executable statement in main.py
         run: |
           python3 - <<'EOF'
           import ast, sys
+
           src = open("shell/main.py").read()
           tree = ast.parse(src)
+
           for node in tree.body:
               if isinstance(node, (ast.Import, ast.ImportFrom)):
                   continue
@@ -35,8 +59,40 @@ jobs:
               if "SSH_ORIGINAL_COMMAND" in seg:
                   print("OK: first executable statement is the SSH bypass")
                   sys.exit(0)
-              print("FAIL: first executable statement is not the SSH bypass:\n", seg[:200])
+              print("::error::CLAUDE.md: the non-interactive bypass must be the first "
+                    "executable statement of shell/main.py. Found instead:")
+              print(seg[:300])
               sys.exit(1)
+
+          print("::error::no executable statement found in shell/main.py")
+          sys.exit(1)
+          EOF
+
+      # The env-only guard was the Phase 0 bug: sshd runs the login shell as
+      # `sable -c "<cmd>"` and does NOT set SSH_ORIGINAL_COMMAND, so checking
+      # the variable alone sends ssh, scp and rsync into the REPL. The live
+      # test in the integration job is the real proof; this is a cheap
+      # early signal that runs in seconds without Docker.
+      - name: Bypass reads argv as well as the environment
+        run: |
+          python3 - <<'EOF'
+          import ast, sys
+
+          src = open("shell/main.py").read()
+          guard = next(
+              n for n in ast.parse(src).body
+              if not isinstance(n, (ast.Import, ast.ImportFrom))
+              and not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant))
+          )
+          seg = ast.get_source_segment(src, guard)
+          if "argv" not in seg:
+              print("::error::the bypass checks only SSH_ORIGINAL_COMMAND. sshd invokes "
+                    "the login shell as `sable -c \"<cmd>\"` without setting it, so ssh, "
+                    "scp and rsync would land in the interactive REPL. See "
+                    "tests/integration/test_ssh_bypass_live.py.")
+              print(seg[:300])
+              sys.exit(1)
+          print("OK: bypass covers both the argv and the environment path")
           EOF
 
   unit:
@@ -62,10 +118,51 @@ jobs:
     needs: unit
     steps:
       - uses: actions/checkout@v4
+
       - name: Build playground image
         run: docker build -t sable-playground -f docker/Dockerfile.playground .
-      - name: Run integration tests in Linux with tmux + bwrap
+
+      # Split from the rest so a failure names the thing that broke rather
+      # than "integration failed". These three are the Phase 0 gate items
+      # that CI previously never exercised: SSH, scp, and the tmux layout.
+      #
+      # --cap-add=SYS_ADMIN and the seccomp opt-out are for bubblewrap, which
+      # the sandbox tests need. sshd and tmux run fine without them.
+      - name: SSH bypass, live (ssh, scp, sshd)
         run: |
           docker run --rm -v "$PWD:/app" \
             --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
-            sable-playground bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q"
+            sable-playground \
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_ssh_bypass_live.py -q"
+
+      - name: Playground tmux layout (three panes, sized, rendering)
+        run: |
+          docker run --rm -v "$PWD:/app" \
+            --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            sable-playground \
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_playground_layout.py -q"
+
+      # The whole suite, including the two above again. Cheap, and it is what
+      # catches a collection error in a file no named step covers.
+      #
+      # The Phase 2 placeholders in test_full_loop, test_llm_backends and
+      # test_session_resume are marked xfail(strict), so they report as
+      # expected failures rather than failing the job, and an XPASS fails the
+      # build the moment one of them gets a real body without losing its
+      # marker.
+      - name: Full integration suite
+        run: |
+          docker run --rm -v "$PWD:/app" \
+            --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            sable-playground \
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q"
+
+      # The playground is how a contributor on Windows or macOS runs anything
+      # at all, and `playground.ps1 tests` is the first line of the Phase 0
+      # gate. It goes through the entrypoint, which the steps above bypass, so
+      # a break in playground-entry.sh would otherwise go unnoticed.
+      - name: Playground entrypoint runs the unit suite
+        run: |
+          docker run --rm -v "$PWD:/app" \
+            --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            sable-playground /usr/local/bin/playground-entry.sh tests

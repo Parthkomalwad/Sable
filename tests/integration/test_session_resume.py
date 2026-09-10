@@ -5,7 +5,15 @@ into LLM calls correctly on re-login.
 """
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    # Every test below is still a `raise NotImplementedError` placeholder
+    # scheduled for Phase 2. strict=True means an XPASS fails the build, so
+    # when Phase 2 writes a real body this marker has to come off with it and
+    # the test cannot quietly stay unenforced.
+    pytest.mark.xfail(reason="Phase 2: not implemented yet", strict=True,
+                      raises=NotImplementedError),
+]
 
 
 class TestSessionResume:
