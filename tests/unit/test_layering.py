@@ -9,18 +9,14 @@ current `tasks -> loop` circular import and what lets the daemon run agents
 with no terminal attached.
 
 This test is the finish line for the Phase 0.5 migration (structure.md §5
-step 1). Step 2 moved the tree, so the rule is now live and reporting the
-violations that steps 3 and 4 are there to remove:
+step 1). Step 2 moved the tree, so the rule is now live.
 
-  - `agents` and `skills` import `app` for `_build_backend` and
-    `_write_audit_log`. Step 3 extracts those to `llm/registry.py` and
-    `core/audit.py`, both below `agents`.
-  - `agents` imports `memory` and `skills`, which sit one layer above it.
-    Step 3 inverts those through the events bus.
+Step 3 extracted `_build_backend` to `llm/registry.py` and
+`_write_audit_log` to `core/audit.py`, which removed the `agents`/`skills`
+to `app` edges: the circular import the rule was written to catch.
 
-Until then `test_no_package_imports_its_own_layer_or_higher` fails, on
-purpose: it is the migration's progress bar, and it turns green when the
-work is done.
+Three edges remain, and the marker on the test below explains why they are
+Phase 1 work rather than Phase 0.5 work.
 """
 from __future__ import annotations
 
@@ -130,12 +126,25 @@ requires_sable = pytest.mark.skipif(
 
 @requires_sable
 class TestSableLayering:
-    # Expected to fail until migration steps 3 and 4 land, and marked strict
-    # so that the moment they do, this XPASSes and fails the build until the
-    # marker comes off. That is the point: the finish line has to announce
+    # Step 3 removed the agents/skills -> app edges, which were the real
+    # circular import. Three remain, and all three are genuine collaborator
+    # dependencies rather than accidents:
+    #
+    #   agents/worker.py   -> memory.task   (TaskMemory)
+    #   agents/manager.py  -> memory.task   (TaskMemory)
+    #   agents/worker.py   -> skills.loader (TaskSkillLoader)
+    #
+    # Inverting them means injecting those collaborators instead of
+    # constructing them, or routing through the event bus. Both are runtime
+    # changes, and Phase 1 is where structure.md puts that work (runtime.py
+    # plus agents/bus.py). Phase 0.5 is explicitly no-behaviour-change, so
+    # they stay.
+    #
+    # strict=True so that when Phase 1 lands, this XPASSes and fails the
+    # build until the marker comes off. The finish line has to announce
     # itself rather than sit here quietly passing as an xfail forever.
     @pytest.mark.xfail(
-        reason="steps 3 and 4 remove the remaining agents/skills -> app edges",
+        reason="Phase 1 inverts the three agents -> memory/skills edges via the event bus",
         strict=True,
     )
     def test_no_package_imports_its_own_layer_or_higher(self):

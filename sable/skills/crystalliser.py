@@ -63,8 +63,8 @@ class SkillCrystalliser:
         )
 
         import asyncio
-        from sable.app.repl import _build_backend
-        backend = _build_backend(self._config)
+        from sable.llm.registry import build_backend
+        backend = build_backend(self._config)
         messages = [{"role": "user", "content": prompt}]
         try:
             response = asyncio.run(backend.complete(messages, _SKILL_SYSTEM_PROMPT))

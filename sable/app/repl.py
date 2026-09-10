@@ -178,50 +178,12 @@ def _make_key_bindings(db=None) -> KeyBindings:
     return kb
 
 
-def _mock_backend_or_none(mode: str = "orchestrator"):
-    """Return a MockLLMBackend when SABLE_MOCK_LLM is set, else None.
-
-    Lets the whole shell run with zero API calls for demos and the playground.
-    The fixture lives under tests/, which is not importable from an installed
-    copy, so an ImportError here falls back to the real backend rather than
-    breaking startup.
-    """
-    if os.environ.get("SABLE_MOCK_LLM", "").strip().lower() not in {"1", "true", "yes", "on"}:
-        return None
-    try:
-        from tests.fixtures.mock_llm import MockLLMBackend
-    except ImportError:
-        _out("[sable] SABLE_MOCK_LLM is set but the mock backend is unavailable")
-        return None
-    return MockLLMBackend(mode=mode)
-
-
-def _build_backend(config: ShellConfig, mock_mode: str = "orchestrator"):
-    """Return the configured LLM backend, or the mock when SABLE_MOCK_LLM is set.
-
-    mock_mode selects which canned script the mock plays: "orchestrator" for
-    the REPL's reasoning loop, "worker" for a TaskAgent.
-    """
-    # Checked before importing the real backends so the mock path does not
-    # need httpx installed.
-    mock = _mock_backend_or_none(mock_mode)
-    if mock is not None:
-        return mock
-
-    from sable.llm.ollama import OllamaBackend
-    from sable.llm.openai import OpenAIBackend
-    from sable.llm.anthropic import AnthropicBackend
-
-    if config.backend == "ollama":
-        return OllamaBackend(base_url=config.api_base or "http://localhost:11434", model=config.model)
-    elif config.backend == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY") or getattr(config, "api_key", "") or ""
-        return OpenAIBackend(api_key=api_key, model=config.model)
-    elif config.backend == "anthropic":
-        api_key = os.environ.get("ANTHROPIC_API_KEY") or getattr(config, "api_key", "") or ""
-        return AnthropicBackend(api_key=api_key, model=config.model)
-    else:
-        return OllamaBackend(base_url=config.api_base or "http://localhost:11434", model=config.model)
+# Backend construction lives in llm/registry.py so that agents/ and skills/
+# can build one without importing the REPL (docs/structure.md §5 step 3).
+# Re-exported under the old private names because this module's tests and
+# call sites still reach for them.
+from sable.llm.registry import build_backend as _build_backend
+from sable.llm.registry import mock_backend_or_none as _mock_backend_or_none
 
 
 def _get_os_info() -> str:
@@ -232,34 +194,10 @@ def _get_os_info() -> str:
 
 
 
-def _audit_log(action: str, command: str, exit_code: int | None = None) -> None:
-    import datetime, getpass
-    log_path = "/var/log/agentic-shell/audit.log"
-    try:
-        user = getpass.getuser()
-    except Exception:
-        user = "unknown"
-    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    line = f"{timestamp} user={user} action={action} cmd={command!r} exit={exit_code}\n"
-    try:
-        with open(log_path, "a") as f:
-            f.write(line)
-    except (PermissionError, OSError):
-        pass
-
-
-def _write_audit_log(session_id: str, cwd: str, command: str) -> None:
-    """Append one line to audit.log. Format: ISO\tsession_id\tcwd\tcommand"""
-    from sable.core.db import AUDIT_LOG_PATH
-    from datetime import datetime, timezone
-    AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    line = f"{datetime.now(timezone.utc).isoformat()}\t{session_id}\t{cwd}\t{command}\n"
-    try:
-        with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(line)
-    except (PermissionError, OSError):
-        pass
-
+# The audit writers live in core/audit.py for the same reason: the
+# orchestrator appends to the ledger and must not import the REPL to do it.
+from sable.core.audit import write_action as _audit_log
+from sable.core.audit import write_command as _write_audit_log
 
 
 def _check_and_enforce_budget(db, config: ShellConfig, session_id: str) -> bool:
