@@ -5,7 +5,11 @@
 # Build:  docker build -t sable-playground -f docker/Dockerfile.playground .
 # Run:    scripts/playground.ps1   (Windows)   |   scripts/playground.sh (Linux/macOS)
 
-FROM ubuntu:22.04
+# ubuntu:24.04 ships Python 3.12. 22.04 shipped 3.10, which is BELOW this
+# project's own requires-python of >=3.11, so the image every local test ran
+# in was testing a Python the project does not claim to support, and CI's
+# 3.11/3.12 matrix could diverge from it in either direction.
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -22,7 +26,7 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt pytest \
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt pytest \
     && python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base'); tiktoken.get_encoding('o200k_base')"
 
 # Runtime dirs + audit log
