@@ -1,0 +1,123 @@
+# Sable's shipped safety policy.
+#
+# Phase 0.5 step 4 moved these out of policy/engine.py so a rule can be read,
+# audited and changed without editing Python. TOML rather than the YAML named
+# in structure.md §2: tomllib is stdlib from Python 3.11, which this project
+# already requires, and structure.md §3 moves config to TOML anyway. Adding a
+# YAML parser on the path that gates every command was not worth it.
+#
+# Each rule keeps the `why`, so Phase 3's `/policy explain "<cmd>"` can tell
+# the user which rule fired and what it is protecting them from, instead of
+# echoing a regex at them.
+#
+# `pattern` is a Python regex, matched case-sensitively against the command
+# string unless the pattern says otherwise. Editing one changes what the shell
+# refuses to run without a typed YES, so tests/unit/test_safety.py pins the
+# behaviour of every rule here.
+
+[meta]
+version = 1
+description = "Default destructive-command blocklist and secret formats"
+
+# ── Commands that require an explicit typed confirmation ────────────────────
+# Matching one of these does not block the command outright; it forces the
+# literal-YES confirm flow in policy/engine.py.
+
+[[destructive]]
+name = "dd-to-device"
+category = "disk"
+pattern = '\bdd\s+if=.*of=/dev/'
+why = "dd writing straight to a device overwrites a disk or partition table with no undo"
+
+[[destructive]]
+name = "mkfs"
+category = "disk"
+pattern = '\bmkfs\b'
+why = "formatting a filesystem discards everything on it"
+
+[[destructive]]
+name = "fdisk-device"
+category = "disk"
+pattern = '\bfdisk\b.*(/dev/)'
+why = "repartitioning a device can make every filesystem on it unreachable"
+
+[[destructive]]
+name = "redirect-to-sd-device"
+category = "disk"
+pattern = '>\s*/dev/sd[a-z]\b'
+why = "redirecting into a raw disk corrupts it from the first byte"
+
+[[destructive]]
+name = "redirect-to-nvme-device"
+category = "disk"
+pattern = '>\s*/dev/nvme\d'
+why = "redirecting into a raw nvme disk corrupts it from the first byte"
+
+[[destructive]]
+name = "recursive-delete"
+category = "delete"
+pattern = '\brm\s+-[^\s]*r[^\s]*\s+\S'
+why = "recursive delete, and the path may expand to more than intended"
+
+[[destructive]]
+name = "curl-pipe-shell"
+category = "remote-code"
+pattern = '\bcurl\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b'
+why = "runs whatever the server returns, unreviewed, with your privileges"
+
+[[destructive]]
+name = "wget-pipe-shell"
+category = "remote-code"
+pattern = '\bwget\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b'
+why = "runs whatever the server returns, unreviewed, with your privileges"
+
+[[destructive]]
+name = "shutdown"
+category = "system-state"
+pattern = '\bshutdown\b'
+why = "takes the machine down, and over SSH that ends your own session"
+
+[[destructive]]
+name = "reboot"
+category = "system-state"
+pattern = '\breboot\b'
+why = "restarts the machine, and over SSH that ends your own session"
+
+[[destructive]]
+name = "iptables-flush"
+category = "system-state"
+pattern = '\biptables\s+-F\b'
+why = "flushes every firewall rule, which can expose the host or lock you out"
+
+# ── Structured credential formats ───────────────────────────────────────────
+# Checked before the Shannon-entropy fallback, because real credentials are
+# often not high-entropy enough to trip it: an AWS access key scores 3.68
+# against a 4.5 threshold and was missed until this list was consulted first.
+
+[[secret]]
+name = "aws-access-key"
+pattern = 'AKIA[A-Z0-9]{16}'
+
+[[secret]]
+name = "secret-key-assignment"
+pattern = '(?i)secret[_\s]?key[\s:=]+\S{20,}'
+
+[[secret]]
+name = "jwt"
+pattern = 'eyJ[A-Za-z0-9\-_]{20,}\.[A-Za-z0-9\-_]+'
+
+[[secret]]
+name = "private-key-block"
+pattern = '-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----'
+
+[[secret]]
+name = "bearer-token"
+pattern = '(?i)bearer\s+[A-Za-z0-9\-_\.]{20,}'
+
+[[secret]]
+name = "api-key-assignment"
+pattern = '(?i)api[_\-]?key[\s:=]+[A-Za-z0-9\-_\.]{20,}'
+
+[[secret]]
+name = "gcp-service-account"
+pattern = '"type"\s*:\s*"service_account"'

@@ -14,47 +14,13 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
+from sable import data
+from sable.llm import prompts
 
-_SPINNER_VERBS = [
-    'Accomplishing', 'Actioning', 'Actualizing', 'Architecting', 'Baking',
-    'Beaming', "Beboppin'", 'Befuddling', 'Billowing', 'Blanching',
-    'Bloviating', 'Boogieing', 'Boondoggling', 'Booping', 'Bootstrapping',
-    'Brewing', 'Bunning', 'Burrowing', 'Calculating', 'Canoodling',
-    'Caramelizing', 'Cascading', 'Catapulting', 'Cerebrating', 'Channeling',
-    'Channelling', 'Choreographing', 'Churning', 'Clauding', 'Coalescing',
-    'Cogitating', 'Combobulating', 'Composing', 'Computing', 'Concocting',
-    'Considering', 'Contemplating', 'Cooking', 'Crafting', 'Creating',
-    'Crunching', 'Crystallizing', 'Cultivating', 'Deciphering', 'Deliberating',
-    'Determining', 'Dilly-dallying', 'Discombobulating', 'Doing', 'Doodling',
-    'Drizzling', 'Ebbing', 'Effecting', 'Elucidating', 'Embellishing',
-    'Enchanting', 'Envisioning', 'Evaporating', 'Fermenting', 'Fiddle-faddling',
-    'Finagling', 'Flambéing', 'Flibbertigibbeting', 'Flowing', 'Flummoxing',
-    'Fluttering', 'Forging', 'Forming', 'Frolicking', 'Frosting',
-    'Gallivanting', 'Galloping', 'Garnishing', 'Generating', 'Gesticulating',
-    'Germinating', 'Gitifying', 'Grooving', 'Gusting', 'Harmonizing',
-    'Hashing', 'Hatching', 'Herding', 'Honking', 'Hullaballooing',
-    'Hyperspacing', 'Ideating', 'Imagining', 'Improvising', 'Incubating',
-    'Inferring', 'Infusing', 'Ionizing', 'Jitterbugging', 'Julienning',
-    'Kneading', 'Leavening', 'Levitating', 'Lollygagging', 'Manifesting',
-    'Marinating', 'Meandering', 'Metamorphosing', 'Misting', 'Moonwalking',
-    'Moseying', 'Mulling', 'Mustering', 'Musing', 'Nebulizing',
-    'Nesting', 'Newspapering', 'Noodling', 'Nucleating', 'Orbiting',
-    'Orchestrating', 'Osmosing', 'Perambulating', 'Percolating', 'Perusing',
-    'Philosophising', 'Photosynthesizing', 'Pollinating', 'Pondering', 'Pontificating',
-    'Pouncing', 'Precipitating', 'Prestidigitating', 'Processing', 'Proofing',
-    'Propagating', 'Puttering', 'Puzzling', 'Quantumizing', 'Razzle-dazzling',
-    'Razzmatazzing', 'Recombobulating', 'Reticulating', 'Roosting', 'Ruminating',
-    'Sautéing', 'Scampering', 'Schlepping', 'Scurrying', 'Seasoning',
-    'Shenaniganing', 'Shimmying', 'Simmering', 'Skedaddling', 'Sketching',
-    'Slithering', 'Smooshing', 'Sock-hopping', 'Spelunking', 'Spinning',
-    'Sprouting', 'Stewing', 'Sublimating', 'Swirling', 'Swooping',
-    'Symbioting', 'Synthesizing', 'Tempering', 'Thinking', 'Thundering',
-    'Tinkering', 'Tomfoolering', 'Topsy-turvying', 'Transfiguring', 'Transmuting',
-    'Twisting', 'Undulating', 'Unfurling', 'Unravelling', 'Vibing',
-    'Waddling', 'Wandering', 'Warping', 'Whatchamacalliting', 'Whirlpooling',
-    'Whirring', 'Whisking', 'Wibbling', 'Working', 'Wrangling',
-    'Zesting', 'Zigzagging',
-]
+# Loaded from sable/data/spinner_verbs.txt (Phase 0.5 step 4): 187 lines of
+# list literal in the middle of this module made it harder to read for no
+# benefit, and the verbs are the sort of thing people edit.
+_SPINNER_VERBS = list(data.load_lines("spinner_verbs"))
 
 _SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
@@ -100,23 +66,9 @@ class _Spinner:
             if i % 20 == 0:
                 verb_idx += 1
 
-_SYSTEM_PROMPT = """You are an orchestrator shell agent running on Linux.
-The user has asked you to accomplish a goal. Reason step by step.
-
-Rules:
-1. Act directly (action=run) for simple, fast tasks a single command or a few commands.
-2. Spawn a sub-agent (action=spawn) for long-running work (>30s estimated), work that can run in parallel, OR if a command timed out (output contains "[timeout after"). Give each sub-agent a focused, self-contained goal.
-3. CRITICAL: If you see "[timeout after 128s]" in output, the command is still running in the background OR it failed. Do NOT retry the same command. Spawn a sub-agent with the full goal instead.
-4. After spawning, continue your loop check sub-agent status each turn.
-5. When the goal is fully achieved, emit action=done.
-6. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
-7. Never cd outside the current working directory.
-
-Respond with JSON only no markdown, no extra text:
-{"action": "run", "command": "<bash command>", "explanation": "<one sentence>"}
-{"action": "spawn", "name": "<slug-name>", "goal": "<full goal for sub-agent>", "explanation": "<why delegating>"}
-{"action": "done", "explanation": "<summary of what was accomplished>"}
-"""
+# Editable markdown at sable/llm/prompts/orchestrator.md, so tuning the
+# orchestrator's instructions is not a code change.
+_SYSTEM_PROMPT = prompts.load("orchestrator")
 
 
 def _make_slug(goal: str) -> str:
