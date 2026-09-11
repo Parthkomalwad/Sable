@@ -30,11 +30,6 @@ def _build_spawn_context(turns: list[dict], goal: str) -> str:
     )
 
 
-def _get_recent_turns() -> list[dict]:
-    """Return the current active turns list (module-level reference)."""
-    return _active_turns
-
-
 def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None = None) -> bool:
     """Handle /task subcommands. Return True if handled."""
     from sable.agents.manager import TaskManager
@@ -99,7 +94,7 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
         goal = " ".join(parts[2:])
         try:
             # Build context handoff from recent orchestrator turns
-            context = _build_spawn_context(turns=_get_recent_turns(), goal=goal)
+            context = _build_spawn_context(turns=turns or [], goal=goal)
             manager.spawn(name, goal, context=context)
             _out(f"task '{name}' spawned")
             if context:
