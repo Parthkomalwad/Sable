@@ -314,6 +314,18 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
             from sable.agents.orchestrator import OrchestratorAgent
             from sable.core.db import DB_PATH
             task_manager = TaskManager(config=config, db=db)
+            # The composition root for a typed goal. Constructing these here
+            # rather than inside OrchestratorAgent is what keeps the
+            # `agents -> skills` edge out of the layering rule, the same
+            # inversion `corrections_db` and the worker's collaborators use.
+            #
+            # "orchestrator" is a task name with no task-local skills
+            # directory, which is correct: a typed goal has no workspace, so
+            # only global approved skills apply.
+            from sable.skills.index import SkillIndex
+            from sable.skills.loader import TaskSkillLoader
+
+            _tasks_base = str(Path(config.tasks_base_dir).expanduser())
             agent = OrchestratorAgent(
                 goal=line,
                 cwd=cwd,
@@ -322,6 +334,8 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 task_manager=task_manager,
                 session_id=session_id,
                 corrections_db=db,
+                skill_loader=TaskSkillLoader("orchestrator", _tasks_base),
+                skill_index=SkillIndex(),
             )
             try:
                 agent.run()
