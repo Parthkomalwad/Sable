@@ -142,6 +142,7 @@ class OrchestratorAgent:
             spinner.stop()
 
             raw = self._extract_raw(response)
+            self._record_turn(_turn, messages, raw, response)
             action = self._parse_action(raw)
 
             action_type = action.get("action", "")
@@ -358,6 +359,28 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
     # LLM call
     # ------------------------------------------------------------------
+
+    def _record_turn(self, turn: int, messages: list[dict], raw: str, response) -> None:
+        """Store what the model saw and answered, for `/why` (I9).
+
+        Redaction happens inside the replay log, so a secret in a command never
+        reaches the table. Never raises, by that module's contract.
+        """
+        from sable.core.events.replay import record_turn
+
+        record_turn(
+            self._db_path,
+            agent="orchestrator",
+            role="orchestrator",
+            turn=turn,
+            system_prompt=_SYSTEM_PROMPT,
+            messages=messages,
+            response=raw,
+            model=getattr(response, "model", None) or self._config.model_for("orchestrator"),
+            prompt_tokens=getattr(response, "prompt_tokens", 0),
+            completion_tokens=getattr(response, "completion_tokens", 0),
+            cost_usd=getattr(response, "cost_usd", 0.0),
+        )
 
     def _call_llm(self, messages: list[dict]):
         from sable.llm.registry import build_backend

@@ -7,6 +7,7 @@ Tables:
 - token_events: per-call telemetry
 - session_memory: compressed context snapshots
 - agent_events: the append-only agent bus (see core/events/bus.py)
+- agent_turns: the redacted prompt replay log (see core/events/replay.py)
 """
 from __future__ import annotations
 
@@ -119,6 +120,29 @@ CREATE INDEX IF NOT EXISTS idx_agent_events_agent_id
     ON agent_events (agent, id)
 """
 
+_CREATE_AGENT_TURNS = """
+CREATE TABLE IF NOT EXISTS agent_turns (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts            TEXT NOT NULL,
+    agent         TEXT NOT NULL,
+    role          TEXT NOT NULL,
+    turn          INTEGER NOT NULL,
+    model         TEXT,
+    system_prompt TEXT NOT NULL,
+    messages_json TEXT NOT NULL,
+    response      TEXT NOT NULL,
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd      REAL NOT NULL DEFAULT 0.0
+)
+"""
+
+# `/task <name> replay` reads one agent's turns in order, which is this index.
+_CREATE_AGENT_TURNS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_agent_turns_agent_id
+    ON agent_turns (agent, id)
+"""
+
 _CREATE_SKILL_PATTERNS = """
 CREATE TABLE IF NOT EXISTS skill_patterns (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,6 +175,8 @@ class Database:
         self._conn.execute(_CREATE_SKILL_PATTERNS)
         self._conn.execute(_CREATE_AGENT_EVENTS)
         self._conn.execute(_CREATE_AGENT_EVENTS_INDEX)
+        self._conn.execute(_CREATE_AGENT_TURNS)
+        self._conn.execute(_CREATE_AGENT_TURNS_INDEX)
         self._conn.commit()
 
     def write_event(self, event: TokenEvent) -> None:
