@@ -4,7 +4,7 @@ Exercises the real OrchestratorAgent loop against the mock LLM backend's
 orchestrator script (run, run, spawn, run, done). What is faked is only the
 boundary the test cannot own: tmux (via TaskManager.spawn) and command
 execution. Everything between, the turn loop, action parsing, the handoff
-file, the status/result poll and the context rebuild, is the real code.
+file, the bus drain and the context rebuild, is the real code.
 
 Runs anywhere: no Docker, no tmux, no API key.
 """
@@ -55,12 +55,16 @@ def db_path(tmp_path):
 class _RecordingTaskManager:
     """Stands in for TaskManager.spawn, which would need a live tmux server.
 
-    Records the spawn and writes the status.md and result.md files a real
-    TaskAgent would produce, so the orchestrator's own polling path runs.
+    Records the spawn and then does what a real TaskAgent does: publishes its
+    progress to the event bus, and writes status.md / result.md as the
+    human-readable mirrors. Since Phase 1 the orchestrator reads the events
+    and not the files, so the publish is what this test actually exercises;
+    the files are written because a real worker still writes them.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, db_path: str) -> None:
         self.spawned: list[dict] = []
+        self._db_path = db_path
 
     def spawn(self, name: str, goal: str, context: str = "",
               task_base_dir: str | None = None) -> None:
@@ -68,16 +72,31 @@ class _RecordingTaskManager:
             {"name": name, "goal": goal, "context": context,
              "task_base_dir": task_base_dir}
         )
+
+        result_body = (
+            f"# Task: {name}\n**Goal**: {goal}\n\n"
+            "## Files created\n```\n./hello.txt\n```\n\n"
+            "## Steps taken (2)\n1. `ls hello.txt`\n2. `cat hello.txt`\n"
+        )
+
+        from sable.core.events.bus import EventBus
+        from sable.core.events.types import EventKind
+
+        bus = EventBus(db_path=self._db_path)
+        bus.publish(name, EventKind.STARTED, {"goal": goal})
+        bus.publish(
+            name, EventKind.STATUS,
+            {"step": 1, "command": "ls hello.txt", "explanation": "check it exists"},
+        )
+        bus.publish(name, EventKind.COMPLETED, {"steps": 2, "result": result_body})
+        bus.close()
+
         agentic = Path(task_base_dir) / name / ".agentic"
         agentic.mkdir(parents=True, exist_ok=True)
         (agentic / "status.md").write_text(
             f"# Agent: {name} (running step 1)\n**Goal**: {goal}\n"
         )
-        (agentic / "result.md").write_text(
-            f"# Task: {name}\n**Goal**: {goal}\n\n"
-            "## Files created\n```\n./hello.txt\n```\n\n"
-            "## Steps taken (2)\n1. `ls hello.txt`\n2. `cat hello.txt`\n"
-        )
+        (agentic / "result.md").write_text(result_body)
 
 
 def _make_orchestrator(tmp_path, db_path, task_manager, goal="create a hello file"):
@@ -116,7 +135,7 @@ def _run(orchestrator, commands_seen: list[str]):
 
 class TestOrchestratorSpawn:
     def test_runs_commands_then_spawns_a_worker(self, tmp_path, db_path):
-        manager = _RecordingTaskManager()
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
         commands: list[str] = []
 
@@ -131,7 +150,7 @@ class TestOrchestratorSpawn:
         assert manager.spawned[0]["name"] == "verify-hello"
 
     def test_spawned_goal_carries_the_working_directory(self, tmp_path, db_path):
-        manager = _RecordingTaskManager()
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
 
         _run(orchestrator, [])
@@ -141,7 +160,7 @@ class TestOrchestratorSpawn:
         assert str(tmp_path) in goal
 
     def test_handoff_file_is_written_for_the_sub_agent(self, tmp_path, db_path):
-        manager = _RecordingTaskManager()
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
 
         _run(orchestrator, [])
@@ -158,7 +177,7 @@ class TestOrchestratorSpawn:
     def test_sub_agent_result_flows_back_into_orchestrator_context(self, tmp_path, db_path):
         """The point of the test: the turn after the spawn sees the worker's
         result folded into the context the orchestrator sends to the model."""
-        manager = _RecordingTaskManager()
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
         contexts: list[list[dict]] = []
 
@@ -183,9 +202,13 @@ class TestOrchestratorSpawn:
         assert "hello.txt" in folded[0]
 
     def test_result_reaches_context_only_once(self, tmp_path, db_path):
-        """result.md is consumed when folded in, so later turns do not
-        re-report the same completion."""
-        manager = _RecordingTaskManager()
+        """A completion is folded in exactly once.
+
+        The orchestrator advances its bus cursor past everything it drains,
+        so a later turn cannot re-report the same completion. This used to
+        be enforced by deleting result.md after reading it.
+        """
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
         contexts: list[list[dict]] = []
 
@@ -208,7 +231,7 @@ class TestOrchestratorSpawn:
         assert len(completions) == 1
 
     def test_loop_ends_on_done_without_hitting_the_turn_limit(self, tmp_path, db_path):
-        manager = _RecordingTaskManager()
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
 
         _run(orchestrator, [])
@@ -217,7 +240,7 @@ class TestOrchestratorSpawn:
         assert len(orchestrator._history) <= 10
 
     def test_result_file_records_the_outcome(self, tmp_path, db_path):
-        manager = _RecordingTaskManager()
+        manager = _RecordingTaskManager(db_path)
         orchestrator = _make_orchestrator(tmp_path, db_path, manager)
 
         _run(orchestrator, [])
