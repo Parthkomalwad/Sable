@@ -192,7 +192,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     choice = "b"
                 route = Route.AGENTIC if choice == "a" else Route.BASH
                 # The user just labelled this line for us (I3).
-                _record_router_correction(line, route.value)
+                _record_router_correction(line, route.value, db=db)
 
             if route == Route.BASH:
                 if is_destructive(line):
@@ -225,6 +225,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 db_path=str(DB_PATH),
                 task_manager=task_manager,
                 session_id=session_id,
+                corrections_db=db,
             )
             try:
                 agent.run()

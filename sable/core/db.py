@@ -8,6 +8,7 @@ Tables:
 - session_memory: compressed context snapshots
 - agent_events: the append-only agent bus (see core/events/bus.py)
 - agent_turns: the redacted prompt replay log (see core/events/replay.py)
+- skill_corrections: what the user corrected (see skills/corrections.py)
 """
 from __future__ import annotations
 
@@ -157,6 +158,25 @@ CREATE TABLE IF NOT EXISTS skill_patterns (
 """
 
 
+_CREATE_SKILL_CORRECTIONS = """
+CREATE TABLE IF NOT EXISTS skill_corrections (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        TEXT NOT NULL,
+    kind      TEXT NOT NULL,
+    proposed  TEXT,
+    corrected TEXT,
+    withheld  INTEGER NOT NULL DEFAULT 0
+)
+"""
+
+# The sidebar counts the week's corrections on every refresh, which is a scan
+# over (withheld, ts) and nothing else.
+_CREATE_SKILL_CORRECTIONS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_skill_corrections_withheld_ts
+    ON skill_corrections (withheld, ts)
+"""
+
+
 class Database:
     """Manages the SQLite session database."""
 
@@ -177,6 +197,8 @@ class Database:
         self._conn.execute(_CREATE_AGENT_EVENTS_INDEX)
         self._conn.execute(_CREATE_AGENT_TURNS)
         self._conn.execute(_CREATE_AGENT_TURNS_INDEX)
+        self._conn.execute(_CREATE_SKILL_CORRECTIONS)
+        self._conn.execute(_CREATE_SKILL_CORRECTIONS_INDEX)
         self._conn.commit()
 
     def write_event(self, event: TokenEvent) -> None:

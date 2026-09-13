@@ -45,6 +45,7 @@ _HELP_TEXT = (
     "  /clip           Snippet clipboard (add/run/del)\n"
     "  /task           Manage background agents\n"
     "  /skill          Manage skill files\n"
+    "  /corrections   Commands you corrected (list, delete <id>)\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
@@ -63,6 +64,47 @@ _HELP_TEXT = (
     "  Ctrl+G         Steer a running agent\n"
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
+
+
+def _handle_corrections_builtin(argument: str, db) -> bool:
+    """Handle `/corrections [delete <id>]`. Always returns True.
+
+    Withheld rows are reported alongside the kept ones rather than silently
+    omitted: a user who corrected five commands and sees three listed should
+    be able to learn that the other two carried a secret.
+    """
+    from sable.skills.corrections import (
+        delete_correction, list_corrections, withheld_count,
+    )
+
+    if argument.startswith("delete"):
+        target = argument[len("delete"):].strip()
+        if not target.isdigit():
+            _out("usage: /corrections delete <id>")
+            return True
+        if delete_correction(db, int(target)):
+            _out(f"deleted correction {target}")
+        else:
+            _out(f"no correction with id {target}")
+        return True
+
+    if argument:
+        _out("usage: /corrections [delete <id>]")
+        return True
+
+    rows = list_corrections(db)
+    withheld = withheld_count(db)
+
+    if not rows:
+        _out("no corrections recorded yet")
+    else:
+        for row in rows:
+            _out(f"  {row['id']:>4}  {row['kind']:<6}  {row['proposed']}")
+            _out(f"        {'':<6}  -> {row['corrected']}")
+
+    if withheld:
+        _out(f"  {withheld} withheld this week (contained a secret)")
+    return True
 
 
 def handle_builtin(
@@ -168,6 +210,9 @@ def handle_builtin(
     if cmd == "/task" or cmd.startswith("/task "):
         parts = cmd[len("/task"):].strip().split()
         return _handle_task_builtin(parts, config, db, turns=turns)
+
+    if cmd == "/corrections" or cmd.startswith("/corrections "):
+        return _handle_corrections_builtin(cmd[len("/corrections"):].strip(), db)
 
     if cmd == "/skill" or cmd.startswith("/skill "):
         parts = cmd[len("/skill"):].strip().split()
