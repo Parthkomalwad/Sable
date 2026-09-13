@@ -133,7 +133,7 @@ def _make_key_bindings(db=None) -> KeyBindings:
         # reached for the bypass. Record it as a bash correction (I3).
         pending = event.app.current_buffer.text.strip()
         if pending:
-            _record_router_correction(pending, "bash")
+            _record_router_correction(pending, "bash", db=db)
         _out("[bash mode] next command runs directly")
 
     @kb.add("c-t")

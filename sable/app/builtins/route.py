@@ -8,13 +8,18 @@ from sable.core.config.schema import ShellConfig
 from sable.ui.console import out as _out
 
 
-def _record_router_correction(line: str, label: str) -> None:
+def _record_router_correction(line: str, label: str, db=None) -> None:
     """Append one "input<TAB>label" row to the router corrections file.
 
     Written whenever the user overrides a routing decision: Ctrl+B (this line
     was bash, not a goal) or an answer to the [b/a] prompt. These rows are the
     training data for the router accuracy programme (I3); the corpus in
     tests/fixtures/router_corpus.tsv is the curated version of the same shape.
+
+    When a database is supplied the same override is also stored as a K3
+    correction. The TSV write comes first and does not depend on the database:
+    the corpus is the older contract and must not start failing because
+    telemetry is unavailable.
     """
     from sable.core import paths
 
@@ -27,6 +32,11 @@ def _record_router_correction(line: str, label: str) -> None:
             handle.write(text + "\t" + label + "\n")
     except (PermissionError, OSError):
         pass
+
+    if db is not None:
+        from sable.skills.corrections import KIND_ROUTE, record_correction
+
+        record_correction(db, text, label, kind=KIND_ROUTE)
 
 
 def _handle_route_builtin(argument: str, config: ShellConfig) -> bool:

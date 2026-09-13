@@ -45,6 +45,8 @@ _HELP_TEXT = (
     "  /clip           Snippet clipboard (add/run/del)\n"
     "  /task           Manage background agents\n"
     "  /skill          Manage skill files\n"
+    "  /corrections   Commands you corrected (list, delete <id>)\n"
+    "  /alias \"phrase\" = <command>   Name a command in your own words\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
@@ -63,6 +65,108 @@ _HELP_TEXT = (
     "  Ctrl+G         Steer a running agent\n"
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
+
+
+_ALIAS_USAGE = 'usage: /alias "<phrase>" = <command>  |  /alias delete "<phrase>"'
+
+
+def _strip_quotes(text: str) -> str:
+    """Remove one matching pair of surrounding quotes, if present."""
+    text = text.strip()
+    for quote in ('"', "'"):
+        if len(text) >= 2 and text.startswith(quote) and text.endswith(quote):
+            return text[1:-1]
+    return text
+
+
+def _handle_alias_builtin(argument: str, db) -> bool:
+    """Handle `/alias`, `/alias "<phrase>" = <cmd>` and `/alias delete "<phrase>"`.
+
+    The phrase is quoted and the command is not, so the first `=` outside the
+    quoted phrase separates them. A command may itself contain `=`
+    (`make FOO=bar`), which is why the split is on the first one after the
+    closing quote rather than on every one.
+    """
+    from sable.skills.aliases import add_alias, delete_alias, list_aliases
+
+    if not argument:
+        rows = list_aliases(db)
+        if not rows:
+            _out("no aliases yet")
+            _out(_ALIAS_USAGE)
+        for row in rows:
+            uses = f"{row['use_count']} use" + ("s" if row["use_count"] != 1 else "")
+            _out(f"  {row['phrase']}  ->  {row['command']}  ({uses})")
+        return True
+
+    if argument.startswith("delete"):
+        phrase = _strip_quotes(argument[len("delete"):])
+        if not phrase:
+            _out(_ALIAS_USAGE)
+        elif delete_alias(db, phrase):
+            _out(f"deleted alias {phrase!r}")
+        else:
+            _out(f"no alias {phrase!r}")
+        return True
+
+    if "=" not in argument:
+        _out(_ALIAS_USAGE)
+        return True
+
+    phrase_part, _, command_part = argument.partition("=")
+    phrase = _strip_quotes(phrase_part)
+    command = command_part.strip()
+
+    if not phrase or not command:
+        _out(_ALIAS_USAGE)
+        return True
+
+    if add_alias(db, phrase, command):
+        _out(f"alias {phrase!r} -> {command}")
+    else:
+        _out("could not store that alias")
+    return True
+
+
+def _handle_corrections_builtin(argument: str, db) -> bool:
+    """Handle `/corrections [delete <id>]`. Always returns True.
+
+    Withheld rows are reported alongside the kept ones rather than silently
+    omitted: a user who corrected five commands and sees three listed should
+    be able to learn that the other two carried a secret.
+    """
+    from sable.skills.corrections import (
+        delete_correction, list_corrections, withheld_count,
+    )
+
+    if argument.startswith("delete"):
+        target = argument[len("delete"):].strip()
+        if not target.isdigit():
+            _out("usage: /corrections delete <id>")
+            return True
+        if delete_correction(db, int(target)):
+            _out(f"deleted correction {target}")
+        else:
+            _out(f"no correction with id {target}")
+        return True
+
+    if argument:
+        _out("usage: /corrections [delete <id>]")
+        return True
+
+    rows = list_corrections(db)
+    withheld = withheld_count(db)
+
+    if not rows:
+        _out("no corrections recorded yet")
+    else:
+        for row in rows:
+            _out(f"  {row['id']:>4}  {row['kind']:<6}  {row['proposed']}")
+            _out(f"        {'':<6}  -> {row['corrected']}")
+
+    if withheld:
+        _out(f"  {withheld} withheld this week (contained a secret)")
+    return True
 
 
 def handle_builtin(
@@ -168,6 +272,12 @@ def handle_builtin(
     if cmd == "/task" or cmd.startswith("/task "):
         parts = cmd[len("/task"):].strip().split()
         return _handle_task_builtin(parts, config, db, turns=turns)
+
+    if cmd == "/alias" or cmd.startswith("/alias "):
+        return _handle_alias_builtin(cmd[len("/alias"):].strip(), db)
+
+    if cmd == "/corrections" or cmd.startswith("/corrections "):
+        return _handle_corrections_builtin(cmd[len("/corrections"):].strip(), db)
 
     if cmd == "/skill" or cmd.startswith("/skill "):
         parts = cmd[len("/skill"):].strip().split()
