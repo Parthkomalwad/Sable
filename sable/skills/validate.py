@@ -40,6 +40,29 @@ _MARKER_RE = re.compile(rf"{_MARKER}(\d+)")
 #: timeout.
 VALIDATE_TIMEOUT = 30
 
+#: Exit codes that say the validator could not run, rather than that the
+#: thing it checks is broken. These grade as no signal at all: the run's own
+#: outcome stands, as it does for a skill declaring no validator.
+#:
+#: Found by the Phase 2 gate run. A crystallised deploy skill carried
+#: `curl -sf localhost:8080/health`, a reasonable inference from the
+#: commands the model was shown. Run anywhere the API is not up, curl exits
+#: 7 and the skill was graded a failure: confidence fell across runs that
+#: had succeeded. Each use costs 0.10, so a good skill used a few times on a
+#: machine where the service is not running drops out of retrieval and the
+#: loop degrades itself.
+#:
+#: Deliberately short, and curl-flavoured because that is what models
+#: reach for. This is a heuristic, not a taxonomy: a validator that fails
+#: for an environmental reason outside this set is still graded a failure,
+#: and knowing what a validator *is* belongs to B4's skill doctor. A health
+#: check that genuinely fails returns 1 or 22, which must keep failing or
+#: the distinction becomes a way to never fail at all.
+ENVIRONMENT_EXIT_CODES = frozenset({
+    7,    # curl: failed to connect to host
+    127,  # shell: command not found
+})
+
 
 @dataclass(frozen=True)
 class Grade:
@@ -100,6 +123,20 @@ def grade_skill_use(
         )
 
     code = int(match.group(1))
+
+    if code in ENVIRONMENT_EXIT_CODES:
+        # The validator could not run here, which is evidence about the
+        # machine and none at all about the skill. The run's own outcome
+        # stands, exactly as it does for a skill declaring no validator.
+        return Grade(
+            success=ran_ok,
+            reason=(
+                f"validator could not run (exited {code}); "
+                f"graded on the run's own outcome"
+            ),
+            output=_strip_marker(output),
+        )
+
     return Grade(
         success=code == 0,
         reason=f"validator exited {code}",
