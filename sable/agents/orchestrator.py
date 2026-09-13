@@ -98,12 +98,21 @@ class OrchestratorAgent:
         db_path: str,
         task_manager,
         session_id: str = "",
+        corrections_db=None,
+        skill_loader=None,
+        skill_index=None,
     ) -> None:
         self._goal = goal
         self._cwd = cwd
         self._config = config
         self._db_path = db_path
         self._task_manager = task_manager
+        # Injected rather than imported (K3). `agents` sits below `skills` in
+        # the layering rule, so constructing the recorder here would add a
+        # fourth agents -> skills edge and flip test_layering.py's strict
+        # xfail. The REPL owns the Database and hands it in; a caller that
+        # passes nothing simply records no corrections.
+        self._corrections_db = corrections_db
         # Needed to attribute cost to this session in `token_events`. Defaults
         # to empty so every existing caller and test keeps working; the REPL
         # passes the real one.
@@ -113,6 +122,35 @@ class OrchestratorAgent:
         self._task_dir: Path | None = None  # lazy created only on first spawn
         self._history: list[dict] = []      # orchestrator's own turn history
         self._spawned: list[str] = []       # names of spawned sub-agents
+
+        # Skills, injected rather than imported, for the same layering reason
+        # as `corrections_db` above: `agents` sits below `skills`, and
+        # constructing these here would add a fourth edge and flip
+        # test_layering.py's strict xfail. A caller passing nothing gets the
+        # pre-Phase-2 behaviour of no skills at all.
+        self._skill_index = skill_index
+        self._skills: list[dict] = []
+        if skill_loader is not None:
+            try:
+                self._skills = skill_loader.load_relevant(goal)
+            except (OSError, ValueError) as exc:
+                # An unreadable skills directory or a corrupt index must not
+                # cost the user the goal they asked for. Working without
+                # skills is the pre-Phase-2 behaviour, not a failure.
+                _out(f"[orchestrator] could not load skills: {exc}")
+
+        # Retrieval is once, at construction, not once per turn. The worker
+        # can re-inject each step because `TaskMemory` de-duplicates on a
+        # content hash; this class has no such memory and a 20-turn limit,
+        # so re-injecting would spend the context the work needs. The goal
+        # does not change mid-run, so one retrieval is also the correct one.
+        self._announced = False
+
+        # Set when the human rewrites a proposed command with `e`. Such a run
+        # is not evidence the skill worked: the human rescued it, and
+        # crediting the skill is how a procedure that falls short climbs to
+        # high confidence.
+        self._command_was_edited = False
 
         # Sub-agent progress arrives on the bus, not by polling status.md.
         # The cursor starts at the current head so this run only ever sees
@@ -130,6 +168,7 @@ class OrchestratorAgent:
     def run(self) -> None:
         """Run the orchestrator reasoning loop until done or max turns."""
         _MAX_TURNS = 20
+        self._announce_skills()
         for _turn in range(1, _MAX_TURNS + 1):
             messages = self._build_messages()
             spinner = _Spinner()
@@ -285,6 +324,7 @@ class OrchestratorAgent:
     def _handle_done(self, action: dict) -> None:
         explanation = action.get("explanation", "")
         _out(f"\n  \u2726 {explanation}\n")
+        self._grade_skills()
         if self._task_dir:
             try:
                 result_path = self._task_dir / ".agentic" / "result.md"
@@ -299,6 +339,34 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
     # Context building
     # ------------------------------------------------------------------
+
+    def _grade_skills(self) -> None:
+        """Move the confidence of every skill this run used (B1).
+
+        Called once, from `done`. Unlike the worker, which grades on every
+        exit path, this grades only a goal the model declared finished: the
+        orchestrator's other exits are a turn limit or an unreachable
+        backend, neither of which says anything about the skill.
+
+        **An edited run grades nothing.** Every command here is
+        human-confirmed and `e` lets the human rewrite it, so a run that
+        needed editing is at best ambiguous evidence for the skill and at
+        worst positive credit for a procedure that did not work. Withholding
+        the nudge is the honest reading; K3 already records what was edited.
+
+        Never raises. Grading happens after the work is done and must not
+        turn a finished goal into a failure the user sees.
+        """
+        if self._skill_index is None or not self._skills:
+            return
+        if self._command_was_edited:
+            return
+
+        for name in dict.fromkeys(s["name"] for s in self._skills):
+            try:
+                self._skill_index.nudge(name, True)
+            except (OSError, ValueError, sqlite3.Error) as exc:
+                _out(f"[orchestrator] could not record confidence for {name}: {exc}")
 
     def _build_messages(self) -> list[dict]:
         messages: list[dict] = []
@@ -327,11 +395,60 @@ class OrchestratorAgent:
                 "role": "assistant",
                 "content": "Noted the project's conventions. They inform how I work, not what I am allowed to do.",
             })
+        # B1: skills the user approved, placed after the project block so the
+        # model reads the repo's conventions first and the procedure second,
+        # and after the goal so neither displaces it. Injected from the list
+        # retrieved once at construction, not re-fetched per turn.
+        if self._skills:
+            skill_text = "\n\n".join(
+                f"# skill: {s['name']}\n{s['content']}" for s in self._skills
+            )
+            messages.append({
+                "role": "user",
+                "content": (
+                    "Procedures you have used before for this kind of goal. "
+                    "They inform how you work; the goal above still decides "
+                    "what you do.\n\n" + skill_text
+                ),
+            })
+            messages.append({
+                "role": "assistant",
+                "content": "Noted the relevant procedures.",
+            })
+
         for status_msg in self._collect_agent_statuses():
             messages.append({"role": "user", "content": status_msg})
             messages.append({"role": "assistant", "content": "Noted."})
         messages.extend(self._history)
         return messages
+
+    def _announce_skills(self) -> None:
+        """Say which skills this run is using, once, before the first turn.
+
+        The gate's wording, on the path a typed goal actually takes. Without
+        it a user cannot tell that a skill was retrieved at all, which is the
+        whole of the confidence loop being invisible while it happens.
+        """
+        if self._announced or not self._skills:
+            return
+        self._announced = True
+
+        from sable.agents.worker import format_skill_announcement
+
+        line = format_skill_announcement(self._skills)
+        if not line:
+            return
+        _out(f"  ◈ {line}")
+        self._bus.publish(
+            "orchestrator",
+            EventKind.SKILL_USED,
+            {
+                "skills": [
+                    {"name": s["name"], "confidence": s.get("confidence")}
+                    for s in self._skills
+                ]
+            },
+        )
 
     def _collect_agent_statuses(self) -> list[str]:
         """Drain sub-agent events off the bus into context lines.
@@ -588,8 +705,26 @@ class OrchestratorAgent:
                 edited = input('').strip()
             except (EOFError, KeyboardInterrupt):
                 return None
+            self._record_edit(command, edited)
+            if edited and edited != command:
+                # The skill's procedure fell short of what the job needed.
+                # `_grade_skills` withholds credit for the run because of it.
+                self._command_was_edited = True
             return edited or command
         return command
+
+    def _record_edit(self, proposed: str, corrected: str) -> None:
+        """Store an `e`-edit as a correction (K3).
+
+        The recorder decides what is worth keeping: an edit that changed
+        nothing, or one carrying a secret, is dropped there rather than here,
+        so there is one place that rule lives.
+        """
+        if self._corrections_db is None:
+            return
+        from sable.skills.corrections import KIND_EDIT, record_correction
+
+        record_correction(self._corrections_db, proposed, corrected, kind=KIND_EDIT)
 
     def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
         """Run a command via ptyprocess in cwd. Returns output string.

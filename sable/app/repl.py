@@ -90,6 +90,72 @@ _active_turns: list[dict] = []
 
 
 
+def _match_alias(db, line: str):
+    """Resolve a line to a stored alias, or None. Never raises.
+
+    Imported lazily so that a broken or absent alias store degrades to "no
+    aliases" rather than stopping the REPL from starting.
+    """
+    if db is None:
+        return None
+    try:
+        from sable.skills.aliases import match_alias
+        return match_alias(db, line)
+    except (ImportError, sqlite3.Error):
+        return None
+
+
+def _after_alias_use(db, alias_hit: dict) -> None:
+    """Count the use and, at the threshold, offer promotion to a skill.
+
+    Offered, never taken: a skill is text a model reads and acts on, so a
+    human decides. The offer is recorded so an ignored one does not reappear
+    on every later use.
+    """
+    try:
+        from sable.skills.aliases import (
+            mark_promotion_offered, record_use, should_offer_promotion,
+        )
+    except ImportError:
+        return
+
+    phrase = alias_hit["phrase"]
+    record_use(db, phrase)
+    if should_offer_promotion(db, phrase):
+        _out(f"[alias] '{phrase}' has been used 3 times.")
+        _out("        /skill new to turn it into a skill, or ignore this.")
+        mark_promotion_offered(db, phrase)
+
+
+def pending_skills_banner() -> str:
+    """One line naming how many drafted skills are waiting for approval.
+
+    Reported at login rather than at `/exit`, where the drafting happens:
+    a message shown to a closing shell is one the user cannot act on. A
+    draft nobody is told about is the same as no draft at all.
+
+    Returns an empty string when there is nothing to say, so a fresh
+    install is not greeted by a count of zero, or by an error from an
+    index that does not exist yet.
+    """
+    try:
+        from sable.skills.index import SkillIndex
+
+        pending = SkillIndex().pending()
+    except (OSError, ValueError, ImportError):
+        # ValueError covers a corrupt index (JSONDecodeError subclasses it).
+        # A broken index is not a reason to refuse to start a shell.
+        return ""
+
+    count = len(pending)
+    if count == 0:
+        return ""
+
+    noun = "draft skill" if count == 1 else "draft skills"
+    return (f"[skill] {count} {noun} pending approval "
+            f"(/skill list to review)")
+
+
 def _save_turns_if_needed(
     turns: list[dict], session_id: str, config: ShellConfig, force: bool = False
 ) -> None:
@@ -144,6 +210,14 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
     turns: list[dict] = []
     _active_turns = turns  # the dispatcher is handed this each turn
 
+    # Skills drafted at the last `/exit` are inert until someone approves
+    # them, so this is where the user finds out they exist: a shell they
+    # can act in, rather than one that is closing. Silent when there are
+    # none (Task 7).
+    _pending_line = pending_skills_banner()
+    if _pending_line:
+        _out(_pending_line)
+
     try:
         while True:
             try:
@@ -181,6 +255,28 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     _out(f"exit {exit_code}")
                 continue
 
+            # K4: an alias resolves before the router is consulted. This is
+            # the only place it can be both instant and free; anywhere later
+            # and the line has already cost a classification or a turn.
+            alias_hit = _match_alias(db, line)
+            if alias_hit is not None:
+                resolved = alias_hit["command"]
+                _out(f"[alias] {alias_hit['phrase']} -> {resolved}")
+                # An alias is not a safety bypass: the resolved command goes
+                # down the ordinary bash path and is gated the same way.
+                if is_destructive(resolved):
+                    if not confirm_destructive(resolved):
+                        _audit_log("destructive_blocked", resolved)
+                        continue
+                exit_code, _ = execute_bash(resolved, cwd)
+                _last_exit = exit_code
+                _audit_log("alias", resolved, exit_code)
+                _write_audit_log(session_id, cwd, resolved)
+                if exit_code != 0:
+                    _out(f"exit {exit_code}")
+                _after_alias_use(db, alias_hit)
+                continue
+
             route = classify(line, mode=config.routing_mode)
 
             if route == Route.AMBIGUOUS:
@@ -192,7 +288,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     choice = "b"
                 route = Route.AGENTIC if choice == "a" else Route.BASH
                 # The user just labelled this line for us (I3).
-                _record_router_correction(line, route.value)
+                _record_router_correction(line, route.value, db=db)
 
             if route == Route.BASH:
                 if is_destructive(line):
@@ -218,6 +314,18 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
             from sable.agents.orchestrator import OrchestratorAgent
             from sable.core.db import DB_PATH
             task_manager = TaskManager(config=config, db=db)
+            # The composition root for a typed goal. Constructing these here
+            # rather than inside OrchestratorAgent is what keeps the
+            # `agents -> skills` edge out of the layering rule, the same
+            # inversion `corrections_db` and the worker's collaborators use.
+            #
+            # "orchestrator" is a task name with no task-local skills
+            # directory, which is correct: a typed goal has no workspace, so
+            # only global approved skills apply.
+            from sable.skills.index import SkillIndex
+            from sable.skills.loader import TaskSkillLoader
+
+            _tasks_base = str(Path(config.tasks_base_dir).expanduser())
             agent = OrchestratorAgent(
                 goal=line,
                 cwd=cwd,
@@ -225,6 +333,9 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 db_path=str(DB_PATH),
                 task_manager=task_manager,
                 session_id=session_id,
+                corrections_db=db,
+                skill_loader=TaskSkillLoader("orchestrator", _tasks_base),
+                skill_index=SkillIndex(),
             )
             try:
                 agent.run()
