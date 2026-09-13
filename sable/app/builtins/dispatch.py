@@ -47,6 +47,8 @@ _HELP_TEXT = (
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
     "  /task <n> replay     Every turn of one agent, as the model saw it\n"
+    "  /task <n> events     The agent's event stream\n"
+    "  /task <n> guide <text>  Steer a running agent (also Ctrl+G)\n"
     "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
     "  /tour           Guided walkthrough of what Sable does\n"
     "  /budget reset  Clear hard-stop budget flag\n"
@@ -57,6 +59,7 @@ _HELP_TEXT = (
     "\n"
     "  >> text        Force agentic (prefix mode)\n"
     "  Ctrl+B         Next command runs as raw bash\n"
+    "  Ctrl+G         Steer a running agent\n"
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
 

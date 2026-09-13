@@ -69,6 +69,66 @@ def _render_turn(turn, full: bool) -> None:
     _out("")
 
 
+#: Colour per event kind, so a stream is skimmable: green for reaching a
+#: milestone, red for ending badly, purple for a human stepping in.
+_KIND_COLOUR = {
+    "spawned": DIM,
+    "started": GREEN,
+    "status": WHITE,
+    "completed": GREEN,
+    "failed": YELLOW,
+    "lost": YELLOW,
+    "guidance": PURPLE,
+    "turn": DIM,
+    "command": WHITE,
+}
+
+
+def handle_events(agent: str) -> bool:
+    """`/task <name> events`: the agent's event stream, oldest first.
+
+    The same rows the sidebar and the orchestrator read, rendered for a human.
+    Where `replay` answers "what was it thinking", this answers "what happened
+    and when".
+    """
+    from sable.core.events.bus import EventBus
+
+    with EventBus() as bus:
+        events = bus.since(agent=agent)
+
+    if not events:
+        _out(f"no events for '{agent}'")
+        return True
+
+    _out("")
+    _out(f"  {WHITE}events: {agent}{RESET}  {DIM}{len(events)} total{RESET}")
+    _out("")
+    for event in events:
+        colour = _KIND_COLOUR.get(event.kind, DIM)
+        stamp = event.ts[11:19] if len(event.ts) > 19 else event.ts
+        _out(f"  {DIM}{stamp}{RESET}  {colour}{event.kind:<10}{RESET}  {_payload_summary(event)}")
+    _out("")
+    return True
+
+
+def _payload_summary(event) -> str:
+    """One line of the payload, chosen by kind so the useful field shows."""
+    payload = event.payload
+    if event.kind == "status":
+        step = payload.get("step", "?")
+        command = str(payload.get("command", ""))[:60]
+        return f"step {step}  {command}" if command else f"step {step}"
+    if event.kind == "completed":
+        return str(payload.get("explanation") or payload.get("result", ""))[:70]
+    if event.kind in ("failed", "lost"):
+        return str(payload.get("reason", ""))[:70]
+    if event.kind == "guidance":
+        return str(payload.get("text", ""))[:70]
+    if event.kind == "started":
+        return str(payload.get("goal", ""))[:70]
+    return ", ".join(f"{k}={str(v)[:30]}" for k, v in list(payload.items())[:3])
+
+
 def handle_why(argument: str = "") -> bool:
     """`/why [agent]`: render the most recent turn. Returns True if handled."""
     from sable.core.events.replay import ReplayLog
