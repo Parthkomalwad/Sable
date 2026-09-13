@@ -9,7 +9,7 @@
 # project's own requires-python of >=3.11, so the image every local test ran
 # in was testing a Python the project does not claim to support, and CI's
 # 3.11/3.12 matrix could diverge from it in either direction.
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
