@@ -95,10 +95,30 @@ def parse_llm_json(raw: str) -> dict:
         ValueError: If JSON cannot be parsed after stripping fences.
     """
     cleaned = raw.replace("```json", "").replace("```", "").strip()
+
     try:
-        return _json.loads(cleaned)
-    except _json.JSONDecodeError as exc:
-        raise ValueError(f"Cannot parse LLM JSON response: {cleaned[:200]}") from exc
+        decoded = _json.loads(cleaned)
+    except _json.JSONDecodeError:
+        # A model that emits two objects back to back ("I'll run this, then
+        # spawn that") produces valid JSON followed by more valid JSON, which
+        # json.loads rejects outright as "Extra data". Seen in the wild from
+        # gpt-4o-mini on a multi-step goal. The contract is one action per
+        # turn, so the first complete object IS the answer and the rest is the
+        # model getting ahead of itself; raw_decode takes it and stops.
+        try:
+            decoded, _ = _json.JSONDecoder().raw_decode(cleaned)
+        except _json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Cannot parse LLM JSON response: {cleaned[:200]}"
+            ) from exc
+
+    # Checked on BOTH paths, not just the raw_decode one: a bare list parses
+    # cleanly through json.loads, and every caller goes on to read keys off
+    # this result, so returning one would fail later inside a backend instead
+    # of here where the message names the cause.
+    if not isinstance(decoded, dict):
+        raise ValueError(f"Cannot parse LLM JSON response: {cleaned[:200]}")
+    return decoded
 
 
 def _load_pricing() -> dict:

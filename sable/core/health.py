@@ -176,6 +176,24 @@ def startup_degradations() -> list[Degradation]:
     return found
 
 
+def llm_unparseable(reason: str = "") -> Degradation:
+    """The model answered, but not in a shape the runtime could use.
+
+    Distinct from `llm_unreachable` because the remedy is different and the
+    wrong label sends people to check their network when the backend was fine.
+    Seen for real: a model emitted two JSON objects in one turn, the parse
+    failed, and the banner said "LLM unreachable" while the API was answering
+    perfectly.
+    """
+    detail = f": {reason}" if reason else ""
+    return Degradation(
+        name="llm-parse",
+        summary=f"model returned an unusable response{detail}",
+        reduced="this goal was abandoned; the backend itself is fine",
+        hint="retry, or switch to a stronger model for this role",
+    )
+
+
 def llm_unreachable(reason: str = "") -> Degradation:
     """The degradation for a backend that could not be reached.
 
