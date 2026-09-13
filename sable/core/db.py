@@ -9,6 +9,7 @@ Tables:
 - agent_events: the append-only agent bus (see core/events/bus.py)
 - agent_turns: the redacted prompt replay log (see core/events/replay.py)
 - skill_corrections: what the user corrected (see skills/corrections.py)
+- skill_aliases: natural-language aliases (see skills/aliases.py)
 """
 from __future__ import annotations
 
@@ -177,6 +178,19 @@ CREATE INDEX IF NOT EXISTS idx_skill_corrections_withheld_ts
 """
 
 
+_CREATE_SKILL_ALIASES = """
+CREATE TABLE IF NOT EXISTS skill_aliases (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    phrase           TEXT NOT NULL,
+    normalised       TEXT NOT NULL UNIQUE,
+    command          TEXT NOT NULL,
+    use_count        INTEGER NOT NULL DEFAULT 0,
+    promoted_offered INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
+)
+"""
+
+
 class Database:
     """Manages the SQLite session database."""
 
@@ -199,6 +213,7 @@ class Database:
         self._conn.execute(_CREATE_AGENT_TURNS_INDEX)
         self._conn.execute(_CREATE_SKILL_CORRECTIONS)
         self._conn.execute(_CREATE_SKILL_CORRECTIONS_INDEX)
+        self._conn.execute(_CREATE_SKILL_ALIASES)
         self._conn.commit()
 
     def write_event(self, event: TokenEvent) -> None:
