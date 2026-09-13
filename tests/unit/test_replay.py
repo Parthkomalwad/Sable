@@ -12,11 +12,12 @@ import sqlite3
 import pytest
 
 from sable.core.events.replay import AgentTurn, ReplayLog, record_turn
+from sable.policy.engine import redact_text
 
 
 @pytest.fixture
 def log(tmp_path):
-    instance = ReplayLog(db_path=tmp_path / "sessions.db")
+    instance = ReplayLog(db_path=tmp_path / "sessions.db", redact=redact_text)
     try:
         yield instance
     finally:
@@ -95,9 +96,40 @@ class TestRecord:
 
 class TestRedaction:
     """Redaction happens on the way in. Redacting on read would leave the
-    secret sitting in the database."""
+    secret sitting in the database.
+
+    The redactor is injected rather than imported: `core` sits below `policy`
+    in the layering rule, so `replay.py` takes a callable and the agents (which
+    may import `policy`) supply `strip_secrets`. The `log` fixture passes it,
+    as every caller in Sable does.
+    """
 
     SECRET = "sk-proj-abc123XYZ789defGHI456jklMNO012"
+
+    def test_an_uninjected_log_stores_verbatim(self, tmp_path):
+        """The opt-out, pinned deliberately.
+
+        A ReplayLog built without a redactor does not invent one. That is why
+        every real caller passes `redact_text`, and why this test exists: so
+        the default is a decision on the record rather than an oversight.
+        """
+        with ReplayLog(db_path=tmp_path / "raw.db") as raw:
+            raw.record(
+                agent="w1", role="worker", turn=1,
+                system_prompt="p", messages=_messages(self.SECRET), response="r",
+            )
+            assert self.SECRET in raw.turns_for("w1")[0].messages[0]["content"]
+
+    def test_record_turn_forwards_the_redactor(self, tmp_path):
+        path = tmp_path / "sessions.db"
+        record_turn(
+            path, redact=redact_text,
+            agent="w1", role="worker", turn=1,
+            system_prompt="p", messages=_messages(f"export K={self.SECRET}"),
+            response="r",
+        )
+        with ReplayLog(db_path=path) as log:
+            assert self.SECRET not in log.turns_for("w1")[0].messages[0]["content"]
 
     def test_a_secret_in_a_message_does_not_reach_the_table(self, log, tmp_path):
         log.record(

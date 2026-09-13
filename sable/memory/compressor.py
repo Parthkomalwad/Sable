@@ -79,6 +79,7 @@ def _compress_with_token_reducer(text: str) -> str:
         if len(text) > max_chars:
             return text[:max_chars] + "\n[... truncated ...]"
         return text
-    except Exception:
-        # Any other failure return original
+    except (ValueError, TypeError, RuntimeError):
+        # token-reducer choking on unusual input. Uncompressed context is worse
+        # than compressed, and far better than no context.
         return text

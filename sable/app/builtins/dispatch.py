@@ -16,6 +16,7 @@ list is a parameter. Nothing here mutates another module's namespace.
 from __future__ import annotations
 
 import os
+import sqlite3
 import sys
 
 from sable.app import budget
@@ -46,9 +47,9 @@ _HELP_TEXT = (
     "  /skill          Manage skill files\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
-    "  /task <n> replay     Every turn of one agent, as the model saw it\n"
-    "  /task <n> events     The agent's event stream\n"
-    "  /task <n> guide <text>  Steer a running agent (also Ctrl+G)\n"
+    "  /task replay <n>     Every turn of one agent, as the model saw it\n"
+    "  /task events <n>     The agent's event stream\n"
+    "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
     "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
     "  /tour           Guided walkthrough of what Sable does\n"
     "  /budget reset  Clear hard-stop budget flag\n"
@@ -99,7 +100,9 @@ def handle_builtin(
                 for p in patterns:
                     path = crystalliser.crystallise(p)
                     _out(f"[skill] auto-generated: {path.name}")
-        except Exception:
+        except (ImportError, OSError, sqlite3.Error, ValueError):
+            # Crystallisation runs on the way out. A failure here must not stop
+            # the user exiting their shell.
             pass
         raise SystemExit(0)
 
@@ -128,7 +131,7 @@ def handle_builtin(
             if new_config is not None:
                 for field in vars(new_config):
                     setattr(config, field, getattr(new_config, field))
-        except Exception as exc:
+        except (ImportError, OSError, ValueError, AttributeError) as exc:
             _out(f"Settings panel error: {exc}")
         return True
 

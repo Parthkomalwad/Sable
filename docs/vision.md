@@ -171,7 +171,7 @@ Organised into eight pillars. Each item has an ID for referencing in specs, an e
 | A5 | **Model routing per role**: cheap/local model for classification, summarisation, skill matching; strong model for orchestration. Config gains `models: {router, orchestrator, worker, summariser}`. | S | config, llm |
 | A6 | **Structured tool calls instead of JSON-in-text** where the backend supports native tool use (Anthropic/OpenAI); keep the JSON fallback for Ollama. | M | llm/* |
 | A7 | **Interrupt & steer**: `Ctrl+G` opens a guidance prompt to any running agent (already exists via stdin for TaskAgent surface it in the UI). | S | agent guidance queue |
-| A8 | **Workspace git-snapshots**: every sub-agent step is a commit in its workspace (aider-style); `/task <n> diff`, `/task <n> undo`. Replaces ad-hoc `vN.json` context snapshots with real file-state history. | M | TaskMemory, manager |
+| A8 | **Workspace git-snapshots**: every sub-agent step is a commit in its workspace (aider-style); `/task diff <n>`, `/task undo <n>`. Replaces ad-hoc `vN.json` context snapshots with real file-state history. | M | TaskMemory, manager |
 
 ### Pillar B Self-learning skills (the "gets better the more you use it" story)
 
@@ -303,7 +303,7 @@ The catalog above is mostly about *goals*: things you type a few times a day. Th
 | I6 | **Upgrade path.** Config-schema version + migrators, skill-format migrator (flat → folder), numbered DB migrations, `sable doctor` (tmux/bwrap/python/kernel-userns checks, DB integrity, stale tasks, orphan windows). | S | core |
 | I7 | **Degraded modes, visibly.** Banners (not silent fallbacks) for: LLM unreachable, tmux missing, bwrap unavailable (userns disabled), SQLite locked, terminal < 80 cols, keyring absent. Each has a documented reduced-capability behaviour. | S | ui, core |
 | I8 | **Export / import / sync of `~/.sable/`.** `sable export` tarball and `sable sync <git-remote>` for skills + knowledge + policy (never secrets, never state). Doubles as team mode and new-server bootstrap. | S | paths |
-| I9 | **Prompt replay.** Store exact (redacted) messages sent per turn; `/task <n> replay` and `/why` show what the model saw when it decided. | S | bus, audit |
+| I9 | **Prompt replay.** Store exact (redacted) messages sent per turn; `/task replay <n>` and `/why` show what the model saw when it decided. | S | bus, audit |
 | I10 | **Onboarding.** `/tour`, a no-API-key demo goal on mock-LLM, wizard explains confirm tiers before the first AI command, first-run "what can I say" cheat-sheet. | S | wizard, ui |
 | I11 | **Devcontainer.** `.devcontainer/` on `Dockerfile.playground` one-click VS Code on Windows for you and for Opus. | S | docker |
 | I12 | **Licence, CONTRIBUTING, CHANGELOG, SECURITY.md** before anything public. | S | |

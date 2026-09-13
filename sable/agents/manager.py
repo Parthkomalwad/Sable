@@ -16,9 +16,15 @@ import libtmux
 
 
 class TaskManager:
-    def __init__(self, config, db) -> None:
+    def __init__(self, config, db, memory_factory=None) -> None:
+        """`memory_factory(name, tasks_base, db)` builds a task's memory.
+
+        Injected so that `agents` need not import `memory`, which the layering
+        rule forbids. Optional, so every existing caller keeps working.
+        """
         self._config = config
         self._db = db
+        self._memory_factory = memory_factory
         self._tasks_base = Path(config.tasks_base_dir).expanduser()
         self._server = libtmux.Server()
 
@@ -289,12 +295,23 @@ class TaskManager:
             for r in rows
         ]
 
-    def checkpoint(self, name: str) -> int:
+    def _memory_for(self, name: str):
+        """Build a TaskMemory for `name`.
+
+        Injected by the composition root when one is supplied, imported here
+        otherwise. `agents` sits below `memory` in the layering rule, so the
+        deferred import is a documented exception kept for callers that
+        construct a TaskManager without one; `app/builtins/task.py` passes a
+        factory in.
+        """
+        if self._memory_factory is not None:
+            return self._memory_factory(name, str(self._tasks_base), self._db)
         from sable.memory.task import TaskMemory
-        mem = TaskMemory(name, str(self._tasks_base), db=self._db)
-        return mem.save_snapshot()
+
+        return TaskMemory(name, str(self._tasks_base), db=self._db)
+
+    def checkpoint(self, name: str) -> int:
+        return self._memory_for(name).save_snapshot()
 
     def revert(self, name: str, version: int) -> dict:
-        from sable.memory.task import TaskMemory
-        mem = TaskMemory(name, str(self._tasks_base), db=self._db)
-        return mem.load_snapshot(version)
+        return self._memory_for(name).load_snapshot(version)

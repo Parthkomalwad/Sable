@@ -82,7 +82,8 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
             capture_output=True, text=True, timeout=1
         )
         branch = res.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
+        # No git, or not a repo. The prompt simply loses its branch segment.
         pass
 
     hhmm = _time.strftime("%H:%M")
@@ -140,7 +141,7 @@ def _make_key_bindings(db=None) -> KeyBindings:
         try:
             from sable.ui.tmux.layout import toggle_sidebar
             toggle_sidebar()
-        except Exception:
+        except (ImportError, OSError):
             pass
 
     @kb.add("c-\\")

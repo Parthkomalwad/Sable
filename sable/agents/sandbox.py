@@ -134,32 +134,27 @@ class Sandbox:
         self.use_bwrap = self._probe_bwrap()
 
     def _probe_bwrap(self) -> bool:
-        """Return True only if bwrap is present AND user namespaces work."""
+        """Return True only if bwrap is present AND user namespaces work.
+
+        The probe itself lives in `core/health.py`, so the degraded-mode banner
+        and the sandbox answer the question the same way and cannot disagree.
+        What stays here is the logging, which is this module's concern.
+        """
         global _bwrap_warned
-        if shutil.which("bwrap") is None:
-            if not _bwrap_warned:
+        from sable.core.health import bwrap_available
+
+        if bwrap_available():
+            return True
+        if not _bwrap_warned:
+            if shutil.which("bwrap") is None:
                 logger.warning(
                     "bwrap not found using bash-wrapper write interception as fallback"
                 )
-                _bwrap_warned = True
-            return False
-        import subprocess
-        try:
-            result = subprocess.run(
-                ["bwrap", "--ro-bind", "/", "/", "--unshare-pid", "--", "true"],
-                capture_output=True, timeout=5,
-            )
-            if result.returncode == 0:
-                return True
-        except (OSError, subprocess.SubprocessError):
-            # bwrap missing, not executable, or hanging. Either way the
-            # bash-wrapper fallback below is what we get.
-            pass
-        if not _bwrap_warned:
-            logger.warning(
-                "bwrap present but user namespaces unavailable "
-                "falling back to bash-wrapper write interception"
-            )
+            else:
+                logger.warning(
+                    "bwrap present but user namespaces unavailable "
+                    "falling back to bash-wrapper write interception"
+                )
             _bwrap_warned = True
         return False
 

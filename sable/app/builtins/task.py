@@ -4,6 +4,8 @@ Extracted from `app/repl.py` in Phase 0.5 step 3. Pure move, no logic change.
 """
 from __future__ import annotations
 
+import sqlite3
+
 from sable.ui.console import out as _out
 
 
@@ -19,7 +21,7 @@ def _build_spawn_context(turns: list[dict], goal: str) -> str:
     try:
         from sable.memory.compressor import compress
         summary = compress(recent)
-    except Exception:
+    except (ImportError, ValueError, TypeError):
         summary = "\n".join(
             f"{t.get('role','user')}: {str(t.get('content',''))[:200]}"
             for t in recent
@@ -70,13 +72,13 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
             try:
                 _shutil.rmtree(f)
                 _out(f"  deleted {f.name}/")
-            except Exception as exc:
+            except OSError as exc:
                 _out(f"  failed to delete {f.name}/: {exc}")
         # Also clear tasks from DB
         try:
             db._conn.execute("DELETE FROM tasks")
             db._conn.commit()
-        except Exception:
+        except (sqlite3.Error, AttributeError):
             pass
         _out("done all task folders deleted")
         return True
@@ -99,7 +101,8 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
             _out(f"task '{name}' spawned")
             if context:
                 _out(f"  context: {len(context)} chars of session history handed off")
-        except Exception as exc:
+        except (RuntimeError, OSError, sqlite3.Error) as exc:
+            # RuntimeError is TaskManager's "Not inside a tmux session".
             _out(f"[error] {exc}")
         return True
 
