@@ -151,6 +151,19 @@ def _make_key_bindings(db=None) -> KeyBindings:
         )
         event.app.current_buffer.validate_and_handle()
 
+    @kb.add("c-g")
+    def _ctrl_g(event) -> None:
+        """Steer a running agent (A7).
+
+        Prefills the guidance command rather than sending anything: nothing
+        tracks which agent is "focused", and guessing wrong sends advice to
+        the wrong worker. The user completes the name and the text, and the
+        agent reads it at the top of its next turn.
+        """
+        from prompt_toolkit.document import Document
+
+        event.app.current_buffer.set_document(Document("/task guide "))
+
     @kb.add("c-x")
     def _ctrl_x(event) -> None:
         event.app.current_buffer.set_document(

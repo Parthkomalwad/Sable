@@ -36,7 +36,7 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
     manager = TaskManager(config=config, db=db)
 
     if not parts:
-        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|replay|checkpoint|revert>")
+        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|replay|events|guide|checkpoint|revert>")
         return True
 
     sub = parts[0]
@@ -124,6 +124,15 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
         elif sub == "replay":
             from sable.app.builtins.why import handle_replay
             handle_replay(name)
+        elif sub == "events":
+            from sable.app.builtins.why import handle_events
+            handle_events(name)
+        elif sub == "guide" and len(parts) >= 3:
+            text = " ".join(parts[2:])
+            if manager.guide(name, text):
+                _out(f"  guidance sent to '{name}', it will read this on its next turn")
+            else:
+                _out(f"  could not reach '{name}': no live window for it")
         elif sub == "history":
             for row in manager.history(name):
                 _out(f"  {row['timestamp']}  {row['model']}  ${row['cost_usd']:.4f}")
