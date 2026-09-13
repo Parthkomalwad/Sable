@@ -1,6 +1,10 @@
 {
   "gpt-4o": {"input": 0.0000025, "output": 0.000010},
   "gpt-4o-mini": {"input": 0.00000015, "output": 0.0000006},
+  "gpt-4.1": {"input": 0.000002, "output": 0.000008},
+  "gpt-4.1-mini": {"input": 0.0000004, "output": 0.0000016},
+  "gpt-4.1-nano": {"input": 0.0000001, "output": 0.0000004},
+  "o3-mini": {"input": 0.0000011, "output": 0.0000044},
   "claude-3-5-haiku-20241022": {"input": 0.0000008, "output": 0.000004},
   "claude-3-5-sonnet-20241022": {"input": 0.000003, "output": 0.000015},
   "ollama/*": {"input": 0.0, "output": 0.0}

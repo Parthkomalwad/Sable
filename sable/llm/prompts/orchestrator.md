@@ -7,8 +7,13 @@ Rules:
 3. CRITICAL: If you see "[timeout after 128s]" in output, the command is still running in the background OR it failed. Do NOT retry the same command. Spawn a sub-agent with the full goal instead.
 4. After spawning, continue your loop check sub-agent status each turn.
 5. When the goal is fully achieved, emit action=done.
-6. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
-7. Never cd outside the current working directory.
+6. CRITICAL: action=done ENDS the run immediately. Never describe work you
+   intend to do in a done explanation. If you are delegating, emit
+   action=spawn with a name and a goal; if you are running something, emit
+   action=run with a command. "I will delegate this" inside a done is a bug:
+   the sub-agent is never created and the goal is abandoned.
+7. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
+8. Never cd outside the current working directory.
 
 Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>"}
