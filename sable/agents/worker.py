@@ -33,6 +33,73 @@ from sable.core.events.types import EventKind
 
 logger = logging.getLogger(__name__)
 
+
+def grade_skill_use(*args, **kwargs):
+    """Indirection over `skills/validate.py`, deferred for the layering rule.
+
+    `agents` is a lower layer than `skills` (docs/structure.md §2), so this
+    module may not import it at module scope. `tests/unit/test_layering.py`
+    tolerates exactly three such edges under a strict xfail, and adding a
+    fourth would fail the build rather than quietly passing.
+
+    A thin wrapper rather than an inline import at the call site, because
+    the grading helper below is monkeypatched in tests: patching a name
+    this module owns is what lets a test replace the validator without
+    reaching into another package.
+    """
+    from sable.skills.validate import grade_skill_use as _grade
+
+    return _grade(*args, **kwargs)
+
+
+def grade_skills_used(
+    used_skills: list[str],
+    succeeded: bool,
+    index,
+    cwd: str,
+    wrap=None,
+    validators: dict[str, str] | None = None,
+) -> None:
+    """Move the confidence of every skill this run used (B1).
+
+    Called once, at the run's terminal state, with the names accumulated
+    during it. Deliberately not called per step: a worker injects the same
+    skills on every turn, so nudging per step would take a skill from 0.5 to
+    1.0 on a single goal and make the number meaningless.
+
+    Every exit path reaches here, not only `done`. A nudge on success alone
+    would let confidence drift up forever and look like evidence, since a
+    failure could never be recorded.
+
+    A skill that declares a validator is graded by it (B5): the agent saying
+    `done` is the agent grading its own homework, and the validator asks the
+    system instead. That is what catches the gate's "break the deploy on
+    purpose" step, where the agent believes it succeeded.
+
+    Never raises. Grading happens after the work is finished, and a
+    bookkeeping failure must not turn a completed run into a crash.
+    """
+    validators = validators or {}
+
+    for name in dict.fromkeys(used_skills):      # de-duplicated, order kept
+        success = succeeded
+        check = validators.get(name, "")
+        if check:
+            try:
+                success = grade_skill_use(
+                    check, cwd=cwd, wrap=wrap, ran_ok=succeeded
+                ).success
+            except (OSError, ValueError) as exc:
+                # The validator could not be run at all (no pty, bad cwd).
+                # The run's own outcome stands rather than a skill being
+                # punished for the environment failing to check it.
+                logger.warning("validator for skill %s could not run: %s", name, exc)
+
+        try:
+            index.nudge(name, success)
+        except (OSError, ValueError, sqlite3.Error) as exc:
+            logger.warning("could not record confidence for skill %s: %s", name, exc)
+
 _SYSTEM_PROMPT_TEMPLATE = """You are an autonomous task agent running inside a sandboxed workspace: {workspace}
 All commands run with that as CWD. You have full R/W access inside it; read-only outside.
 
@@ -130,6 +197,12 @@ class TaskAgent:
         self._skill_loader = skill_loader
         self._guidance_q: queue.Queue = queue.Queue()
         self._running = True
+
+        # Every skill injected during this run, and the validators any of
+        # them declared. Graded once at the terminal state (B1, B5): see
+        # `grade_skills_used` for why this is not done per step.
+        self._used_skills: list[str] = []
+        self._skill_validators: dict[str, str] = {}
 
         # The bus is how the orchestrator learns what this worker is doing.
         # status.md and result.md are still written below, but as
@@ -280,6 +353,10 @@ class TaskAgent:
         )
         _MAX_STEPS = 25
         _step = 0
+        # False unless the worker reaches `done`. The step limit, an
+        # unreachable LLM and a broken loop all mean the goal was not
+        # achieved, and each of those exits reaches the grading call below.
+        succeeded = False
 
         while self._running:
             _step += 1
@@ -296,6 +373,15 @@ class TaskAgent:
             guidance = self._drain_guidance()
             skills = self._skill_loader.load_relevant(self._goal)
             messages = self._memory.build_context()
+
+            # Accumulated across the run, graded once after the loop. Every
+            # turn re-injects the same skills, so recording per step would
+            # nudge a skill a dozen times for one goal.
+            for s in skills:
+                self._used_skills.append(s["name"])
+                validator = s.get("validate", "")
+                if validator:
+                    self._skill_validators[s["name"]] = validator
 
             # Remind the agent of its goal every 5 steps to prevent drift
             if _step % 5 == 0:
@@ -392,9 +478,36 @@ class TaskAgent:
                     result=summary or "",
                 )
                 print(f"\n[task '{self._name}'] Goal achieved. Window kept open for review.")
+                succeeded = True
                 break
 
         self._running = False
+
+        # B1: move the confidence of every skill this run used, once, on the
+        # way out. Every exit path reaches here, not only `done`: nudging
+        # solely on success would let confidence drift up forever, since a
+        # failure could never be recorded. `succeeded` is False unless the
+        # worker reached `done`, because the step limit, an unreachable LLM
+        # and a broken loop all mean the goal was not achieved.
+        if self._used_skills:
+            grade_skills_used(
+                used_skills=self._used_skills,
+                succeeded=succeeded,
+                index=self._skill_index(),
+                cwd=self._workspace,
+                wrap=self._sandbox.wrap_command,
+                validators=self._skill_validators,
+            )
+
+    def _skill_index(self):
+        """The SkillIndex to record confidence in.
+
+        Deferred import for the layering rule, like `grade_skill_use` above:
+        `agents` sits below `skills` and may not import it at module scope.
+        """
+        from sable.skills.index import SkillIndex
+
+        return SkillIndex()
 
     def _write_live_status(self, command: str, explanation: str, step: int = 0) -> None:
         """Write a live status file so orchestrator knows what agent is doing right now."""
