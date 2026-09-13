@@ -15,7 +15,6 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-from libtmux.exc import LibTmuxException
 
 from sable import data
 from sable.agents import runtime
@@ -244,9 +243,20 @@ class OrchestratorAgent:
                 task_base_dir=str(self._task_dir),
             )
             self._spawned.append(name)
-        except (LibTmuxException, RuntimeError, OSError) as exc:
-            # RuntimeError is "not inside a tmux session"; LibTmuxException
-            # covers the window and pane failures underneath that.
+        except (RuntimeError, OSError) as exc:
+            # RuntimeError is TaskManager's "Not inside a tmux session"; OSError
+            # covers the process and filesystem failures under it.
+            #
+            # Deliberately not LibTmuxException: the orchestrator never touches
+            # tmux, it calls an injected collaborator, and naming that
+            # collaborator's private exception type means importing libtmux
+            # here. Tests inject a fake manager and replace `libtmux` in
+            # sys.modules with a MagicMock, where resolving the `.exc`
+            # submodule raises ModuleNotFoundError, at module scope and at call
+            # time alike. A tmux-specific failure that derives straight from
+            # Exception therefore escapes to the turn loop, which is the right
+            # place for it: it means the manager is broken, not that this spawn
+            # was refused.
             _out(f"[orchestrator] failed to spawn '{name}': {exc}")
 
         self._history.append({"role": "assistant", "content": json.dumps(action)})
