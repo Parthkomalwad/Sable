@@ -227,6 +227,42 @@ class TestTheValidatorIsCarriedThrough:
         assert loader.load_relevant("deploy the api")[0]["validate"] == ""
 
 
+class TestConfidenceIsCarriedThrough:
+    """Task 11 announces the score, so the score has to travel with the skill.
+
+    Re-reading the index per skill to find it again would be wasted work,
+    and the ranking path is the only place the entry is already in hand.
+    """
+
+    def test_a_global_skill_carries_its_confidence(self, global_dir, index_path, tasks_base):
+        _write_global(global_dir, "deploy-api", "Deploy the API")
+        index = SkillIndex(index_path=str(index_path))
+        index.add(name="deploy-api", file="/s/deploy-api", keywords=["deploy", "api"],
+                  auto_generated=True)
+
+        loader = TaskSkillLoader("t", str(tasks_base), index_path=str(index_path))
+
+        assert loader.load_relevant("deploy the api")[0]["confidence"] == 0.5
+
+    def test_a_local_skill_has_no_confidence(self, global_dir, index_path, tasks_base):
+        """No index entry, so no score. Inventing one would misreport."""
+        _write_local(tasks_base, "t", "local-only", "# Local only\n\nSteps.\n")
+
+        loader = TaskSkillLoader("t", str(tasks_base), index_path=str(index_path))
+
+        assert loader.load_relevant("local only")[0]["confidence"] is None
+
+    def test_the_fallback_path_has_no_confidence(self, global_dir, tasks_base, tmp_path):
+        """With no index there is no score to report, and that is honest."""
+        _write_global(global_dir, "deploy-api", "Deploy the API")
+
+        loader = TaskSkillLoader(
+            "t", str(tasks_base), index_path=str(tmp_path / "absent.json")
+        )
+
+        assert loader.load_relevant("deploy the api")[0]["confidence"] is None
+
+
 class TestLocalSkills:
     """Task-local skills have no index entry: the index only knows ~/skills."""
 

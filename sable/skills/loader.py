@@ -101,6 +101,11 @@ class TaskSkillLoader:
             # Carried here because the worker grades at its terminal state,
             # by which point the file is no longer open.
             "validate": skill.validate,
+            # What the shell currently thinks of this skill. Filled in from
+            # the index by the caller below; a local task skill has no index
+            # entry and so keeps None, which the announcement renders as a
+            # name with no number rather than inventing a score for it.
+            "confidence": None,
         }
 
     def _candidate_paths(self, directory: Path) -> list[tuple[str, Path]]:
@@ -216,6 +221,11 @@ class TaskSkillLoader:
                 continue
             skill = self._read(path, name, "global")
             if skill is not None:
+                # The ranking path is the only place the index entry is in
+                # hand, so it is where the score gets attached. The
+                # announcement needs it and re-reading the index per skill
+                # to find it again would be wasted work.
+                skill["confidence"] = entry.get("confidence")
                 out.append((name, skill))
         return out
 

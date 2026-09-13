@@ -52,6 +52,39 @@ def grade_skill_use(*args, **kwargs):
     return _grade(*args, **kwargs)
 
 
+def format_skill_announcement(skills: list[dict]) -> str:
+    """The line saying which skills a turn is using, and how trusted they are.
+
+    The Phase 2 gate fixes this wording, so it is a contract rather than a
+    preference. It is the only place the confidence loop is visible while it
+    is happening: without it, a user watching a run cannot tell that a skill
+    was retrieved at all, and "the shell got better at this" stays an
+    assertion in a changelog.
+
+    Confidence is rendered to two decimals, which is also what stops the
+    index's float drift (0.6500000000000001 after repeated nudges) reaching
+    a human who would reasonably read it as a bug.
+
+    A skill with no recorded confidence is named without a number. Local
+    task skills have no index entry, and inventing a score for one would
+    misreport what the model was actually given.
+    """
+    if not skills:
+        return ""
+
+    parts = []
+    for skill in skills:
+        name = skill.get("name", "")
+        confidence = skill.get("confidence")
+        if confidence is None:
+            parts.append(name)
+        else:
+            parts.append(f"{name} ({confidence:.2f})")
+
+    label = "using skill" if len(parts) == 1 else "using skills"
+    return f"{label} {', '.join(parts)}"
+
+
 def grade_skills_used(
     used_skills: list[str],
     succeeded: bool,
@@ -400,6 +433,22 @@ class TaskAgent:
                 )
                 if skill_text:
                     messages.insert(1, {"role": "user", "content": skill_text})
+                    # Announced only when something was actually injected.
+                    # A skill already seen this run is filtered out of
+                    # `skill_text` above, and claiming to use a skill the
+                    # model was not given this turn would be a lie the
+                    # replay log would contradict.
+                    announcement = format_skill_announcement(skills)
+                    if announcement:
+                        print(f"[agent] {announcement}", flush=True)
+                        self._publish(
+                            EventKind.SKILL_USED,
+                            step=_step,
+                            skills=[
+                                {"name": s["name"], "confidence": s.get("confidence")}
+                                for s in skills
+                            ],
+                        )
                 for s in skills:
                     self._memory.register_skill_hash(s["name"], s["content"])
 
