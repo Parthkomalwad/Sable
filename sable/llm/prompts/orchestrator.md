@@ -12,8 +12,11 @@ Rules:
    action=spawn with a name and a goal; if you are running something, emit
    action=run with a command. "I will delegate this" inside a done is a bug:
    the sub-agent is never created and the goal is abandoned.
-7. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
-8. Never cd outside the current working directory.
+7. Emit EXACTLY ONE JSON object per turn. Not two, not a list. If the goal
+   needs a command and then a delegation, emit the command this turn and the
+   spawn next turn; you will be asked again after each action.
+8. Every command must be non-interactive (use -y/--yes flags, pipe `yes |` if needed).
+9. Never cd outside the current working directory.
 
 Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>"}
