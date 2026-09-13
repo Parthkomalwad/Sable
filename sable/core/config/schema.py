@@ -10,6 +10,18 @@ from dataclasses import dataclass, field
 VALID_BACKENDS = {"ollama", "openai", "anthropic", "custom"}
 VALID_ROUTING_MODES = {"auto", "prefix"}
 
+#: Roles that may carry their own model (A5, roadmap §3.3). Routing, summarising
+#: and skill matching are cheap, high-volume jobs that a small local model does
+#: well; orchestration is the reasoning core and wants the strong model. Any
+#: role left unset falls back to `model`, so an existing config keeps behaving
+#: exactly as it did.
+#:
+#: `router` is accepted and stored but nothing reads it yet: `agents/router.py`
+#: is pure heuristics and makes no LLM call. It is listed here because the
+#: roadmap names it and a model-backed router is a later phase; documenting it
+#: as unread is better than silently dropping a key a user set.
+MODEL_ROLES = ("router", "orchestrator", "worker", "summariser")
+
 
 @dataclass
 class ShellConfig:
@@ -23,6 +35,18 @@ class ShellConfig:
     privacy_mode: bool                  # strip secrets before sending to model
     setup_complete: bool
     tasks_base_dir: str = "~/tasks"
+    # Per-role model overrides (A5). Empty means "use `model` for everything",
+    # which is what every config written before Phase 1 says.
+    models: dict[str, str] = field(default_factory=dict)
+
+    def model_for(self, role: str) -> str:
+        """The model this role should use, falling back to `model`.
+
+        One place decides, so a role nobody configured and a role that does not
+        exist both resolve to the single configured model rather than to an
+        empty string that a backend would send as its model name.
+        """
+        return self.models.get(role) or self.model
 
     @staticmethod
     def defaults() -> "ShellConfig":
@@ -37,6 +61,7 @@ class ShellConfig:
             privacy_mode=False,
             setup_complete=False,
             tasks_base_dir="~/tasks",
+            models={},
         )
 
     @staticmethod
@@ -62,6 +87,24 @@ class ShellConfig:
         if not model:
             raise ValueError("model must be a non-empty string")
 
+        raw_models = data.get("models") or {}
+        if not isinstance(raw_models, dict):
+            raise ValueError(f"models must be an object, got {raw_models!r}")
+        models: dict[str, str] = {}
+        for role, role_model in raw_models.items():
+            if role not in MODEL_ROLES:
+                raise ValueError(
+                    f"Unknown model role: {role!r}. Must be one of {MODEL_ROLES}"
+                )
+            if not isinstance(role_model, str):
+                raise ValueError(
+                    f"models.{role} must be a string, got {role_model!r}"
+                )
+            # An empty value means "not set": store nothing so model_for falls
+            # back rather than sending "" as the model name.
+            if role_model:
+                models[role] = role_model
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -72,6 +115,7 @@ class ShellConfig:
             privacy_mode=bool(data.get("privacy_mode", False)),
             setup_complete=bool(data.get("setup_complete", False)),
             tasks_base_dir=data.get("tasks_base_dir", "~/tasks"),
+            models=models,
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -89,5 +133,6 @@ class ShellConfig:
             "privacy_mode": self.privacy_mode,
             "setup_complete": self.setup_complete,
             "tasks_base_dir": self.tasks_base_dir,
+            "models": dict(self.models),
             "api_key": getattr(self, "api_key", ""),
         }
