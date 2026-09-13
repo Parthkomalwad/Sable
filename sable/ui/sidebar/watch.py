@@ -316,9 +316,35 @@ def _render_all(db, model) -> str:
     bc.print(_panel_git())
     bc.print(_panel_processes())
     bc.print(_panel_tokens(db))
-    bc.print(_panel_corrections(db))
+    # Rendered only when it has something to say. The sidebar prints into a
+    # pane of fixed height and has no notion of how much of it is left, so a
+    # seventh panel pushes the session panel off the top at 45 rows: nothing
+    # errors, the panel is simply gone. This is a stop-gap that restores the
+    # default view, NOT a fix for the underlying problem.
+    #
+    # The real fix is `ui.sidebar.panels` from config plus a renderer that
+    # measures the space it has and says what it dropped (structure.md §3.3,
+    # Phase 4 G1/G6). Until then, a user with corrections is still at seven
+    # panels, which is why test_sidebar_panels.py pins the session panel
+    # surviving a full render rather than trusting this to be enough.
+    if _has_corrections(db):
+        bc.print(_panel_corrections(db))
     bc.print(_panel_clipboard(db))
     return buf.getvalue()
+
+
+def _has_corrections(db) -> bool:
+    """True when the corrections panel would show anything but a hint.
+
+    Defaults to False: a sidebar that cannot read the count should show one
+    panel fewer, not crowd out the session panel to display a zero.
+    """
+    from sable.skills.corrections import weekly_count, withheld_count
+
+    try:
+        return bool(weekly_count(db) or withheld_count(db))
+    except (sqlite3.Error, AttributeError, TypeError):
+        return False
 
 
 def _diff_write(prev_lines: List[str], new_lines: List[str]) -> None:
