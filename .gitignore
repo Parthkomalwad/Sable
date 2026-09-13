@@ -18,6 +18,13 @@ config.json
 *.key
 *.pem
 
+# Local environment. `.env` holds real API keys; `.env.example` is the blank
+# template and is meant to be committed. The `env/` rule above matches a
+# directory, not this file, which is why it needs its own entry.
+.env
+.env.*
+!.env.example
+
 # DB / telemetry data
 *.db
 *.db-wal
