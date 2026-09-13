@@ -9,6 +9,7 @@ from sable.ui.console import out as _out
 
 def _handle_skill_builtin(parts: list[str]) -> bool:
     """Handle /skill subcommands. Return True if handled."""
+    import os
     import subprocess
     from pathlib import Path
     skills_dir = Path.home() / "skills" / "instructions"
