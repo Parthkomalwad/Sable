@@ -20,12 +20,15 @@ import logging
 import os
 import queue
 import sqlite3
+import subprocess
 import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ptyprocess import PtyProcessUnicode
+
+from sable.core.events.types import EventKind
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +104,13 @@ class TaskAgent:
         self._guidance_q: queue.Queue = queue.Queue()
         self._running = True
 
+        # The bus is how the orchestrator learns what this worker is doing.
+        # status.md and result.md are still written below, but as
+        # human-readable mirrors: nothing reads them back any more.
+        from sable.core.events.bus import EventBus
+
+        self._bus = EventBus(db_path=self._db_path)
+
     def _open_db(self):
         class _DB:
             def __init__(self, path):
@@ -123,6 +133,10 @@ class TaskAgent:
 
     def _db_conn(self):
         return sqlite3.connect(self._db_path, check_same_thread=False)
+
+    def _publish(self, kind: str, **payload) -> None:
+        """Announce something on the bus. Never raises, by the bus's contract."""
+        self._bus.publish(self._name, kind, payload)
 
     def _update_task_status(self, status: str, last_output: str = "") -> None:
         conn = self._db_conn()
@@ -254,6 +268,12 @@ class TaskAgent:
         print(f"[agent] workspace: {self._workspace}", flush=True)
         print(f"[agent] sandbox: {'bwrap (kernel namespace)' if self._sandbox.use_bwrap else 'bash-wrapper (writes blocked outside workspace)'}", flush=True)
         self._update_task_status("running")
+        self._publish(
+            EventKind.STARTED,
+            goal=self._goal,
+            workspace=self._workspace,
+            sandbox="bwrap" if self._sandbox.use_bwrap else "bash-wrapper",
+        )
         _MAX_STEPS = 25
         _step = 0
 
@@ -262,6 +282,11 @@ class TaskAgent:
             if _step > _MAX_STEPS:
                 print(f"[agent] step limit ({_MAX_STEPS}) reached stopping", flush=True)
                 self._update_task_status("lost")
+                self._publish(
+                    EventKind.LOST,
+                    reason=f"step limit ({_MAX_STEPS}) reached",
+                    steps=_step - 1,
+                )
                 break
 
             guidance = self._drain_guidance()
@@ -298,6 +323,11 @@ class TaskAgent:
                     if _attempt == 2:
                         logger.error("LLM call failed after 3 attempts giving up")
                         self._update_task_status("lost")
+                        self._publish(
+                            EventKind.FAILED,
+                            reason=f"LLM unreachable after 3 attempts: {exc}",
+                            steps=_step,
+                        )
             if response is None:
                 break
 
@@ -323,6 +353,15 @@ class TaskAgent:
                 print(f"[agent] output: {output[:200]}", flush=True)
 
             self._update_task_status("running", output)
+            self._publish(
+                EventKind.STATUS,
+                step=_step,
+                command=command,
+                explanation=parsed.get("explanation", ""),
+                # Bounded: the bus is read on every orchestrator turn, and a
+                # command that prints a megabyte must not bloat every read.
+                output=(output or "")[:2000],
+            )
             self._write_live_status(command, parsed.get("explanation", ""), step=_step)
             self._write_task_event(
                 prompt_tokens=getattr(response, "prompt_tokens", 0),
@@ -339,7 +378,13 @@ class TaskAgent:
 
             if parsed.get("done"):
                 self._update_task_status("completed")
-                self._write_result_summary()
+                summary = self._write_result_summary()
+                self._publish(
+                    EventKind.COMPLETED,
+                    steps=_step,
+                    explanation=parsed.get("explanation", ""),
+                    result=summary or "",
+                )
                 print(f"\n[task '{self._name}'] Goal achieved. Window kept open for review.")
                 break
 
@@ -348,7 +393,6 @@ class TaskAgent:
     def _write_live_status(self, command: str, explanation: str, step: int = 0) -> None:
         """Write a live status file so orchestrator knows what agent is doing right now."""
         try:
-            import subprocess
             tree = subprocess.run(
                 ["find", ".", "-maxdepth", "3", "-not", "-path", "*/.agentic/*", "-not", "-name", ".*"],
                 capture_output=True, text=True, cwd=self._workspace, timeout=3,
@@ -365,8 +409,19 @@ class TaskAgent:
         except Exception:
             pass
 
-    def _write_result_summary(self) -> None:
-        """Write a result.md summary so the orchestrator knows what was done."""
+    def _write_result_summary(self) -> str:
+        """Write result.md and return the summary text.
+
+        Returns the summary so the caller can put it on the bus as the
+        `completed` payload. The file is still written, but as a
+        human-readable mirror: since Phase 1 the orchestrator reads the event,
+        not the file.
+
+        Returns an empty string if the summary could not be built, which the
+        caller publishes as an empty result rather than failing the task. A
+        finished piece of work must not be reported as failed because its
+        write-up could not be produced.
+        """
         try:
             # Collect all assistant turns as summary
             turns = self._memory._turns
@@ -375,7 +430,6 @@ class TaskAgent:
                 if t.get("role") == "assistant"
             ]
             # Run ls in workspace to capture final file tree
-            import subprocess
             tree = subprocess.run(
                 ["find", ".", "-not", "-path", "*/.agentic/*", "-not", "-name", ".*"],
                 capture_output=True, text=True, cwd=self._workspace, timeout=5,
@@ -392,15 +446,18 @@ class TaskAgent:
                 try:
                     p = json.loads(s)
                     summary += f"{i}. `{p.get('command','')}`  {p.get('explanation','')}\n"
-                except Exception:
+                except (json.JSONDecodeError, TypeError, AttributeError):
+                    # A turn that is not action JSON: show it verbatim.
                     summary += f"{i}. {s[:120]}\n"
 
             result_path = Path(self._workspace).parent / ".agentic" / "result.md"
             result_path.parent.mkdir(parents=True, exist_ok=True)
             result_path.write_text(summary)
             print(f"[agent] result written to {result_path}", flush=True)
-        except Exception as exc:
+            return summary
+        except (OSError, subprocess.SubprocessError) as exc:
             print(f"[agent] could not write result: {exc}", flush=True)
+            return ""
 
 
 if __name__ == "__main__":

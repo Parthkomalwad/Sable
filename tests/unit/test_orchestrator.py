@@ -157,22 +157,125 @@ def test_handle_spawn_skips_invalid_name(tmp_path):
     orch._task_manager.spawn.assert_not_called()
 
 
-def test_collect_agent_statuses_consumes_result(tmp_path):
-    """_collect_agent_statuses reads result.md, removes it, and removes agent from _spawned."""
-    orch = _make_orchestrator(tmp_path, goal="build an app")
-    # Manually set up task dir and a fake completed agent
-    orch._task_dir = tmp_path / "tasks" / orch._slug
-    agent_agentic = orch._task_dir / "frontend" / ".agentic"
-    agent_agentic.mkdir(parents=True)
-    (agent_agentic / "result.md").write_text("# Done\nBuilt react app")
-    orch._spawned = ["frontend"]
+class TestCollectAgentStatusesFromBus:
+    """Sub-agent progress now arrives on the bus, not from status.md.
 
-    statuses = orch._collect_agent_statuses()
+    Phase 1 replaced a file poll (up to 3s of lag, and a read-then-unlink
+    that lost the result if the orchestrator died between the two calls)
+    with a cursor this process owns. These pin the delivery semantics that
+    replaced it.
+    """
 
-    assert len(statuses) == 1
-    assert "COMPLETED" in statuses[0]
-    assert not (agent_agentic / "result.md").exists()  # consumed
-    assert "frontend" not in orch._spawned
+    @staticmethod
+    def _publish(orch, agent, kind, **payload):
+        from sable.core.events.bus import EventBus
+
+        bus = EventBus(db_path=orch._db_path)
+        bus.publish(agent, kind, payload)
+        bus.close()
+
+    def test_completed_event_is_folded_in_and_agent_retired(self, tmp_path):
+        from sable.core.events.types import EventKind
+
+        orch = _make_orchestrator(tmp_path, goal="build an app")
+        orch._spawned = ["frontend"]
+        self._publish(orch, "frontend", EventKind.COMPLETED, result="# Done\nBuilt react app")
+
+        statuses = orch._collect_agent_statuses()
+
+        assert len(statuses) == 1
+        assert "COMPLETED" in statuses[0]
+        assert "Built react app" in statuses[0]
+        assert "frontend" not in orch._spawned
+
+    def test_a_result_is_delivered_exactly_once(self, tmp_path):
+        """What the cursor replaced the unlink with.
+
+        The old code deleted result.md so it would not be re-read. The
+        cursor does the same job without a destructive step: a second drain
+        must not repeat the result into the model's context.
+        """
+        from sable.core.events.types import EventKind
+
+        orch = _make_orchestrator(tmp_path, goal="build an app")
+        orch._spawned = ["frontend"]
+        self._publish(orch, "frontend", EventKind.COMPLETED, result="done once")
+
+        assert len(orch._collect_agent_statuses()) == 1
+        assert orch._collect_agent_statuses() == []
+
+    def test_status_events_report_the_latest_step_only(self, tmp_path):
+        """A worker publishes one status per step; only the newest is useful."""
+        from sable.core.events.types import EventKind
+
+        orch = _make_orchestrator(tmp_path, goal="build an app")
+        orch._spawned = ["frontend"]
+        for step in (1, 2, 3):
+            self._publish(
+                orch, "frontend", EventKind.STATUS,
+                step=step, command=f"cmd-{step}", explanation="working",
+            )
+
+        statuses = orch._collect_agent_statuses()
+
+        assert len(statuses) == 1, "stale steps should not accumulate in context"
+        assert "step 3" in statuses[0]
+        assert "cmd-3" in statuses[0]
+        assert "cmd-1" not in statuses[0]
+
+    def test_a_still_running_agent_stays_spawned(self, tmp_path):
+        from sable.core.events.types import EventKind
+
+        orch = _make_orchestrator(tmp_path, goal="build an app")
+        orch._spawned = ["frontend"]
+        self._publish(orch, "frontend", EventKind.STATUS, step=1, command="ls")
+
+        orch._collect_agent_statuses()
+
+        assert "frontend" in orch._spawned
+
+    @pytest.mark.parametrize("kind,reason", [("failed", "LLM unreachable"), ("lost", "step limit")])
+    def test_failure_and_loss_are_reported_not_silently_dropped(self, tmp_path, kind, reason):
+        """The orchestrator has to learn a sub-agent died, or it waits forever."""
+        orch = _make_orchestrator(tmp_path, goal="build an app")
+        orch._spawned = ["frontend"]
+        self._publish(orch, "frontend", kind, reason=reason)
+
+        statuses = orch._collect_agent_statuses()
+
+        assert len(statuses) == 1
+        assert kind.upper() in statuses[0]
+        assert reason in statuses[0]
+        assert "frontend" not in orch._spawned
+
+    def test_events_from_other_agents_are_ignored(self, tmp_path):
+        """Two orchestrators can share one database."""
+        from sable.core.events.types import EventKind
+
+        orch = _make_orchestrator(tmp_path, goal="build an app")
+        orch._spawned = ["frontend"]
+        self._publish(orch, "someone-elses-worker", EventKind.COMPLETED, result="not mine")
+
+        assert orch._collect_agent_statuses() == []
+        assert "frontend" in orch._spawned
+
+    def test_events_from_before_this_run_are_not_replayed(self, tmp_path):
+        """The reason the cursor starts at the bus head rather than zero.
+
+        Re-running the same goal reuses the slug and the agent names. Without
+        a starting cursor, the previous run's COMPLETED event would be folded
+        into the new run's first turn.
+        """
+        from sable.core.events.types import EventKind
+
+        stale = _make_orchestrator(tmp_path, goal="build an app")
+        self._publish(stale, "frontend", EventKind.COMPLETED, result="from a previous run")
+
+        fresh = _make_orchestrator(tmp_path, goal="build an app")
+        fresh._spawned = ["frontend"]
+
+        assert fresh._collect_agent_statuses() == []
+        assert "frontend" in fresh._spawned
 
 
 def test_handle_done_writes_result(tmp_path):

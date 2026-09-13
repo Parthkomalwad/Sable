@@ -15,6 +15,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from sable import data
+from sable.core.events.types import EventKind
 from sable.llm import prompts
 
 # Loaded from sable/data/spinner_verbs.txt (Phase 0.5 step 4): 187 lines of
@@ -98,6 +99,15 @@ class OrchestratorAgent:
         self._task_dir: Path | None = None  # lazy created only on first spawn
         self._history: list[dict] = []      # orchestrator's own turn history
         self._spawned: list[str] = []       # names of spawned sub-agents
+
+        # Sub-agent progress arrives on the bus, not by polling status.md.
+        # The cursor starts at the current head so this run only ever sees
+        # events published after it began; without that, a re-run under the
+        # same slug would fold a previous run's results into its context.
+        from sable.core.events.bus import EventBus
+
+        self._bus = EventBus(db_path=db_path)
+        self._bus_cursor = self._bus.latest_id()
 
     # ------------------------------------------------------------------
     # Public
@@ -262,28 +272,52 @@ class OrchestratorAgent:
         return messages
 
     def _collect_agent_statuses(self) -> list[str]:
-        """Read status.md and result.md for all spawned sub-agents."""
-        if self._task_dir is None:
+        """Drain sub-agent events off the bus into context lines.
+
+        Before Phase 1 this read status.md and result.md and deleted
+        result.md once consumed. That cost up to 3 seconds of lag and lost
+        the result outright if the orchestrator died between the read and the
+        unlink. The bus is authoritative now; the files remain only as a
+        human-readable mirror.
+
+        Advancing `_bus_cursor` past everything drained is what delivers a
+        result exactly once, replacing the read-then-unlink handshake with a
+        cursor this process owns.
+        """
+        if not self._spawned:
             return []
-        summaries = []
-        for name in list(self._spawned):
-            agentic = self._task_dir / name / ".agentic"
-            result_path = agentic / "result.md"
-            status_path = agentic / "status.md"
-            if result_path.exists():
-                try:
-                    content = result_path.read_text()
-                    summaries.append(f"[agent '{name}' COMPLETED]\n{content}")
-                    result_path.unlink()
-                    self._spawned.remove(name)
-                except Exception:
-                    pass
-            elif status_path.exists():
-                try:
-                    content = status_path.read_text()
-                    summaries.append(f"[agent '{name}' running]\n{content}")
-                except Exception:
-                    pass
+
+        summaries: list[str] = []
+        # Only the newest status per agent. A worker publishes one per step,
+        # so replaying every one would fill the context with stale lines.
+        latest_status: dict[str, str] = {}
+
+        for event in self._bus.since(self._bus_cursor):
+            self._bus_cursor = event.id or self._bus_cursor
+            name = event.agent
+            if name not in self._spawned:
+                continue
+
+            if event.kind == EventKind.COMPLETED:
+                latest_status.pop(name, None)
+                result = event.payload.get("result") or event.payload.get("explanation", "")
+                summaries.append(f"[agent '{name}' COMPLETED]\n{result}")
+                self._spawned.remove(name)
+            elif event.kind in (EventKind.FAILED, EventKind.LOST):
+                latest_status.pop(name, None)
+                reason = event.payload.get("reason", "no reason given")
+                summaries.append(f"[agent '{name}' {event.kind.upper()}]\n{reason}")
+                self._spawned.remove(name)
+            elif event.kind == EventKind.STATUS:
+                step = event.payload.get("step", "?")
+                command = event.payload.get("command", "")
+                explanation = event.payload.get("explanation", "")
+                latest_status[name] = (
+                    f"[agent '{name}' running, step {step}]\n"
+                    f"last action: `{command}` {explanation}"
+                )
+
+        summaries.extend(latest_status.values())
         return summaries
 
     def _build_handoff(self, agent_name: str, agent_goal: str) -> str:
