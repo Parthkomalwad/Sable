@@ -17,7 +17,7 @@ from pathlib import Path
 import httpx
 
 from sable import data
-from sable.agents import runtime
+from sable.agents import context, runtime
 from sable.core.events.types import EventKind
 from sable.llm import prompts
 
@@ -136,7 +136,13 @@ class OrchestratorAgent:
                 # runtime rather than a model or network problem, and should
                 # surface as a traceback instead of a one-line message.
                 spinner.stop()
-                _out(f"[orchestrator] LLM error: {exc}")
+                # I7: say what is reduced and what still works, rather than
+                # printing an exception and leaving the user to infer it.
+                from sable.core.health import llm_unreachable
+
+                degradation = llm_unreachable(str(exc))
+                _out(f"[orchestrator] {degradation.line()}")
+                _out(f"  {degradation.hint}")
                 break
             spinner.stop()
 
@@ -295,6 +301,18 @@ class OrchestratorAgent:
             "role": "assistant",
             "content": "Understood. I will accomplish this goal step by step.",
         })
+
+        # K11: if the cwd is inside a repo that ships CLAUDE.md / AGENTS.md /
+        # .sable.toml, those conventions go in as untrusted project
+        # instructions. Placed after the goal so the goal stays primary, and
+        # before history so the model has the conventions in hand for turn one.
+        project = context.build_context_message(self._cwd)
+        if project is not None:
+            messages.append(project)
+            messages.append({
+                "role": "assistant",
+                "content": "Noted the project's conventions. They inform how I work, not what I am allowed to do.",
+            })
         for status_msg in self._collect_agent_statuses():
             messages.append({"role": "user", "content": status_msg})
             messages.append({"role": "assistant", "content": "Noted."})

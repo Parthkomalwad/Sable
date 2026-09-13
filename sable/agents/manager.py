@@ -170,6 +170,53 @@ class TaskManager:
         )
         self._db._conn.commit()
 
+    def guide(self, name: str, text: str) -> bool:
+        """Send a line of guidance to a running agent's stdin (A7).
+
+        The worker reads stdin on a daemon thread and drains the queue at the
+        top of each turn, so guidance lands on its next turn rather than
+        interrupting the command it is running. That is the right granularity:
+        killing a half-finished command to deliver advice would lose the work.
+
+        Delivery is tmux `send-keys` into the agent's window, because the
+        worker is a separate process whose stdin is that pane. Returns False
+        when the agent has no live window to send to.
+        """
+        if not text.strip():
+            return False
+
+        row = self._db._conn.execute(
+            "SELECT tmux_window_id, status FROM tasks WHERE name=?", (name,)
+        ).fetchone()
+        if not row or not row[0]:
+            return False
+
+        window_id, status = row[0], row[1]
+        if status in ("completed", "lost"):
+            return False
+
+        session = self._session()
+        if session is None:
+            return False
+        window = self._find_window(session, window_id)
+        if window is None:
+            return False
+
+        try:
+            # Literal (-l) so a goal containing a semicolon or a quote is not
+            # interpreted by tmux, then Enter as a separate key.
+            window.active_pane.send_keys(text, enter=True, literal=True)
+        except (OSError, subprocess.SubprocessError, AttributeError, TypeError):
+            return False
+
+        from sable.core.events.bus import EventBus
+        from sable.core.events.types import EventKind
+
+        bus = EventBus()
+        bus.publish(name, EventKind.GUIDANCE, {"text": text})
+        bus.close()
+        return True
+
     def attach(self, name: str) -> None:
         session = self._session()
         if not session:
