@@ -97,6 +97,10 @@ class TaskSkillLoader:
             # though, because after B2 it lives in frontmatter and a body
             # has no reason to repeat it.
             "description": skill.description,
+            # B5: the command that decides whether using this skill worked.
+            # Carried here because the worker grades at its terminal state,
+            # by which point the file is no longer open.
+            "validate": skill.validate,
         }
 
     def _candidate_paths(self, directory: Path) -> list[tuple[str, Path]]:

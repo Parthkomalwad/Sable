@@ -190,6 +190,43 @@ class TestTheReturnedShape:
         assert before != after
 
 
+class TestTheValidatorIsCarriedThrough:
+    """B5 grades a skill by the command its frontmatter declares.
+
+    The worker grades at its terminal state, long after the file was read,
+    so the validator has to travel with the loaded skill. Without this key
+    the grader silently falls back to the run's own outcome and no skill is
+    ever validated, which would look exactly like validators not working.
+    """
+
+    def test_a_declared_validator_is_returned(self, global_dir, index_path, tasks_base):
+        folder = global_dir / "deploy-api"
+        folder.mkdir(parents=True)
+        (folder / "SKILL.md").write_text(
+            '+++\nname = "deploy-api"\ndescription = "Deploy the API"\n'
+            'validate = "docker compose ps api"\n'
+            'status = "enabled"\nsource = "user"\n+++\n\nSteps.\n',
+            encoding="utf-8",
+        )
+        _indexed(index_path, "deploy-api", ["deploy", "api"])
+
+        loader = TaskSkillLoader("t", str(tasks_base), index_path=str(index_path))
+
+        assert loader.load_relevant("deploy the api")[0]["validate"] == (
+            "docker compose ps api"
+        )
+
+    def test_a_skill_without_one_reports_an_empty_string(
+        self, global_dir, index_path, tasks_base
+    ):
+        _write_global(global_dir, "deploy-api", "Deploy the API")
+        _indexed(index_path, "deploy-api", ["deploy", "api"])
+
+        loader = TaskSkillLoader("t", str(tasks_base), index_path=str(index_path))
+
+        assert loader.load_relevant("deploy the api")[0]["validate"] == ""
+
+
 class TestLocalSkills:
     """Task-local skills have no index entry: the index only knows ~/skills."""
 
