@@ -26,6 +26,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
+
 from sable.agents import runtime
 from sable.core.events.types import EventKind
 
@@ -86,7 +88,9 @@ class TaskAgent:
                         "content": f"[orchestrator context]\n{handoff}",
                     }])
                     handoff_path.unlink()  # consume once
-            except Exception:
+            except (OSError, UnicodeDecodeError):
+                # Starting without the orchestrator's context is worse than
+                # starting with it, but far better than not starting.
                 pass
 
         # Extract orchestrator's original CWD from goal prefix "Working directory: <path>"
@@ -270,7 +274,7 @@ class TaskAgent:
                 try:
                     response = self._call_llm(messages)
                     break
-                except Exception as exc:
+                except (runtime.AgentError, httpx.HTTPError, ValueError, OSError) as exc:
                     logger.warning("LLM call failed (attempt %d/3): %s", _attempt + 1, exc)
                     if _attempt == 2:
                         logger.error("LLM call failed after 3 attempts giving up")
@@ -359,7 +363,9 @@ class TaskAgent:
                 f"**Last action**: `{command}` {explanation}\n\n"
                 f"## Current workspace files\n```\n{tree or '(empty)'}\n```\n"
             )
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
+            # Includes the `find` above timing out. status.md is a mirror;
+            # the bus already carries this step.
             pass
 
     def _write_result_summary(self) -> str:
@@ -440,7 +446,9 @@ if __name__ == "__main__":
         raw = _json.loads(config_path.read_text())
         from sable.core.config.schema import ShellConfig
         config = ShellConfig.from_dict(raw)
-    except Exception:
+    except (OSError, _json.JSONDecodeError, ValueError, KeyError):
+        # No config, unreadable config, or one this version rejects. A worker
+        # is spawned without a terminal to ask on, so it runs on defaults.
         from sable.core.config.schema import ShellConfig
         config = ShellConfig.defaults()
 

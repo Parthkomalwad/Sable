@@ -5,6 +5,7 @@
 | You want to see how a request flows through every component (v4 target) | [architecture-v4.md](architecture-v4.md) |
 | You want the current (v0.3) architecture with diagrams | [architecture.md](architecture.md) |
 | You need every component, table and data flow spelled out | [architecture-reference.md](architecture-reference.md) |
+| You need the exact JSON, SQL or file contract something parses | [contracts.md](contracts.md) |
 | You are planning or building v4 work | [vision.md](vision.md) → [roadmap-phases.md](roadmap-phases.md) → [structure.md](structure.md) |
 | You are opening a branch or cutting a release | [branching.md](branching.md) |
 | You want the original product requirements | [specs/prd-v1.md](specs/prd-v1.md) (v1 shell) · [specs/prd-v3.md](specs/prd-v3.md) (task engine + skills) |

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import libtmux
+from libtmux.exc import LibTmuxException
 
 
 class TaskManager:
@@ -32,7 +33,9 @@ class TaskManager:
             for s in self._server.sessions:
                 if s.session_name == name:
                     return s
-        except Exception:
+        except (LibTmuxException, OSError):
+            # No server, or it went away mid-iteration. The caller treats None
+            # as "not inside tmux" and reports that itself.
             pass
         return None
 
@@ -45,7 +48,7 @@ class TaskManager:
             for w in session.windows:
                 if w.window_id == window_id:
                     return w
-        except Exception:
+        except (LibTmuxException, OSError):
             pass
         return None
 
@@ -179,7 +182,9 @@ class TaskManager:
             return
         try:
             session.windows[0].select()
-        except (IndexError, Exception):
+        except (IndexError, LibTmuxException, OSError):
+            # `(IndexError, Exception)` before, which is just Exception: the
+            # first entry is a subclass of the second and never matched alone.
             pass
 
     def inspect(self, name: str) -> None:
