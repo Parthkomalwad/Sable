@@ -110,6 +110,11 @@ class OpenAIBackend(LLMBackend):
                 parsed = parse_llm_json(retry_text)
             except ValueError:
                 raise ValueError(f"LLM returned unparseable response: {full_text[:300]}")
+            # The retry is what actually parsed, so it is what `raw` should
+            # carry: the first answer is the one the model could not express
+            # as JSON, and handing that to a caller reading `raw` would give
+            # it the text we already rejected.
+            full_text = retry_text
 
         cost = calculate_cost(prompt_tokens, completion_tokens, self.model)
 
@@ -125,4 +130,5 @@ class OpenAIBackend(LLMBackend):
             done=bool(parsed.get("done", False)),
             spawn=parsed.get("spawn") or None,
             action=parsed.get("action", ""),
+            raw=full_text,
         )

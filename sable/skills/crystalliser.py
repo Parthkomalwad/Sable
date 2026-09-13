@@ -219,7 +219,17 @@ class SkillCrystalliser:
             # nothing. The run itself already succeeded.
             return None
 
-        raw = getattr(response, "explanation", "") or getattr(response, "command", "")
+        # `raw` first: this question's answer carries `reusable`, `name`,
+        # `triggers`, `validate` and `body`, none of which is in the base
+        # schema, so the typed fields come back empty and reading them lost
+        # the entire answer. A live run billed 166 completion tokens and
+        # drafted nothing, silently. The other two are kept as a fallback
+        # for any backend or fixture that predates the field.
+        raw = (
+            getattr(response, "raw", "")
+            or getattr(response, "explanation", "")
+            or getattr(response, "command", "")
+        )
         parsed = runtime.parse_json_action(raw, {})
         return parsed or None
 
