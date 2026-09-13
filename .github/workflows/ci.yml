@@ -30,7 +30,7 @@ jobs:
           fi
           echo "OK: no bare print() outside sable/agents/worker.py"
 
-      # Non-blocking on purpose: there are 72 of these in sable/ today and they
+      # Non-blocking on purpose: there are 71 of these in sable/ today and they
       # are cleaned up in Phase 1. Making it blocking now would just fail every
       # PR. The count is printed so the number is visible in the log and the
       # Phase 1 cleanup has a baseline to measure against.

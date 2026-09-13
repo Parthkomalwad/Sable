@@ -11,27 +11,11 @@ from __future__ import annotations
 import re
 import sqlite3
 from pathlib import Path
+from sable.llm import prompts
 
 
-_SKILL_SYSTEM_PROMPT = """You are a skill documentation writer.
-Given a list of shell commands a developer runs repeatedly, write a concise
-markdown skill file in this format:
-
-# <skill name>
-
-## When to use
-<1-2 sentences>
-
-## Steps
-<numbered steps>
-
-## Commands
-```bash
-<commands>
-```
-
-Be concise. The skill name should be a short slug like "git-deploy" or "docker-rebuild".
-"""
+# Editable markdown at sable/llm/prompts/skill_writer.md.
+_SKILL_SYSTEM_PROMPT = prompts.load("skill_writer")
 
 SKILLS_DIR = Path.home() / "skills" / "instructions"
 
