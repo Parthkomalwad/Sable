@@ -36,7 +36,7 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
     manager = TaskManager(config=config, db=db)
 
     if not parts:
-        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|checkpoint|revert>")
+        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|replay|checkpoint|revert>")
         return True
 
     sub = parts[0]
@@ -121,6 +121,9 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
         elif sub == "stats":
             s = manager.stats(name)
             _out(f"  tokens: {s['prompt_tokens']}p / {s['completion_tokens']}c  cost: ${s['cost_usd']:.4f}")
+        elif sub == "replay":
+            from sable.app.builtins.why import handle_replay
+            handle_replay(name)
         elif sub == "history":
             for row in manager.history(name):
                 _out(f"  {row['timestamp']}  {row['model']}  ${row['cost_usd']:.4f}")

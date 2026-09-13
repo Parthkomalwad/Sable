@@ -173,6 +173,28 @@ class TaskAgent:
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace)
         return runtime.call_llm(backend, messages, system_prompt)
 
+    def _record_turn(self, step: int, messages: list[dict], parsed: dict, response) -> None:
+        """Store what the model saw and answered, for `/task <name> replay` (I9).
+
+        Redaction happens inside the replay log. Never raises, by that module's
+        contract: a worker must not die because its own audit trail failed.
+        """
+        from sable.core.events.replay import record_turn
+
+        record_turn(
+            self._db_path,
+            agent=self._name,
+            role="worker",
+            turn=step,
+            system_prompt=_SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace),
+            messages=messages,
+            response=json.dumps(parsed),
+            model=getattr(response, "model", None) or self._config.model_for("worker"),
+            prompt_tokens=getattr(response, "prompt_tokens", 0),
+            completion_tokens=getattr(response, "completion_tokens", 0),
+            cost_usd=getattr(response, "cost_usd", 0.0),
+        )
+
     def _parse_response(self, response) -> dict:
         # LLMResponse now carries a done field populated by the backend from the parsed JSON.
         if hasattr(response, "command") and hasattr(response, "explanation"):
@@ -288,6 +310,7 @@ class TaskAgent:
                 break
 
             parsed = self._parse_response(response)
+            self._record_turn(_step, messages, parsed, response)
             command = parsed.get("command", "")
 
             if command:
