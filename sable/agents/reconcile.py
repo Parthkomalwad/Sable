@@ -6,8 +6,10 @@ Resolves the tmux session internally main.py does not hold a session object.
 from __future__ import annotations
 
 import sqlite3
+import subprocess
 
 import libtmux
+from libtmux.exc import LibTmuxException
 
 
 def reconcile(db_path: str) -> list[str]:
@@ -35,13 +37,14 @@ def reconcile(db_path: str) -> list[str]:
 
     session_name = None
     try:
-        import subprocess
         result = subprocess.run(
             ["tmux", "display-message", "-p", "#{session_name}"],
             capture_output=True, text=True,
         )
         session_name = result.stdout.strip() or None
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
+        # tmux not installed, or not running. Every task then looks lost,
+        # which is the correct answer when there is no server to hold them.
         pass
 
     session = None
@@ -51,7 +54,7 @@ def reconcile(db_path: str) -> list[str]:
                 if s.session_name == session_name:
                     session = s
                     break
-        except Exception:
+        except (LibTmuxException, OSError):
             pass
 
     def _window_alive(session, window_id: str) -> bool:
@@ -59,7 +62,7 @@ def reconcile(db_path: str) -> list[str]:
             for w in session.windows:
                 if w.window_id == window_id:
                     return True
-        except Exception:
+        except (LibTmuxException, OSError):
             pass
         return False
 

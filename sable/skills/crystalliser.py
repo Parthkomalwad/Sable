@@ -48,7 +48,9 @@ class SkillCrystalliser:
 
         import asyncio
         from sable.llm.registry import build_backend
-        backend = build_backend(self._config)
+        # Writing up a skill from a command cluster is summarising, not
+        # reasoning: it gets the cheap model when one is configured (A5).
+        backend = build_backend(self._config, role="summariser")
         messages = [{"role": "user", "content": prompt}]
         try:
             response = asyncio.run(backend.complete(messages, _SKILL_SYSTEM_PROMPT))

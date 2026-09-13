@@ -13,6 +13,10 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
+
+import httpx
+from libtmux.exc import LibTmuxException
+
 from sable import data
 from sable.agents import runtime
 from sable.core.events.types import EventKind
@@ -127,7 +131,11 @@ class OrchestratorAgent:
             spinner.start()
             try:
                 response = self._call_llm(messages)
-            except Exception as exc:
+            except (runtime.AgentError, httpx.HTTPError, ValueError, OSError) as exc:
+                # AgentError covers the timeout, httpx the transport, ValueError
+                # the parse chain's final give-up. Anything else is a bug in the
+                # runtime rather than a model or network problem, and should
+                # surface as a traceback instead of a one-line message.
                 spinner.stop()
                 _out(f"[orchestrator] LLM error: {exc}")
                 break
@@ -184,7 +192,9 @@ class OrchestratorAgent:
         try:
             from sable.core.audit import write_command
             write_command("orchestrator", self._cwd, confirmed_cmd)
-        except Exception:
+        except (ImportError, OSError):
+            # write_command already swallows permission and OS errors on the
+            # file itself; what is left is the import failing.
             pass
 
         # If the command timed out, auto-spawn a sub-agent with the remaining goal
@@ -233,7 +243,9 @@ class OrchestratorAgent:
                 task_base_dir=str(self._task_dir),
             )
             self._spawned.append(name)
-        except Exception as exc:
+        except (LibTmuxException, RuntimeError, OSError) as exc:
+            # RuntimeError is "not inside a tmux session"; LibTmuxException
+            # covers the window and pane failures underneath that.
             _out(f"[orchestrator] failed to spawn '{name}': {exc}")
 
         self._history.append({"role": "assistant", "content": json.dumps(action)})
@@ -248,7 +260,9 @@ class OrchestratorAgent:
                 result_path.write_text(
                     f"# Orchestrator result\n**Goal:** {self._goal}\n\n{explanation}\n"
                 )
-            except Exception:
+            except OSError:
+                # The mirror is a convenience; failing to write it must not
+                # turn a finished goal into a failed one.
                 pass
 
     # ------------------------------------------------------------------
