@@ -168,8 +168,8 @@ jobs:
             sable-playground \
             bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_repl_pty.py -q"
 
-      # The whole suite, including the two above again. Cheap, and it is what
-      # catches a collection error in a file no named step covers.
+      # The whole suite, including the named steps above again. Cheap, and
+      # it is what catches a collection error in a file no named step covers.
       #
       # The Phase 2 placeholders in test_full_loop, test_llm_backends and
       # test_session_resume are marked xfail(strict), so they report as
