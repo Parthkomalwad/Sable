@@ -9,9 +9,10 @@ import json
 import os
 import random
 import re
+import sqlite3
 import sys
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -96,12 +97,17 @@ class OrchestratorAgent:
         config,
         db_path: str,
         task_manager,
+        session_id: str = "",
     ) -> None:
         self._goal = goal
         self._cwd = cwd
         self._config = config
         self._db_path = db_path
         self._task_manager = task_manager
+        # Needed to attribute cost to this session in `token_events`. Defaults
+        # to empty so every existing caller and test keeps working; the REPL
+        # passes the real one.
+        self._session_id = session_id
         self._slug = _make_slug(goal)
         self._tasks_base = Path(config.tasks_base_dir).expanduser()
         self._task_dir: Path | None = None  # lazy created only on first spawn
@@ -397,6 +403,11 @@ class OrchestratorAgent:
         from sable.core.events.replay import record_turn
         from sable.policy.engine import redact_text
 
+        model = getattr(response, "model", None) or self._config.model_for("orchestrator")
+        prompt_tokens = getattr(response, "prompt_tokens", 0)
+        completion_tokens = getattr(response, "completion_tokens", 0)
+        cost_usd = getattr(response, "cost_usd", 0.0)
+
         record_turn(
             self._db_path,
             redact=redact_text,
@@ -406,11 +417,73 @@ class OrchestratorAgent:
             system_prompt=_SYSTEM_PROMPT,
             messages=messages,
             response=raw,
-            model=getattr(response, "model", None) or self._config.model_for("orchestrator"),
-            prompt_tokens=getattr(response, "prompt_tokens", 0),
-            completion_tokens=getattr(response, "completion_tokens", 0),
-            cost_usd=getattr(response, "cost_usd", 0.0),
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_usd=cost_usd,
         )
+        self._record_cost(model, prompt_tokens, completion_tokens, cost_usd)
+
+    def _record_cost(
+        self, model: str, prompt_tokens: int, completion_tokens: int, cost_usd: float
+    ) -> None:
+        """Write one `token_events` row for this turn.
+
+        Without this, a natural-language goal costs real money and reports
+        nothing: the sidebar and `/stats` read `token_events`, and so does
+        `app/budget.py`, which means the daily and session limits could never
+        trip on orchestrator spend. `agent_turns` already had the numbers; they
+        simply never reached the table everything else reads.
+
+        Sub-agents are unaffected: they write their own `task_events` rows.
+
+        Never raises. Telemetry is worth less than the work it describes, which
+        is the same rule the bus and the replay log follow.
+        """
+        from sable.core.events.types import TokenEvent
+
+        event = TokenEvent(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            session_id=self._session_id,
+            action_type="nl_route",
+            nl_input=self._goal,
+            command=None,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            cost_usd=cost_usd,
+            model=model,
+            exit_code=None,
+        )
+        from sable.core.db import _CREATE_TOKEN_EVENTS
+
+        try:
+            conn = sqlite3.connect(self._db_path, check_same_thread=False)
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+                # Create the table if this process got here before Database
+                # did, the same guard EventBus and ReplayLog carry. An
+                # orchestrator can run in a process that never constructed
+                # Database, and a missing table would otherwise be swallowed
+                # below as a silent zero, which is the bug this fixes.
+                conn.execute(_CREATE_TOKEN_EVENTS)
+                conn.execute(
+                    "INSERT INTO token_events (timestamp, session_id, action_type, "
+                    "nl_input, command, prompt_tokens, completion_tokens, "
+                    "total_tokens, cost_usd, model, exit_code) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        event.timestamp, event.session_id, event.action_type,
+                        event.nl_input, event.command, event.prompt_tokens,
+                        event.completion_tokens, event.total_tokens,
+                        event.cost_usd, event.model, event.exit_code,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            pass
 
     def _call_llm(self, messages: list[dict]):
         from sable.llm.registry import build_backend
