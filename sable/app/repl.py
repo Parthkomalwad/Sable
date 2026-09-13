@@ -127,6 +127,35 @@ def _after_alias_use(db, alias_hit: dict) -> None:
         mark_promotion_offered(db, phrase)
 
 
+def pending_skills_banner() -> str:
+    """One line naming how many drafted skills are waiting for approval.
+
+    Reported at login rather than at `/exit`, where the drafting happens:
+    a message shown to a closing shell is one the user cannot act on. A
+    draft nobody is told about is the same as no draft at all.
+
+    Returns an empty string when there is nothing to say, so a fresh
+    install is not greeted by a count of zero, or by an error from an
+    index that does not exist yet.
+    """
+    try:
+        from sable.skills.index import SkillIndex
+
+        pending = SkillIndex().pending()
+    except (OSError, ValueError, ImportError):
+        # ValueError covers a corrupt index (JSONDecodeError subclasses it).
+        # A broken index is not a reason to refuse to start a shell.
+        return ""
+
+    count = len(pending)
+    if count == 0:
+        return ""
+
+    noun = "draft skill" if count == 1 else "draft skills"
+    return (f"[skill] {count} {noun} pending approval "
+            f"(/skill list to review)")
+
+
 def _save_turns_if_needed(
     turns: list[dict], session_id: str, config: ShellConfig, force: bool = False
 ) -> None:
@@ -180,6 +209,14 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
     global _active_turns
     turns: list[dict] = []
     _active_turns = turns  # the dispatcher is handed this each turn
+
+    # Skills drafted at the last `/exit` are inert until someone approves
+    # them, so this is where the user finds out they exist: a shell they
+    # can act in, rather than one that is closing. Silent when there are
+    # none (Task 7).
+    _pending_line = pending_skills_banner()
+    if _pending_line:
+        _out(_pending_line)
 
     try:
         while True:
