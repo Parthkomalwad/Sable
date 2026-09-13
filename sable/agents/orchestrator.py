@@ -5,7 +5,6 @@ Each turn the LLM returns one action: run | spawn | done.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import random
@@ -14,9 +13,18 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
+
+import httpx
+
 from sable import data
+from sable.agents import runtime
 from sable.core.events.types import EventKind
 from sable.llm import prompts
+
+#: The actions this role may emit. `wait` and `ask` are specified in
+#: docs/contracts.md and not yet implemented; `mcp` is reserved for Phase 6.
+#: Anything outside this set stops the loop rather than being guessed at.
+ORCHESTRATOR_ACTIONS = frozenset({"run", "spawn", "done"})
 
 # Loaded from sable/data/spinner_verbs.txt (Phase 0.5 step 4): 187 lines of
 # list literal in the middle of this module made it harder to read for no
@@ -122,13 +130,18 @@ class OrchestratorAgent:
             spinner.start()
             try:
                 response = self._call_llm(messages)
-            except Exception as exc:
+            except (runtime.AgentError, httpx.HTTPError, ValueError, OSError) as exc:
+                # AgentError covers the timeout, httpx the transport, ValueError
+                # the parse chain's final give-up. Anything else is a bug in the
+                # runtime rather than a model or network problem, and should
+                # surface as a traceback instead of a one-line message.
                 spinner.stop()
                 _out(f"[orchestrator] LLM error: {exc}")
                 break
             spinner.stop()
 
             raw = self._extract_raw(response)
+            self._record_turn(_turn, messages, raw, response)
             action = self._parse_action(raw)
 
             action_type = action.get("action", "")
@@ -179,7 +192,9 @@ class OrchestratorAgent:
         try:
             from sable.core.audit import write_command
             write_command("orchestrator", self._cwd, confirmed_cmd)
-        except Exception:
+        except (ImportError, OSError):
+            # write_command already swallows permission and OS errors on the
+            # file itself; what is left is the import failing.
             pass
 
         # If the command timed out, auto-spawn a sub-agent with the remaining goal
@@ -228,7 +243,20 @@ class OrchestratorAgent:
                 task_base_dir=str(self._task_dir),
             )
             self._spawned.append(name)
-        except Exception as exc:
+        except (RuntimeError, OSError) as exc:
+            # RuntimeError is TaskManager's "Not inside a tmux session"; OSError
+            # covers the process and filesystem failures under it.
+            #
+            # Deliberately not LibTmuxException: the orchestrator never touches
+            # tmux, it calls an injected collaborator, and naming that
+            # collaborator's private exception type means importing libtmux
+            # here. Tests inject a fake manager and replace `libtmux` in
+            # sys.modules with a MagicMock, where resolving the `.exc`
+            # submodule raises ModuleNotFoundError, at module scope and at call
+            # time alike. A tmux-specific failure that derives straight from
+            # Exception therefore escapes to the turn loop, which is the right
+            # place for it: it means the manager is broken, not that this spawn
+            # was refused.
             _out(f"[orchestrator] failed to spawn '{name}': {exc}")
 
         self._history.append({"role": "assistant", "content": json.dumps(action)})
@@ -243,7 +271,9 @@ class OrchestratorAgent:
                 result_path.write_text(
                     f"# Orchestrator result\n**Goal:** {self._goal}\n\n{explanation}\n"
                 )
-            except Exception:
+            except OSError:
+                # The mirror is a convenience; failing to write it must not
+                # turn a finished goal into a failed one.
                 pass
 
     # ------------------------------------------------------------------
@@ -340,21 +370,32 @@ class OrchestratorAgent:
     # LLM call
     # ------------------------------------------------------------------
 
+    def _record_turn(self, turn: int, messages: list[dict], raw: str, response) -> None:
+        """Store what the model saw and answered, for `/why` (I9).
+
+        Redaction happens inside the replay log, so a secret in a command never
+        reaches the table. Never raises, by that module's contract.
+        """
+        from sable.core.events.replay import record_turn
+
+        record_turn(
+            self._db_path,
+            agent="orchestrator",
+            role="orchestrator",
+            turn=turn,
+            system_prompt=_SYSTEM_PROMPT,
+            messages=messages,
+            response=raw,
+            model=getattr(response, "model", None) or self._config.model_for("orchestrator"),
+            prompt_tokens=getattr(response, "prompt_tokens", 0),
+            completion_tokens=getattr(response, "completion_tokens", 0),
+            cost_usd=getattr(response, "cost_usd", 0.0),
+        )
+
     def _call_llm(self, messages: list[dict]):
         from sable.llm.registry import build_backend
-        backend = build_backend(self._config)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(
-                asyncio.wait_for(backend.complete(messages, _SYSTEM_PROMPT), timeout=120.0)
-            )
-            pending = asyncio.all_tasks(loop)
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            return result
-        finally:
-            loop.close()
+        backend = build_backend(self._config, role="orchestrator")
+        return runtime.call_llm(backend, messages, _SYSTEM_PROMPT)
 
     def _extract_raw(self, response) -> str:
         """Reconstruct orchestrator action JSON from LLMResponse."""
@@ -397,16 +438,23 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
 
     def _parse_action(self, raw: str) -> dict:
-        """Parse raw LLM output into an action dict. Returns done on failure."""
-        cleaned = raw.replace("```json", "").replace("```", "").strip()
-        try:
-            parsed = json.loads(cleaned)
-            action = parsed.get("action", "")
-            if action not in ("run", "spawn", "done"):
-                return {"action": "done", "explanation": f"unrecognised action: {action}"}
+        """Parse raw LLM output into an action dict. Returns done on failure.
+
+        `wait` and `ask` are specified in docs/contracts.md but not implemented,
+        so they land here as unrecognised and stop the loop with a reason rather
+        than being silently treated as something else.
+        """
+        cleaned = runtime.strip_fences(raw)
+        parsed = runtime.parse_json_action(
+            raw,
+            {"action": "done", "explanation": f"could not parse response: {cleaned[:100]}"},
+        )
+        if "action" not in parsed:
             return parsed
-        except json.JSONDecodeError:
-            return {"action": "done", "explanation": f"could not parse response: {cleaned[:100]}"}
+        action = parsed.get("action", "")
+        if action not in ORCHESTRATOR_ACTIONS:
+            return {"action": "done", "explanation": f"unrecognised action: {action}"}
+        return parsed
 
     # ------------------------------------------------------------------
     # Command execution
@@ -442,60 +490,22 @@ class OrchestratorAgent:
             return edited or command
         return command
 
-    def _run_command(self, command: str, timeout: int = 120) -> str:
-        """Run a command via ptyprocess in cwd. Returns output string."""
-        if not command.strip():
-            return "(empty command)"
-        import select
-        import signal
-        import tempfile
-        import time
-        from ptyprocess import PtyProcessUnicode
+    def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
+        """Run a command via ptyprocess in cwd. Returns output string.
+
+        The pty loop itself is `runtime.run_command`; what stays here is the
+        orchestrator's own policy check. Unlike the worker, it runs unwrapped:
+        the orchestrator works in the user's real cwd, not a sandbox.
+        """
         from sable.policy.engine import is_destructive
 
         if is_destructive(command):
             _out(f"[orchestrator] blocked destructive command: {command}")
             return "[blocked: destructive command]"
 
-        try:
-            fd, script_path = tempfile.mkstemp(suffix=".sh", prefix="orch_")
-            try:
-                with os.fdopen(fd, "w") as f:
-                    f.write(command)
-                proc = PtyProcessUnicode.spawn(["/bin/bash", script_path], cwd=self._cwd)
-                output_parts = []
-                deadline = time.monotonic() + timeout
-                while True:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        try:
-                            proc.kill(signal.SIGKILL)
-                        except Exception:
-                            pass
-                        output_parts.append(f"\n[timeout after {timeout}s]")
-                        break
-                    try:
-                        rlist, _, _ = select.select([proc.fd], [], [], min(remaining, 5.0))
-                        if rlist:
-                            output_parts.append(proc.read(1024))
-                        elif not proc.isalive():
-                            break
-                    except EOFError:
-                        break
-                    except Exception:
-                        break
-                try:
-                    proc.wait()
-                except Exception:
-                    pass
-                return "".join(output_parts)
-            finally:
-                try:
-                    os.unlink(script_path)
-                except OSError:
-                    pass
-        except Exception as exc:
-            return f"[error: {exc}]"
+        return runtime.run_command(
+            command, cwd=self._cwd, timeout=timeout, prefix="orch_"
+        )
 
 
 def _out(text: str) -> None:

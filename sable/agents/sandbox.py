@@ -151,7 +151,9 @@ class Sandbox:
             )
             if result.returncode == 0:
                 return True
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
+            # bwrap missing, not executable, or hanging. Either way the
+            # bash-wrapper fallback below is what we get.
             pass
         if not _bwrap_warned:
             logger.warning(

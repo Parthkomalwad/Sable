@@ -4,9 +4,9 @@ Entry point: python3 -m sable.agents.worker --task <name> --goal "<text>"
 
 Per-turn sequence:
 1. Build context (pinned goal + compressed history + matched skills)
-2. backend.complete()
+2. backend.complete(), via agents/runtime.call_llm
 3. safety.py blocklist check
-4. sandbox.wrap_command() + PtyProcessUnicode
+4. agents/runtime.run_command, wrapped by sandbox.wrap_command
 5. Update tasks row
 6. Write task_events row
 7. Compress if token threshold exceeded
@@ -26,8 +26,9 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ptyprocess import PtyProcessUnicode
+import httpx
 
+from sable.agents import runtime
 from sable.core.events.types import EventKind
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,9 @@ class TaskAgent:
                         "content": f"[orchestrator context]\n{handoff}",
                     }])
                     handoff_path.unlink()  # consume once
-            except Exception:
+            except (OSError, UnicodeDecodeError):
+                # Starting without the orchestrator's context is worse than
+                # starting with it, but far better than not starting.
                 pass
 
         # Extract orchestrator's original CWD from goal prefix "Working directory: <path>"
@@ -164,24 +167,33 @@ class TaskAgent:
 
     def _call_llm(self, messages: list[dict]):
         from sable.llm.registry import build_backend
-        import asyncio
-        backend = build_backend(self._config, mock_mode="worker")
+
+        backend = build_backend(self._config, role="worker", mock_mode="worker")
         print("[agent] calling LLM...", flush=True)
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace)
-            result = loop.run_until_complete(
-                asyncio.wait_for(backend.complete(messages, system_prompt), timeout=120.0)
-            )
-            # Drain pending tasks before closing to avoid "Task destroyed" warnings
-            pending = asyncio.all_tasks(loop)
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            loop.close()
-            return result
-        except asyncio.TimeoutError:
-            raise RuntimeError("LLM call timed out after 120s")
+        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace)
+        return runtime.call_llm(backend, messages, system_prompt)
+
+    def _record_turn(self, step: int, messages: list[dict], parsed: dict, response) -> None:
+        """Store what the model saw and answered, for `/task <name> replay` (I9).
+
+        Redaction happens inside the replay log. Never raises, by that module's
+        contract: a worker must not die because its own audit trail failed.
+        """
+        from sable.core.events.replay import record_turn
+
+        record_turn(
+            self._db_path,
+            agent=self._name,
+            role="worker",
+            turn=step,
+            system_prompt=_SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace),
+            messages=messages,
+            response=json.dumps(parsed),
+            model=getattr(response, "model", None) or self._config.model_for("worker"),
+            prompt_tokens=getattr(response, "prompt_tokens", 0),
+            completion_tokens=getattr(response, "completion_tokens", 0),
+            cost_usd=getattr(response, "cost_usd", 0.0),
+        )
 
     def _parse_response(self, response) -> dict:
         # LLMResponse now carries a done field populated by the backend from the parsed JSON.
@@ -207,57 +219,23 @@ class TaskAgent:
         except json.JSONDecodeError:
             return {"command": "", "explanation": raw, "done": False}
 
-    def _run_command(self, command: str, timeout: int = 120) -> str:
-        import tempfile
-        import select
-        import signal
-        wrapped = self._sandbox.wrap_command(command)
-        # Write to a temp script file so multi-line guard scripts work correctly
-        try:
-            fd, script_path = tempfile.mkstemp(suffix=".sh", prefix="agent_")
-            try:
-                with os.fdopen(fd, "w") as f:
-                    f.write(wrapped)
-                proc = PtyProcessUnicode.spawn(
-                    ["/bin/bash", script_path],
-                    cwd=self._workspace,
-                )
-                output_parts = []
-                import time
-                deadline = time.monotonic() + timeout
-                while True:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        print(f"[agent] command timed out after {timeout}s killing", flush=True)
-                        try:
-                            proc.kill(signal.SIGKILL)
-                        except Exception:
-                            pass
-                        output_parts.append(f"\n[timeout: command exceeded {timeout}s limit]")
-                        break
-                    try:
-                        rlist, _, _ = select.select([proc.fd], [], [], min(remaining, 5.0))
-                        if rlist:
-                            chunk = proc.read(1024)
-                            output_parts.append(chunk)
-                        elif not proc.isalive():
-                            break
-                    except EOFError:
-                        break
-                    except Exception:
-                        break
-                try:
-                    proc.wait()
-                except Exception:
-                    pass
-                return "".join(output_parts)
-            finally:
-                try:
-                    os.unlink(script_path)
-                except OSError:
-                    pass
-        except Exception as exc:
-            return f"[error: {exc}]"
+    def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
+        """Run one command inside the sandbox and return its output.
+
+        The pty loop is `runtime.run_command`; what is specific to the worker
+        is the `Sandbox` wrapper and the line it prints when time runs out.
+        """
+        def announce_timeout(limit: int) -> None:
+            print(f"[agent] command timed out after {limit}s killing", flush=True)
+
+        return runtime.run_command(
+            command,
+            cwd=self._workspace,
+            timeout=timeout,
+            wrap=self._sandbox.wrap_command,
+            on_timeout=announce_timeout,
+            prefix="agent_",
+        )
 
     def run(self) -> None:
         t = threading.Thread(target=self._stdin_reader, daemon=True)
@@ -318,7 +296,7 @@ class TaskAgent:
                 try:
                     response = self._call_llm(messages)
                     break
-                except Exception as exc:
+                except (runtime.AgentError, httpx.HTTPError, ValueError, OSError) as exc:
                     logger.warning("LLM call failed (attempt %d/3): %s", _attempt + 1, exc)
                     if _attempt == 2:
                         logger.error("LLM call failed after 3 attempts giving up")
@@ -332,6 +310,7 @@ class TaskAgent:
                 break
 
             parsed = self._parse_response(response)
+            self._record_turn(_step, messages, parsed, response)
             command = parsed.get("command", "")
 
             if command:
@@ -347,9 +326,10 @@ class TaskAgent:
             output = ""
             if command:
                 print(f"[agent] running: {command}", flush=True)
-                # Give docker/npm/pip commands extra time image pulls can take minutes
-                cmd_timeout = 600 if any(kw in command for kw in ("docker", "npm", "pip", "yarn", "git clone")) else 120
-                output = self._run_command(command, timeout=cmd_timeout)
+                # Image and package pulls get the longer ceiling; see runtime.
+                output = self._run_command(
+                    command, timeout=runtime.escalated_timeout(command)
+                )
                 print(f"[agent] output: {output[:200]}", flush=True)
 
             self._update_task_status("running", output)
@@ -406,7 +386,9 @@ class TaskAgent:
                 f"**Last action**: `{command}` {explanation}\n\n"
                 f"## Current workspace files\n```\n{tree or '(empty)'}\n```\n"
             )
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
+            # Includes the `find` above timing out. status.md is a mirror;
+            # the bus already carries this step.
             pass
 
     def _write_result_summary(self) -> str:
@@ -487,7 +469,9 @@ if __name__ == "__main__":
         raw = _json.loads(config_path.read_text())
         from sable.core.config.schema import ShellConfig
         config = ShellConfig.from_dict(raw)
-    except Exception:
+    except (OSError, _json.JSONDecodeError, ValueError, KeyError):
+        # No config, unreadable config, or one this version rejects. A worker
+        # is spawned without a terminal to ask on, so it runs on defaults.
         from sable.core.config.schema import ShellConfig
         config = ShellConfig.defaults()
 
