@@ -30,19 +30,21 @@ jobs:
           fi
           echo "OK: no bare print() outside sable/agents/worker.py"
 
-      # Non-blocking on purpose: there are 71 of these in sable/ today and they
-      # are cleaned up in Phase 1. Making it blocking now would just fail every
-      # PR. The count is printed so the number is visible in the log and the
-      # Phase 1 cleanup has a baseline to measure against.
-      - name: Report bare `except Exception` in sable/ (non-blocking until Phase 1)
+      # Blocking since the Phase 1 sweep took sable/ from 72 of these to zero.
+      # Both spellings are caught: `except Exception` and a bare `except:`,
+      # which is worse because it swallows KeyboardInterrupt and SystemExit.
+      # structure.md 4.7 bans the pattern outright, so a new one is a fresh
+      # violation and belongs in the PR that introduced it.
+      - name: No bare exception handlers in sable/
         run: |
           set -uo pipefail
-          count=$(grep -rcn "except Exception" sable/ --include='*.py' \
-                  | awk -F: '{s+=$2} END {print s+0}')
-          echo "bare 'except Exception' in sable/: $count"
-          if [ "$count" -gt 0 ]; then
-            echo "::warning::$count bare 'except Exception' remain in sable/, scheduled for cleanup in Phase 1"
+          matches=$(grep -rnE "except Exception|except\s*:" sable/ --include='*.py' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "::error::structure.md 4.7: name the exceptions this code can actually raise."
+            exit 1
           fi
+          echo "OK: zero bare exception handlers in sable/"
 
       # Blocking. This is the rule CLAUDE.md calls non-negotiable, and it was
       # broken in main while CI stayed green.
@@ -125,6 +127,22 @@ jobs:
 
       - name: Build playground image
         run: docker build -t sable-playground -f docker/Dockerfile.playground .
+
+      # The production image had rotted unnoticed: ubuntu:22.04 (Python 3.10,
+      # below the >=3.11 this project requires) and a login-shell wrapper
+      # invoking `shell.main`, the compat shim scheduled for deletion. Nothing
+      # built it, so nothing noticed. Building it here is cheap and catches the
+      # next drift; the run asserts it can actually start.
+      - name: Build production image and check it boots
+        run: |
+          docker build -t sable-prod -f docker/Dockerfile .
+          # Through the login-shell wrapper, which is how a real user reaches
+          # it: that is what pins the interpreter and PYTHONPATH.
+          docker run --rm sable-prod /usr/local/bin/sable --version
+          docker run --rm sable-prod python -c "import sys; assert sys.version_info >= (3, 11), sys.version"
+          # The compat shim must not be in the image: it is deleted one
+          # release out, and an image that needs it stops booting that day.
+          docker run --rm sable-prod bash -c "test ! -d /app/shell"
 
       # Split from the rest so a failure names the thing that broke rather
       # than "integration failed". These three are the Phase 0 gate items
