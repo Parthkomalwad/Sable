@@ -28,9 +28,12 @@ def store_api_key(service: str, key: str) -> None:
             secret=key.encode(),
             replace=True,
         )
-    except Exception:
-        # Keyring unavailable caller should fall back to config.json
-        raise RuntimeError(f"Keyring unavailable: cannot store key for {service!r}")
+    except (ImportError, OSError, RuntimeError, AttributeError) as exc:
+        # No secretstorage, no D-Bus session, or a locked collection that will
+        # not unlock. The caller falls back to config.json.
+        raise RuntimeError(
+            f"Keyring unavailable: cannot store key for {service!r}"
+        ) from exc
 
 
 def get_api_key(service: str) -> str | None:
@@ -55,5 +58,5 @@ def get_api_key(service: str) -> str | None:
         if not items:
             return None
         return items[0].get_secret().decode()
-    except Exception:
+    except (ImportError, OSError, RuntimeError, AttributeError, UnicodeDecodeError):
         return None

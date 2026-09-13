@@ -57,10 +57,20 @@ When the goal is fully achieved, set "done": true and leave "command" empty.
 
 class TaskAgent:
     def __init__(self, task_name: str, goal: str, config, db_path: str,
-                 shared_read_dir: str | None = None) -> None:
-        from sable.memory.task import TaskMemory
+                 shared_read_dir: str | None = None,
+                 memory=None, skill_loader=None) -> None:
+        """A worker's collaborators are injected, not constructed here.
+
+        `memory` and `skill_loader` are the TaskMemory and TaskSkillLoader this
+        agent uses. They default to None and are built by the caller (see
+        `__main__` below), which is what inverts the `agents -> memory/skills`
+        dependency the layering rule forbids: `agents` is a lower layer than
+        both, so it may not reach up to them. The composition root does.
+
+        They are optional rather than required so that every existing caller,
+        and every test, keeps working unchanged.
+        """
         from sable.agents.sandbox import Sandbox
-        from sable.skills.loader import TaskSkillLoader
 
         self._name = task_name
         self._goal = goal
@@ -74,7 +84,17 @@ class TaskAgent:
         os.makedirs(workspace, exist_ok=True)
         self._workspace = workspace
 
-        self._memory = TaskMemory(task_name, tasks_base, db=self._open_db())
+        if memory is None:
+            # Fallback for callers that did not inject one. Kept as a deferred
+            # import so `agents` does not import `memory` at module scope; the
+            # layering rule counts function-level imports too, so this is a
+            # documented exception rather than a clean inversion. It exists
+            # only so an old call site keeps working: the composition root
+            # below injects both collaborators.
+            from sable.memory.task import TaskMemory
+
+            memory = TaskMemory(task_name, tasks_base, db=self._open_db())
+        self._memory = memory
         self._memory.set_goal(goal)
 
         # Load orchestrator context handoff if present
@@ -103,7 +123,11 @@ class TaskAgent:
 
         self._sandbox = Sandbox(task_dir=workspace, shared_read_dir=shared_read_dir,
                                 extra_write_dirs=extra_write_dirs or None)
-        self._skill_loader = TaskSkillLoader(task_name, tasks_base)
+        if skill_loader is None:
+            from sable.skills.loader import TaskSkillLoader
+
+            skill_loader = TaskSkillLoader(task_name, tasks_base)
+        self._skill_loader = skill_loader
         self._guidance_q: queue.Queue = queue.Queue()
         self._running = True
 
@@ -180,9 +204,11 @@ class TaskAgent:
         contract: a worker must not die because its own audit trail failed.
         """
         from sable.core.events.replay import record_turn
+        from sable.policy.engine import redact_text
 
         record_turn(
             self._db_path,
+            redact=redact_text,
             agent=self._name,
             role="worker",
             turn=step,
@@ -475,11 +501,33 @@ if __name__ == "__main__":
         from sable.core.config.schema import ShellConfig
         config = ShellConfig.defaults()
 
+    # The composition root for a spawned worker. Constructing the
+    # collaborators here rather than inside TaskAgent is what inverts the
+    # `agents -> memory/skills` dependency: this block runs as a script, not
+    # as part of the `agents` library.
+    from pathlib import Path as _PathLib
+
+    from sable.memory.task import TaskMemory
+    from sable.skills.loader import TaskSkillLoader
+
+    _tasks_base = str(_PathLib(config.tasks_base_dir).expanduser())
+
+    class _WorkerDB:
+        """Minimal WAL connection holder, the shape TaskMemory expects."""
+
+        def __init__(self, path: str) -> None:
+            import sqlite3 as _sqlite3
+
+            self._conn = _sqlite3.connect(path, check_same_thread=False)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+
     agent = TaskAgent(
         task_name=args.task,
         goal=goal,
         config=config,
         db_path=str(DB_PATH),
         shared_read_dir=args.shared_read_dir,
+        memory=TaskMemory(args.task, _tasks_base, db=_WorkerDB(str(DB_PATH))),
+        skill_loader=TaskSkillLoader(args.task, _tasks_base),
     )
     agent.run()

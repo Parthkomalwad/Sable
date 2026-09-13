@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import platform
+import sqlite3
 from pathlib import Path
 
 os.environ["PROMPT_TOOLKIT_NO_CPR"] = "1"
@@ -60,7 +61,7 @@ def set_offline_mode(offline: bool) -> None:
 def _get_os_info() -> str:
     try:
         return f"{platform.system()} {platform.release()}"
-    except Exception:
+    except (OSError, AttributeError):
         return "Linux"
 
 
@@ -103,7 +104,9 @@ def _save_turns_if_needed(
         enc = tiktoken.get_encoding("cl100k_base")
         token_count = len(enc.encode(compressed))
         save_session_context(session_id, compressed, turns, token_count)
-    except Exception:
+    except (ImportError, OSError, ValueError, TypeError):
+        # Compression or tiktoken failing loses continuity next login, not
+        # this session's work.
         pass
 
 
@@ -118,7 +121,9 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
     try:
         from sable.core.db import Database
         db = Database()
-    except Exception:
+    except (sqlite3.Error, OSError):
+        # The shell runs without telemetry rather than refusing to start. The
+        # I7 banner reports the same condition at startup.
         pass
 
     history_file = Path.home() / ".local" / "share" / "agentic-shell" / "history"

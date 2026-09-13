@@ -209,7 +209,7 @@ system when the UI is gone.
 
 ## 3. Prompt replay
 
-`agent_turns`, written once per model turn. Backs `/task <name> replay` and
+`agent_turns`, written once per model turn. Backs `/task replay <name>` and
 `/why`.
 
 ```sql

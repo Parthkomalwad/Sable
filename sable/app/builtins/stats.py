@@ -19,7 +19,7 @@ def _show_stats(db) -> None:
         for r in rows:
             _out(f"{r['day']:<12} {r['calls']:>6} {r['tokens'] or 0:>8} ${r['cost']:.4f}" if r["cost"] else f"{r['day']:<12} {r['calls']:>6} {r['tokens'] or 0:>8} $0.0000")
         _out("")
-    except Exception as exc:
+    except (sqlite3.Error, AttributeError, KeyError, TypeError) as exc:
         _out(f"Stats error: {exc}")
 
 
@@ -32,5 +32,5 @@ def _show_stats_csv(db) -> None:
         _out("day,calls,tokens,cost")
         for r in rows:
             _out(f"{r['day']},{r['calls']},{r['tokens'] or 0},{r['cost'] or 0:.6f}")
-    except Exception as exc:
+    except (sqlite3.Error, AttributeError, KeyError, TypeError) as exc:
         _out(f"Stats error: {exc}")

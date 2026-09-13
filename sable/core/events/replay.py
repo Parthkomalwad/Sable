@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,17 +73,17 @@ class AgentTurn:
         )
 
 
-def _redact(text: Any) -> str:
-    """Strip secrets from one piece of text, tolerating non-strings.
+#: Signature of a redactor: text in, safe text out.
+Redactor = Callable[[str], str]
 
-    `strip_secrets` returns (text, count); only the text matters here. It also
-    normalises whitespace as a side effect of its entropy pass, which is
-    acceptable: this is a record for a human to read, not a byte-exact replay.
-    """
-    from sable.policy.engine import strip_secrets
 
-    redacted, _ = strip_secrets(text if isinstance(text, str) else str(text))
-    return redacted
+def _no_redaction(text: str) -> str:
+    """The explicit opt-out. Never the default."""
+    return text
+
+
+def _coerce(text: Any) -> str:
+    return text if isinstance(text, str) else str(text)
 
 
 class ReplayLog:
@@ -93,7 +94,18 @@ class ReplayLog:
     the connection the shell uses for telemetry.
     """
 
-    def __init__(self, db_path: str | Path | None = None) -> None:
+    def __init__(
+        self, db_path: str | Path | None = None, redact: Redactor | None = None
+    ) -> None:
+        """`redact` is applied to every stored string.
+
+        Passed in rather than imported, because `core` sits below `policy` in
+        the layering rule and may not reach up to it. The agents that record
+        turns live in `agents`, which may import `policy`, so they supply
+        `strip_secrets`. Omitting it stores text verbatim, which is why every
+        caller in Sable passes one.
+        """
+        self._redact: Redactor = redact or _no_redaction
         if db_path is None:
             from sable.core.db import DB_PATH
 
@@ -140,7 +152,7 @@ class ReplayLog:
             redacted_messages = [
                 {
                     "role": str(message.get("role", "?")),
-                    "content": _redact(message.get("content", "")),
+                    "content": self._redact(_coerce(message.get("content", ""))),
                 }
                 for message in messages
             ]
@@ -155,9 +167,9 @@ class ReplayLog:
                     role,
                     turn,
                     model,
-                    _redact(system_prompt),
+                    self._redact(_coerce(system_prompt)),
                     json.dumps(redacted_messages, default=str),
-                    _redact(response),
+                    self._redact(_coerce(response)),
                     prompt_tokens,
                     completion_tokens,
                     cost_usd,
@@ -214,14 +226,17 @@ class ReplayLog:
         self.close()
 
 
-def record_turn(db_path: str | Path | None, **kwargs) -> int | None:
+def record_turn(
+    db_path: str | Path | None, redact: Redactor | None = None, **kwargs
+) -> int | None:
     """Record one turn and close the connection. Never raises.
 
     The convenience form for an agent that records a handful of turns and has
-    no reason to hold a connection open between them.
+    no reason to hold a connection open between them. `redact` is forwarded to
+    `ReplayLog`; callers in `agents` pass `policy.engine.strip_secrets`.
     """
     try:
-        with ReplayLog(db_path=db_path) as log:
+        with ReplayLog(db_path=db_path, redact=redact) as log:
             return log.record(**kwargs)
     except (sqlite3.Error, OSError):
         return None

@@ -1,6 +1,6 @@
 """Telemetry sidebar process."""
 from __future__ import annotations
-import sys, time, os, subprocess
+import json, sqlite3, sys, time, os, subprocess
 from typing import List
 from datetime import datetime
 from rich.console import Console
@@ -37,7 +37,8 @@ def _cpu_usage():
         d_total = total - prev_total
         d_idle = idle - prev_idle
         return f"{100*(d_total-d_idle)/d_total:.0f}%" if d_total else "0%"
-    except: return "n/a"
+    except (OSError, ValueError, IndexError, ZeroDivisionError):
+        return "n/a"
 
 def _mem_usage():
     try:
@@ -51,13 +52,15 @@ def _mem_usage():
         pct = 100 * used // total
         color = "color(203)" if pct > 85 else "color(221)" if pct > 65 else "color(114)"
         return f"{used//1024}MB/{total//1024}MB ({pct}%)", color
-    except: return "n/a", "color(114)"
+    except (OSError, ValueError, IndexError, ZeroDivisionError):
+        return "n/a", "color(114)"
 
 def _cpu_color(val: str) -> str:
     try:
         n = int(val.rstrip("%"))
         return "color(203)" if n > 85 else "color(221)" if n > 65 else "color(114)"
-    except: return "color(114)"
+    except (ValueError, AttributeError):
+        return "color(114)"
 
 def _last_command(db):
     try:
@@ -68,7 +71,8 @@ def _last_command(db):
             cmd = row[0]
             return cmd[:30] + "…" if len(cmd) > 30 else cmd
         return " "
-    except: return "n/a"
+    except (OSError, ValueError, IndexError, ZeroDivisionError):
+        return "n/a"
 
 def _current_dir():
     try:
@@ -81,7 +85,8 @@ def _current_dir():
             home = os.path.expanduser("~")
             if path.startswith(home): path = "~" + path[len(home):]
             return path[-28:] if len(path) > 28 else path
-    except: pass
+    except (OSError, subprocess.SubprocessError):
+        pass
     return os.getcwd()
 
 def _get_config_model():
@@ -90,7 +95,8 @@ def _get_config_model():
         from pathlib import Path
         cfg = json.loads((Path.home() / ".config/agentic-shell/config.json").read_text())
         return cfg.get("model", "unknown")
-    except: return "unknown"
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return "unknown"
 
 def _git_status():
     """Return (branch, staged, modified, untracked, ahead, behind) or None if not a git repo."""
@@ -120,7 +126,8 @@ def _git_status():
             if len(parts) == 2:
                 ahead, behind = int(parts[0]), int(parts[1])
         return branch, staged, modified, untracked, ahead, behind
-    except: return None
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return None
 
 def _top_procs():
     """Return list of (pid, cpu%, mem%, name) for top 3 CPU consumers."""
@@ -141,7 +148,8 @@ def _top_procs():
             if len(rows) >= 4:
                 break
         return rows
-    except: return []
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return []
 
 def _network_ip():
     """Return primary non-loopback IP."""
@@ -151,7 +159,8 @@ def _network_ip():
         ).stdout.strip()
         ips = [ip for ip in out.split() if not ip.startswith("127.")]
         return ips[0] if ips else " "
-    except: return " "
+    except (OSError, subprocess.SubprocessError):
+        return " "
 
 def _disk_usage():
     """Return (used, total, pct) for root filesystem."""
@@ -162,7 +171,8 @@ def _disk_usage():
         if len(out) >= 2:
             parts = out[1].split()
             return parts[2], parts[1], parts[4]   # used, total, pct
-    except: pass
+    except (OSError, subprocess.SubprocessError, IndexError):
+        pass
     return "n/a", "n/a", "n/a"
 
 # ── panel builders ────────────────────────────────────────
@@ -172,7 +182,7 @@ def _panel_session(db, model):
         today = db.get_today_stats()
         cost_str = f"${today['cost']:.4f}  ({today['calls']} calls)"
         cost_style = "color(203)" if today['cost'] > 0.10 else "color(221)" if today['cost'] > 0.01 else "color(114)"
-    except Exception:
+    except (sqlite3.Error, AttributeError, KeyError, TypeError):
         cost_str, cost_style = " ", "color(238)"
     t = Text()
     t.append("Model  ", style="color(238)"); t.append(model + "\n", style="color(141) bold")
@@ -331,7 +341,7 @@ def _read_clip_key() -> str | None:
             val = p.read_text().strip()
             p.unlink()
             return val if val in ("UP", "DOWN", "ENTER") else None
-    except Exception:
+    except OSError:
         pass
     return None
 
@@ -341,7 +351,7 @@ def _handle_clip_key(key: str, db) -> None:
     global _clip_selected
     try:
         snippets = db.list_snippets()
-    except Exception:
+    except (sqlite3.Error, AttributeError):
         return
     if not snippets:
         return
@@ -364,7 +374,7 @@ def _handle_clip_key(key: str, db) -> None:
                     ["tmux", "send-keys", "-t", f"{session}:0.0", s["command"], "Enter"],
                     capture_output=True
                 )
-        except Exception:
+        except (OSError, subprocess.SubprocessError, sqlite3.Error):
             pass
 
 
@@ -387,7 +397,7 @@ def _setup_tmux_clip_keys() -> None:
                  "if-shell", condition, action, fallback],
                 capture_output=True, timeout=2
             )
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
 
 
@@ -395,7 +405,7 @@ def _panel_clipboard(db) -> Panel:
     global _clip_selected
     try:
         snippets = db.list_snippets()
-    except Exception:
+    except (sqlite3.Error, AttributeError):
         snippets = []
 
     t = Text()

@@ -56,22 +56,32 @@ def check_tmux() -> Degradation | None:
     )
 
 
-def check_sandbox() -> Degradation | None:
-    """bwrap missing or userns unavailable: weaker sandbox for sub-agents.
+def bwrap_available() -> bool:
+    """True when bwrap exists AND user namespaces actually work.
 
-    Reuses `Sandbox`'s own probe rather than repeating it, so the banner can
-    never disagree with what the sandbox actually did.
+    Lives here rather than in `agents/sandbox.py` so that `core` does not have
+    to import `agents` to answer the question: the probe is `shutil.which` plus
+    one subprocess and knows nothing about agents. `Sandbox` calls this, so the
+    banner and the sandbox can never disagree about what is available.
     """
-    try:
-        from sable.agents.sandbox import Sandbox
-    except ImportError:
-        return None
+    if shutil.which("bwrap") is None:
+        return False
+    import subprocess
 
-    probe = Sandbox.__new__(Sandbox)
     try:
-        if probe._probe_bwrap():
-            return None
-    except (OSError, AttributeError):
+        result = subprocess.run(
+            ["bwrap", "--ro-bind", "/", "/", "--unshare-pid", "--", "true"],
+            capture_output=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def check_sandbox() -> Degradation | None:
+    """bwrap missing or userns unavailable: weaker sandbox for sub-agents."""
+    if bwrap_available():
         return None
     return Degradation(
         name="sandbox",
