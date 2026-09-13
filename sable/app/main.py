@@ -70,6 +70,30 @@ def _handle_cli(argv: list[str]) -> bool:
     return False
 
 
+def _report_degradations() -> None:
+    """Print one line per degraded capability, with what to do about it (I7).
+
+    Never raises and never blocks: this sits on the path to the user's login
+    shell, so a probe that misbehaves must cost them nothing.
+    """
+    try:
+        from sable.core.health import startup_degradations
+    except ImportError:
+        return
+
+    degradations = startup_degradations()
+    if not degradations:
+        return
+
+    AMBER = "\033[38;5;179m"
+    DIM = "\033[2;37m"
+    RESET = "\033[0m"
+    for degradation in degradations:
+        sys.stdout.write(f"{AMBER}  ! {degradation.line()}{RESET}\n")
+        sys.stdout.write(f"{DIM}    {degradation.hint}{RESET}\n")
+    sys.stdout.flush()
+
+
 def main(argv: list[str] | None = None) -> None:
     """Shell entry point called by the installed binary."""
     import json
@@ -173,6 +197,10 @@ def main(argv: list[str] | None = None) -> None:
     # Welcome banner (screen already cleared by wrapper before Python starts)
     sys.stdout.write("\n\033[38;5;141m  ✦ Sable\033[0m\n")
     sys.stdout.write(f"\033[2;37m  {config.backend} · {config.model}  |  type naturally or use bash directly\033[0m\n")
+
+    # I7: anything running in a reduced capability says so here, once, with
+    # what still works. A silent fallback is the failure this prevents.
+    _report_degradations()
     if wrap_mode:
         sys.stdout.write(
             "\033[2;37m  wrap mode: running inside your bash, /exit returns to it\033[0m\n"
