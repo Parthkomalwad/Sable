@@ -6,6 +6,7 @@ Always opened with WAL mode and NORMAL synchronous for performance.
 Tables:
 - token_events: per-call telemetry
 - session_memory: compressed context snapshots
+- agent_events: the append-only agent bus (see core/events/bus.py)
 """
 from __future__ import annotations
 
@@ -99,6 +100,25 @@ CREATE TABLE IF NOT EXISTS task_memory (
 )
 """
 
+_CREATE_AGENT_EVENTS = """
+CREATE TABLE IF NOT EXISTS agent_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    agent       TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}'
+)
+"""
+
+# Tailing is `WHERE id > ?`, so the ordering guarantee comes from the
+# AUTOINCREMENT primary key rather than from ts, which only has second
+# resolution and can tie. This index keeps a per-agent tail cheap once the
+# table has a session's worth of rows in it.
+_CREATE_AGENT_EVENTS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_agent_events_agent_id
+    ON agent_events (agent, id)
+"""
+
 _CREATE_SKILL_PATTERNS = """
 CREATE TABLE IF NOT EXISTS skill_patterns (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,6 +149,8 @@ class Database:
         self._conn.execute(_CREATE_TASK_EVENTS)
         self._conn.execute(_CREATE_TASK_MEMORY)
         self._conn.execute(_CREATE_SKILL_PATTERNS)
+        self._conn.execute(_CREATE_AGENT_EVENTS)
+        self._conn.execute(_CREATE_AGENT_EVENTS_INDEX)
         self._conn.commit()
 
     def write_event(self, event: TokenEvent) -> None:
