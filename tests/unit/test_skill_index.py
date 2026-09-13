@@ -284,6 +284,109 @@ class TestApprovalState:
         assert [e["name"] for e in index.get_ranked(["k"])] == ["old"]
 
 
+class TestApprovalWritesThroughToTheFile:
+    """Approval has to change the file, not only the index.
+
+    Found by running approve-then-load against real files, not by a unit
+    test: every test here set file and index status consistently, so none of
+    them exercised the one path where they disagree.
+
+    The loader checks both, deliberately. The index is what `/skill list`
+    and the startup pending-count read cheaply; the file is what keeps the
+    gate honest when the index is deleted. Two copies of one fact means
+    approval must update both, or an approved skill stays unreachable
+    forever because the file still says pending.
+
+    The file is written first. A crash between the two writes then leaves a
+    skill withheld, which is the safe direction to fail.
+    """
+
+    def _skill_file(self, tmp_path, name: str, status: str):
+        folder = tmp_path / name
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "SKILL.md"
+        path.write_text(
+            f'+++\nname = "{name}"\ndescription = "d"\n'
+            f'status = "{status}"\nsource = "crystallised"\n+++\n\nSteps.\n',
+            encoding="utf-8",
+        )
+        return path
+
+    def test_approve_rewrites_the_files_status(self, tmp_path):
+        path = self._skill_file(tmp_path, "draft", "pending")
+        index = _index(tmp_path)
+        index.add(name="draft", file=str(path), keywords=["k"],
+                  auto_generated=True, status="pending")
+
+        index.approve("draft")
+
+        assert 'status = "enabled"' in path.read_text(encoding="utf-8")
+
+    def test_disable_rewrites_the_files_status(self, tmp_path):
+        path = self._skill_file(tmp_path, "live", "enabled")
+        index = _index(tmp_path)
+        index.add(name="live", file=str(path), keywords=["k"], auto_generated=False)
+
+        index.disable("live")
+
+        assert 'status = "disabled"' in path.read_text(encoding="utf-8")
+
+    def test_the_rest_of_the_file_survives(self, tmp_path):
+        """Only status changes. The body is the skill."""
+        path = self._skill_file(tmp_path, "draft", "pending")
+        index = _index(tmp_path)
+        index.add(name="draft", file=str(path), keywords=["k"],
+                  auto_generated=True, status="pending")
+
+        index.approve("draft")
+
+        text = path.read_text(encoding="utf-8")
+        assert "Steps." in text
+        assert 'source = "crystallised"' in text
+        assert 'description = "d"' in text
+
+    def test_a_missing_file_still_updates_the_index(self, tmp_path):
+        """Index and disk drift apart; approving must not be blocked by it.
+
+        The skill is unusable either way, but a stale index entry that
+        cannot be approved is worse: there would be no way to clear it.
+        """
+        index = _index(tmp_path)
+        index.add(name="ghost", file=str(tmp_path / "gone" / "SKILL.md"),
+                  keywords=["k"], auto_generated=True, status="pending")
+
+        assert index.approve("ghost") is True
+        assert index.list_all()[0]["status"] == "enabled"
+
+    def test_an_unparseable_file_still_updates_the_index(self, tmp_path):
+        folder = tmp_path / "bad"
+        folder.mkdir()
+        path = folder / "SKILL.md"
+        path.write_text('+++\nname = "bad\n+++\n\nbody\n', encoding="utf-8")
+        index = _index(tmp_path)
+        index.add(name="bad", file=str(path), keywords=["k"],
+                  auto_generated=True, status="pending")
+
+        assert index.approve("bad") is True
+        assert index.list_all()[0]["status"] == "enabled"
+
+    def test_a_flat_legacy_file_is_left_alone(self, tmp_path):
+        """A pre-B2 flat file has no frontmatter to rewrite.
+
+        Adding some would quietly convert it to the new format behind the
+        user's back, which is Task 2's job and only with the original kept.
+        """
+        path = tmp_path / "old.md"
+        path.write_text("# Old skill\n\nSteps.\n", encoding="utf-8")
+        index = _index(tmp_path)
+        index.add(name="old", file=str(path), keywords=["k"], auto_generated=False)
+
+        index.disable("old")
+
+        assert path.read_text(encoding="utf-8") == "# Old skill\n\nSteps.\n"
+        assert index.list_all()[0]["status"] == "disabled"
+
+
 class TestNudge:
     """`nudge()` is the name the feedback loop calls the existing deltas by.
 

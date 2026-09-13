@@ -144,9 +144,58 @@ class SkillIndex:
         entry = self._find(name)
         if entry is None:
             return False
+        # The file first, then the index. Status lives in both: the index is
+        # what `/skill list` and the startup pending-count read cheaply, and
+        # the file is what keeps the gate honest when the index is deleted.
+        # A crash between the two writes then leaves the skill withheld,
+        # which is the safe direction to fail. The reverse order would leave
+        # a skill enabled in the index that the loader still refuses,
+        # unreachable with no way to clear it.
+        self._write_status_to_file(entry.get("file", ""), status)
         entry["status"] = status
         self._save()
         return True
+
+    @staticmethod
+    def _write_status_to_file(file_path: str, status: str) -> None:
+        """Rewrite a skill file's frontmatter status. Best effort.
+
+        A file that is missing, unreadable, malformed or has no frontmatter
+        at all is left alone and the index update still goes ahead. The skill
+        is unusable either way, but a stale index entry that cannot be
+        approved is worse: there would be no way to clear it.
+
+        A pre-B2 flat file has no frontmatter to rewrite, and gains none
+        here. Adding some would quietly convert it to the new format behind
+        the user's back, which is the migration's job and only with the
+        original kept.
+        """
+        if not file_path:
+            return
+
+        from sable.skills.model import SkillFormatError, parse_skill, render_skill
+
+        path = Path(file_path)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return
+
+        try:
+            skill = parse_skill(text, name=path.parent.name)
+        except SkillFormatError:
+            return
+
+        if skill.is_legacy:
+            return
+
+        skill.status = status
+        try:
+            path.write_text(render_skill(skill), encoding="utf-8")
+        except OSError:
+            # The index update below still runs, so the skill can be managed
+            # even on a read-only or full filesystem.
+            return
 
     @staticmethod
     def _status(entry: dict) -> str:
