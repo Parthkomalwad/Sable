@@ -27,7 +27,7 @@ from __future__ import annotations
 import pytest
 
 from sable.skills import validate as validate_module
-from sable.skills.validate import Grade, grade_skill_use
+from sable.skills.validate import _MARKER, Grade, grade_skill_use
 
 
 class _Recorder:
@@ -99,6 +99,83 @@ class TestGradingOnExitCode:
         grade = grade_skill_use("sleep 999", cwd="/w")
         assert grade.success is False
         assert "timed out" in grade.reason
+
+
+class TestAValidatorThatCouldNotRunIsNoSignal:
+    """Some exit codes say the environment was wrong, not the skill.
+
+    Found by the Phase 2 gate run. `gpt-4o-mini` crystallised a deploy skill
+    and chose `curl -sf localhost:8080/health` as its validator, which is a
+    reasonable inference from the commands it was shown. Run anywhere the
+    API is not up, curl exits 7 (connection refused) and the skill was
+    graded a failure: confidence fell 0.50 -> 0.40 -> 0.35 across runs that
+    had actually succeeded.
+
+    That is the number measuring the wrong thing, and it compounds. Each use
+    costs 0.10, so a good skill used three times on a machine where the
+    service is not running drops out of retrieval entirely and the loop
+    degrades itself.
+
+    A validator that could not run has produced no evidence either way, so
+    the run's own outcome stands, exactly as it does for a skill that
+    declares no validator at all. A health check that genuinely fails
+    returns 1 or 22, and those must keep grading as failure or the
+    distinction is just a way to never fail.
+
+    The code list is deliberately short and curl-flavoured, and is commented
+    as the heuristic it is. Knowing what a validator *is* belongs to B4's
+    skill doctor.
+    """
+
+    @pytest.mark.parametrize("code", [7, 127])
+    def test_an_environment_code_falls_back_to_the_run(self, monkeypatch, code):
+        monkeypatch.setattr(
+            validate_module, "run_command",
+            _Recorder(f"connection refused\n{_MARKER}{code}"),
+        )
+
+        assert grade_skill_use("curl -sf localhost:8080/health",
+                               cwd="/w", ran_ok=True).success is True
+        assert grade_skill_use("curl -sf localhost:8080/health",
+                               cwd="/w", ran_ok=False).success is False
+
+    @pytest.mark.parametrize("code", [1, 22])
+    def test_a_real_failure_still_fails(self, monkeypatch, code):
+        """The service answered and said no. That is the skill's problem."""
+        monkeypatch.setattr(
+            validate_module, "run_command",
+            _Recorder(f"unhealthy\n{_MARKER}{code}"),
+        )
+
+        assert grade_skill_use("curl -sf localhost:8080/health",
+                               cwd="/w", ran_ok=True).success is False
+
+    def test_the_reason_says_the_validator_could_not_run(self, monkeypatch):
+        """`/skill stats` shows this, and the two cases are not the same.
+
+        "could not run" tells a user to check their environment; "exited 1"
+        tells them to check the skill.
+        """
+        monkeypatch.setattr(
+            validate_module, "run_command",
+            _Recorder(f"connection refused\n{_MARKER}7"),
+        )
+
+        grade = grade_skill_use("curl -sf localhost:8080/health",
+                                cwd="/w", ran_ok=True)
+
+        assert "could not run" in grade.reason
+        assert "7" in grade.reason
+
+    def test_success_is_still_success(self, monkeypatch):
+        """Exit 0 is unaffected by any of this."""
+        monkeypatch.setattr(
+            validate_module, "run_command",
+            _Recorder(f"ok\n{_MARKER}0"),
+        )
+
+        assert grade_skill_use("curl -sf localhost:8080/health",
+                               cwd="/w", ran_ok=False).success is True
 
 
 class TestTheValidatorIsSandboxed:
