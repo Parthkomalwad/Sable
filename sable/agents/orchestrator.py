@@ -98,12 +98,19 @@ class OrchestratorAgent:
         db_path: str,
         task_manager,
         session_id: str = "",
+        corrections_db=None,
     ) -> None:
         self._goal = goal
         self._cwd = cwd
         self._config = config
         self._db_path = db_path
         self._task_manager = task_manager
+        # Injected rather than imported (K3). `agents` sits below `skills` in
+        # the layering rule, so constructing the recorder here would add a
+        # fourth agents -> skills edge and flip test_layering.py's strict
+        # xfail. The REPL owns the Database and hands it in; a caller that
+        # passes nothing simply records no corrections.
+        self._corrections_db = corrections_db
         # Needed to attribute cost to this session in `token_events`. Defaults
         # to empty so every existing caller and test keeps working; the REPL
         # passes the real one.
@@ -588,8 +595,22 @@ class OrchestratorAgent:
                 edited = input('').strip()
             except (EOFError, KeyboardInterrupt):
                 return None
+            self._record_edit(command, edited)
             return edited or command
         return command
+
+    def _record_edit(self, proposed: str, corrected: str) -> None:
+        """Store an `e`-edit as a correction (K3).
+
+        The recorder decides what is worth keeping: an edit that changed
+        nothing, or one carrying a secret, is dropped there rather than here,
+        so there is one place that rule lives.
+        """
+        if self._corrections_db is None:
+            return
+        from sable.skills.corrections import KIND_EDIT, record_correction
+
+        record_correction(self._corrections_db, proposed, corrected, kind=KIND_EDIT)
 
     def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
         """Run a command via ptyprocess in cwd. Returns output string.
