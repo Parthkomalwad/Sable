@@ -8,7 +8,7 @@
 # On startup the shell runs the first-run wizard if no config is present.
 # Set SABLE_BACKEND, SABLE_MODEL env vars to skip the wizard.
 
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
