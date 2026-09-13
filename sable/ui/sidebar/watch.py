@@ -316,6 +316,7 @@ def _render_all(db, model) -> str:
     bc.print(_panel_git())
     bc.print(_panel_processes())
     bc.print(_panel_tokens(db))
+    bc.print(_panel_corrections(db))
     bc.print(_panel_clipboard(db))
     return buf.getvalue()
 
@@ -438,6 +439,38 @@ def _panel_clipboard(db) -> Panel:
             t.append(f"\n  ↑↓ scroll  {_clip_selected+1}/{total}", style="color(55)")
 
     return Panel(t, title="[color(141) bold]◈ clipboard[/color(141) bold]", border_style="color(55)", padding=(0, 1))
+
+
+def _panel_corrections(db) -> Panel:
+    """The week's corrections, and how many were withheld for carrying a secret.
+
+    Withheld rows are shown rather than hidden: a user who made five
+    corrections and sees three should be able to find out where the other two
+    went. See skills/corrections.py for why they are dropped rather than
+    stored in redacted form.
+    """
+    from sable.skills.corrections import weekly_count, withheld_count
+
+    kept = weekly_count(db)
+    withheld = withheld_count(db)
+
+    t = Text()
+    t.append("This week ", style="color(238)")
+    t.append(f"{kept}\n", style="color(141) bold" if kept else "color(238)")
+    if withheld:
+        t.append("Withheld  ", style="color(238)")
+        t.append(f"{withheld}", style="color(221)")
+        t.append(" (secret)\n", style="color(238)")
+    if not kept and not withheld:
+        t.append("edit a command with ", style="color(238)")
+        t.append("e", style="color(141)")
+        t.append(" to teach it\n", style="color(238)")
+    return Panel(
+        t,
+        title="[color(141) bold]✎ corrections[/color(141) bold]",
+        border_style="color(55)",
+        padding=(0, 1),
+    )
 
 
 def run():
