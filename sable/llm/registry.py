@@ -44,11 +44,19 @@ def mock_backend_or_none(mode: str = "orchestrator"):
     return MockLLMBackend(mode=mode)
 
 
-def build_backend(config: ShellConfig, mock_mode: str = "orchestrator"):
+def build_backend(
+    config: ShellConfig, mock_mode: str = "orchestrator", role: str | None = None
+):
     """Return the configured LLM backend, or the mock when SABLE_MOCK_LLM is set.
 
     mock_mode selects which canned script the mock plays: "orchestrator" for
     the REPL's reasoning loop, "worker" for a task agent.
+
+    `role` selects the model (A5): `models.<role>` from config, falling back to
+    `model`. This is the single place backends are constructed, so routing the
+    choice through here is what makes "cheap model for summarising, strong model
+    for orchestrating" a config change rather than a code change. Omitting
+    `role` uses `model`, which is what every caller did before Phase 1.
     """
     # Checked before importing the real backends so the mock path does not
     # need httpx installed.
@@ -60,16 +68,18 @@ def build_backend(config: ShellConfig, mock_mode: str = "orchestrator"):
     from sable.llm.ollama import OllamaBackend
     from sable.llm.openai import OpenAIBackend
 
+    model = config.model_for(role) if role else config.model
+
     if config.backend == "openai":
         api_key = os.environ.get("OPENAI_API_KEY") or getattr(config, "api_key", "") or ""
-        return OpenAIBackend(api_key=api_key, model=config.model)
+        return OpenAIBackend(api_key=api_key, model=model)
 
     if config.backend == "anthropic":
         api_key = os.environ.get("ANTHROPIC_API_KEY") or getattr(config, "api_key", "") or ""
-        return AnthropicBackend(api_key=api_key, model=config.model)
+        return AnthropicBackend(api_key=api_key, model=model)
 
     # ollama is both an explicit choice and the fallback for an unknown
     # backend name, matching the behaviour this replaced.
     return OllamaBackend(
-        base_url=config.api_base or _DEFAULT_OLLAMA_URL, model=config.model
+        base_url=config.api_base or _DEFAULT_OLLAMA_URL, model=model
     )

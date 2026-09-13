@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import shlex
 import signal
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,7 +33,16 @@ class TaskManager:
             for s in self._server.sessions:
                 if s.session_name == name:
                     return s
-        except Exception:
+        except (OSError, subprocess.SubprocessError, AttributeError, KeyError):
+            # No server, or it went away mid-iteration. The caller treats None
+            # as "not inside tmux" and reports that itself.
+            #
+            # libtmux shells out to tmux, so its failures arrive as OSError or
+            # a subprocess error; AttributeError and KeyError cover its parsing
+            # of unexpected tmux output. Deliberately not LibTmuxException:
+            # importing `libtmux.exc` breaks every test that replaces
+            # `libtmux` in sys.modules with a MagicMock, since resolving a
+            # submodule of a mock raises ModuleNotFoundError.
             pass
         return None
 
@@ -45,7 +55,7 @@ class TaskManager:
             for w in session.windows:
                 if w.window_id == window_id:
                     return w
-        except Exception:
+        except (OSError, subprocess.SubprocessError, AttributeError, KeyError):
             pass
         return None
 
@@ -179,7 +189,9 @@ class TaskManager:
             return
         try:
             session.windows[0].select()
-        except (IndexError, Exception):
+        except (IndexError, OSError, subprocess.SubprocessError, AttributeError):
+            # `(IndexError, Exception)` before, which is just Exception: the
+            # first entry is a subclass of the second and never matched alone.
             pass
 
     def inspect(self, name: str) -> None:

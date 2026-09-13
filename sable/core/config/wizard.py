@@ -90,6 +90,10 @@ def run_wizard() -> None:
         env_var = "OPENAI_API_KEY" if backend == "openai" else "ANTHROPIC_API_KEY"
         api_key = _ask(f"{env_var}:", is_password=True)
 
+    # Per-role models (A5). Offered, never required: one model for everything
+    # is a perfectly good setup and the default.
+    models = _ask_per_role_models(model)
+
     # Routing mode
     console.print()
     console.print("[bold]Routing modes:[/bold]")
@@ -125,6 +129,7 @@ def run_wizard() -> None:
         session_token_budget=session_budget,
         privacy_mode=privacy_mode,
         setup_complete=True,
+        models=models,
     )
 
     config_dict = config.to_dict()
@@ -143,6 +148,35 @@ def run_wizard() -> None:
 
     console.print("[dim]Run 'sable' again to start.[/dim]")
     console.print()
+
+
+def _ask_per_role_models(default_model: str) -> dict[str, str]:
+    """Offer a cheaper model for the high-volume roles (A5).
+
+    Declining is the default and leaves `models` empty, which means every role
+    uses the one model. Only `summariser` and `worker` are offered: those are
+    where a cheaper model pays off without touching the reasoning core, and a
+    wizard that asked about all four roles would be a worse first run than one
+    that asks about none.
+    """
+    console.print()
+    console.print("[bold]Per-role models (optional):[/bold]")
+    console.print(
+        "  Sable can use a cheaper model for the high-volume jobs "
+        "(summarising, background tasks)\n  and keep the stronger one for "
+        "reasoning about your goals."
+    )
+    console.print(f"  [dim]Leave blank to use {default_model} for everything.[/dim]")
+
+    models: dict[str, str] = {}
+    for role, description in (
+        ("summariser", "writing up skills and summaries"),
+        ("worker", "background task agents"),
+    ):
+        answer = _ask(f"Model for {role} ({description}):", default="")
+        if answer and answer != default_model:
+            models[role] = answer
+    return models
 
 
 def _explain_confirm_tiers() -> None:

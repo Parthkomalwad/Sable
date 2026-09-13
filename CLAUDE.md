@@ -28,7 +28,7 @@ sable/
     main.py        entry point, non-interactive bypass (first statement), startup
     repl.py        the read / route / dispatch loop + _handle_builtin
     builtins/      one module per command family: task, skill, route,
-                   history, stats, memory, session
+                   history, stats, memory, session, why
     mode.py        sable on|off|status, re-attach
     tour.py        /tour walkthrough
   core/          foundation, no LLM knowledge
@@ -37,6 +37,8 @@ sable/
     audit.py       the audit ledger (write_command, write_action)
     executor.py    ptyprocess runner, cd interception
     events/types.py  TokenEvent and friends
+    events/bus.py    the agent event bus (append-only, SQLite)
+    events/replay.py agent_turns: what each model turn saw, redacted
     config/        schema.py, wizard.py, keyring.py
   llm/           base.py (ABC + LLMResponse), ollama, openai, anthropic,
                  registry.py (build_backend), pricing.json
@@ -45,7 +47,8 @@ sable/
     rules.py       loads the policy file; raises rather than run unguarded
     defaults/policy.toml  the destructive and secret patterns, as data
   agents/        orchestrator.py, worker.py, manager.py, reconcile.py,
-                 sandbox.py, router.py, planner.py
+                 sandbox.py, router.py, planner.py,
+                 runtime.py (shared pty runner, LLM call, JSON parse)
   skills/        index.py, watcher.py, crystalliser.py, loader.py
   memory/        session.py, task.py, compressor.py
   data/          spinner_verbs.txt, intent_stopwords.txt (one entry per line)

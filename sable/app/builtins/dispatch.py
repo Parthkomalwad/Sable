@@ -45,6 +45,8 @@ _HELP_TEXT = (
     "  /task           Manage background agents\n"
     "  /skill          Manage skill files\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
+    "  /why [agent]   What the model saw when it last decided\n"
+    "  /task <n> replay     Every turn of one agent, as the model saw it\n"
     "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
     "  /tour           Guided walkthrough of what Sable does\n"
     "  /budget reset  Clear hard-stop budget flag\n"
@@ -149,6 +151,10 @@ def handle_builtin(
         from sable.app.mode import run_plain_subshell
         run_plain_subshell(os.getcwd())
         return True
+
+    if cmd == "/why" or cmd.startswith("/why "):
+        from sable.app.builtins.why import handle_why
+        return handle_why(cmd[len("/why"):])
 
     if cmd == "/route" or cmd.startswith("/route "):
         return _handle_route_builtin(cmd[len("/route"):], config)
