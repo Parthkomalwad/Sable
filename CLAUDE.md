@@ -33,6 +33,7 @@ sable/
     tour.py        /tour walkthrough
   core/          foundation, no LLM knowledge
     paths.py       ~/.sable/* resolution
+    health.py      degraded-mode detection (tmux, bwrap, db, width, keyring)
     db.py          SQLite WAL + schema
     audit.py       the audit ledger (write_command, write_action)
     executor.py    ptyprocess runner, cd interception
@@ -48,7 +49,8 @@ sable/
     defaults/policy.toml  the destructive and secret patterns, as data
   agents/        orchestrator.py, worker.py, manager.py, reconcile.py,
                  sandbox.py, router.py, planner.py,
-                 runtime.py (shared pty runner, LLM call, JSON parse)
+                 runtime.py (shared pty runner, LLM call, JSON parse),
+                 context.py (repo-root CLAUDE.md/AGENTS.md as untrusted data)
   skills/        index.py, watcher.py, crystalliser.py, loader.py
   memory/        session.py, task.py, compressor.py
   data/          spinner_verbs.txt, intent_stopwords.txt (one entry per line)

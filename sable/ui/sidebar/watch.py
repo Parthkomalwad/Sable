@@ -284,6 +284,7 @@ def _panel_shortcuts():
     keys = [
         ("Ctrl+R",   "search history"),
         ("Ctrl+B",   "next cmd → bash"),
+        ("Ctrl+G",   "steer an agent"),
         ("Ctrl+T",   "toggle sidebar"),
         ("Tab",      "complete path/cmd"),
         ("→",        "accept suggestion"),
