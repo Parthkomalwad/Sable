@@ -28,9 +28,11 @@ def replay_db(tmp_path, monkeypatch):
 
 def _record(path, agent="w1", turn=1, response="{}", **kwargs):
     from sable.core.events.replay import record_turn
+    from sable.policy.engine import redact_text
 
     return record_turn(
         path,
+        redact=redact_text,
         agent=agent,
         role=kwargs.pop("role", "worker"),
         turn=turn,

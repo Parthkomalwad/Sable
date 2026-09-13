@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -58,8 +59,10 @@ class TaskMemory:
                 (self._name, self._version, str(path), 0, snap["created_at"]),
             )
             self._db._conn.commit()
-        except Exception:
-            pass  # DB write is best-effort; file is the source of truth
+        except (sqlite3.Error, AttributeError):
+            # Best effort: the vN.json file above is the source of truth, and
+            # AttributeError covers a caller that passed a stub database.
+            pass
         return self._version
 
     def load_snapshot(self, version: int) -> dict:

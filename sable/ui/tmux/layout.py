@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 
 TASKS_PANEL_HEIGHT_PERCENT = 12
@@ -89,13 +90,17 @@ def create_session(username: str) -> None:
 
         # Start the REPL in main pane
         python_bin = sys.executable
-        main_pane.send_keys(f"{python_bin} -m sable.app.main --no-tmux", enter=True)
+        # No --no-tmux flag: nothing parses one, and it would be redundant if
+        # it did. create_session() already returns early when $TMUX is set,
+        # which is the condition the flag was standing in for.
+        main_pane.send_keys(f"{python_bin} -m sable.app.main", enter=True)
 
         # Attach to the session
         os.execvp("tmux", ["tmux", "attach-session", "-t", session_name])
 
-    except Exception:
-        # libtmux unavailable or failed run without sidebar
+    except (ImportError, OSError, subprocess.SubprocessError, AttributeError, KeyError):
+        # libtmux unavailable, or tmux itself failed. Run without the sidebar
+        # rather than refusing to start; the I7 banner reports the same thing.
         return
 
 
@@ -151,5 +156,6 @@ def toggle_sidebar() -> None:
             sidebar_width = max(20, term_width // 5)
             subprocess.run(["tmux", "resize-pane", "-t", sidebar_pane.id, "-x", str(sidebar_width)])
 
-    except Exception:
+    except (ImportError, OSError, subprocess.SubprocessError, AttributeError,
+            IndexError, ValueError):
         return

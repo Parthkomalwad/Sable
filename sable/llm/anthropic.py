@@ -87,7 +87,10 @@ class AnthropicBackend(LLMBackend):
                                 usage = data.get("message", {}).get("usage", {})
                                 prompt_tokens = usage.get("input_tokens", 0)
                 break  # success exit retry loop
-            except Exception as exc:
+            except (httpx.HTTPError, json.JSONDecodeError, ValueError, KeyError) as exc:
+                # Transport failures and the non-streaming error bodies the API
+                # returns for rate limits and overload, which arrive as a
+                # content-type mismatch rather than an HTTP error.
                 err_str = str(exc)
                 # Non-streaming error response (rate limit, overload, etc.) retry with backoff
                 if "text/event-stream" in err_str or "application/json" in err_str:

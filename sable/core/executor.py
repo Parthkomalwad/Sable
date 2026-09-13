@@ -9,6 +9,7 @@ Never use print() here; use Rich Console for all output.
 """
 from __future__ import annotations
 
+import io
 import os
 import re
 import sys
@@ -171,8 +172,10 @@ def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
     try:
         old_settings = termios.tcgetattr(fd)
         tty.setraw(fd)
-    except Exception:
-        pass  # Not a tty (e.g. piped input) skip raw mode
+    except (termios.error, ValueError, io.UnsupportedOperation, OSError):
+        # Not a tty: piped input, or pytest's captured stdin. Raw mode is an
+        # optimisation for interactive programs, not a requirement.
+        pass
 
     output = []
     try:
@@ -206,7 +209,7 @@ def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
         if old_settings is not None:
             try:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            except Exception:
+            except (termios.error, ValueError, OSError):
                 pass
 
     proc.wait()

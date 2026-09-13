@@ -395,9 +395,11 @@ class OrchestratorAgent:
         reaches the table. Never raises, by that module's contract.
         """
         from sable.core.events.replay import record_turn
+        from sable.policy.engine import redact_text
 
         record_turn(
             self._db_path,
+            redact=redact_text,
             agent="orchestrator",
             role="orchestrator",
             turn=turn,

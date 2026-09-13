@@ -151,7 +151,7 @@ python -W error -c "import shell"                  # DeprecationWarning raised (
 - `agent_events` table (`id, ts, agent, kind, payload_json`) + `shell/agents/bus.py` (publish / tail / wait_for). Sub-agent status/result become events; `status.md`/`result.md` files remain as human-readable mirrors.
 - Config: `models: {router, orchestrator, worker, summariser}` with fallback to `model`.
 - `Ctrl+G` → send guidance to the currently focused agent.
-- **I9 Prompt replay**: every turn stores the exact redacted message list in `agent_turns`; `/task <n> replay` and `/why` render what the model saw.
+- **I9 Prompt replay**: every turn stores the exact redacted message list in `agent_turns`; `/task replay <n>` and `/why` render what the model saw.
 - **I7 Degraded-mode banners**: LLM down / tmux missing / bwrap unavailable / SQLite locked / narrow terminal each show a persistent banner and documented reduced behaviour no silent fallbacks.
 
 **Gate you test:**
@@ -160,10 +160,10 @@ python -W error -c "import shell"                  # DeprecationWarning raised (
    → orchestrator runs steps, spawns a worker for the install, sidebar shows worker status flipping
      starting → running → completed WITHOUT the 5 s file-poll lag
 > Ctrl+G  "use python3.11"     → worker acknowledges guidance in its next turn
-> /task <name> events           → shows the event stream
+> /task events <name>           → shows the event stream
 sqlite3 ~/.local/share/agentic-shell/sessions.db 'select kind,count(*) from agent_events group by kind'
 grep -rn "except Exception" shell/agents/   → zero
-> /task <name> replay            → per-turn: what the model saw, what it answered
+> /task replay <name>            → per-turn: what the model saw, what it answered
 Stop Ollama → banner "LLM unreachable bash-only mode" appears; ls still works; restart → banner clears
 Run in a container without userns → banner "sandbox: bash-wrapper fallback (bwrap unavailable)"
 ```
@@ -350,7 +350,7 @@ These are things I'd change or lock down early; Opus should treat them as inputs
 
 - **Voice/NL over SSH from phone** via the Phase 5 notifier channel (reply in Telegram → goal spawned).
 - **Repo-aware mode**: when cwd is a git repo, load `CLAUDE.md`/`AGENTS.md` from it as orchestrator context instant compatibility with the conventions people already write for coding agents.
-- **Replay**: `/task <name> replay` re-renders a past run's blocks from events for post-mortems and demos.
+- **Replay**: `/task replay <name>` re-renders a past run's blocks from events for post-mortems and demos.
 - **Web read-only dashboard** (G9) on localhost for the browser/phone.
 - **Team mode**: shared skills/knowledge over a git remote; per-user policy.
 - **Local-first embeddings** via Ollama `/api/embeddings` for skill and memory retrieval (B6) before considering any vector DB.

@@ -29,7 +29,7 @@ def _show_history(db, limit: int = 20) -> None:
             """,
             (limit,)
         ).fetchall()
-    except Exception as exc:
+    except (sqlite3.Error, AttributeError) as exc:
         _out(f"History error: {exc}")
         return
 
@@ -45,7 +45,7 @@ def _show_history(db, limit: int = 20) -> None:
             date_part = ts[:10]
             time_part = ts[11:16]
             ts_display = f"{date_part} {time_part}"
-        except Exception:
+        except (TypeError, IndexError):
             ts_display = ts[:16] if ts else "?"
 
         if action_type == "nl_route" and nl_input:
@@ -73,7 +73,7 @@ def _show_history(db, limit: int = 20) -> None:
             sys.stdout.write(
                 f"  {DIM}{today['calls']} AI calls today · ${today['cost']:.4f} total{RESET}\n"
             )
-    except Exception:
+    except (sqlite3.Error, AttributeError, KeyError):
         pass
 
     sys.stdout.write("\n")
