@@ -84,41 +84,7 @@ def _wait_for_content(pane_id: str, needle: str, timeout: float = 30.0) -> str:
     )
 
 
-TEST_MODEL = "layout-test-model"
-
-
-def _ensure_config() -> None:
-    """Write a config file if there is none, as the entrypoint does.
-
-    Without it the sidebar's first import runs the first-run wizard and the
-    pane fills with backend prompts instead of panels. docker/playground-
-    entry.sh writes this before starting tmux; a bare `pytest` run against
-    the image never reaches that code, so the panes would render the wizard
-    and the content assertions below would fail for the wrong reason.
-
-    An existing config is left alone, so running the suite inside a live
-    playground does not clobber the user's settings.
-    """
-    import json
-    import pathlib
-    import stat
-
-    config = pathlib.Path.home() / ".config" / "agentic-shell" / "config.json"
-    if config.exists():
-        return
-    config.parent.mkdir(parents=True, exist_ok=True)
-    config.write_text(json.dumps({
-        "backend": "ollama",
-        "model": TEST_MODEL,
-        "api_base": "http://127.0.0.1:11434",
-        "routing_mode": "auto",
-        "daily_token_budget": None,
-        "session_token_budget": None,
-        "privacy_mode": False,
-        "setup_complete": True,
-        "tasks_base_dir": "~/tasks",
-    }, indent=2))
-    config.chmod(stat.S_IRUSR | stat.S_IWUSR)
+from tests.integration.conftest import TEST_MODEL, ensure_config as _ensure_config
 
 
 @pytest.fixture(scope="module")

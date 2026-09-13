@@ -144,7 +144,29 @@ jobs:
           docker run --rm -v "$PWD:/app" \
             --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
             sable-playground \
-            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_playground_layout.py -q"
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_playground_layout.py tests/integration/test_pane_resize.py -q"
+
+      # Upgrading a machine that already had the shell/ layout. Sable is the
+      # login shell, so a broken upgrade locks the user out; this is the one
+      # failure mode with that consequence.
+      - name: In-place upgrade from the shell/ layout
+        run: |
+          docker run --rm -v "$PWD:/app" \
+            --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            sable-playground \
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_inplace_upgrade.py -q"
+
+      # The real REPL on a real pty. Two of the five Phase 0 bugs lived here
+      # and nothing automated could see them, because a pipe reproduces
+      # neither input()'s behaviour nor prompt_toolkit's tty requirement.
+      # Slower than the rest, so it gets its own step and a longer timeout.
+      - name: REPL end to end on a pty (mock LLM)
+        timeout-minutes: 20
+        run: |
+          docker run --rm -v "$PWD:/app" \
+            --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            sable-playground \
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_repl_pty.py -q"
 
       # The whole suite, including the two above again. Cheap, and it is what
       # catches a collection error in a file no named step covers.

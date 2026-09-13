@@ -6,7 +6,7 @@ import io
 import pytest
 
 from sable.core.config.schema import ShellConfig
-from sable.app.repl import _handle_route_builtin, _record_router_correction
+from sable.app.builtins.route import _handle_route_builtin, _record_router_correction
 from sable.agents.router import Route, explain
 
 
