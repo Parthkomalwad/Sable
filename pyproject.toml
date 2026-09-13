@@ -55,7 +55,14 @@ sable = "sable.app.main:main"
 include = ["sable*", "shell*"]
 
 [tool.setuptools.package-data]
+# Phase 0.5 step 4 moved behaviour into data files. They are not optional:
+# without policy.toml the safety blocklist is empty, and without the prompts
+# an agent runs with no instructions. Both raise rather than degrade, so a
+# package missing them fails at startup instead of silently misbehaving.
 "sable.llm" = ["pricing.json"]
+"sable.llm.prompts" = ["*.md"]
+"sable.policy.defaults" = ["*.toml"]
+"sable.data" = ["*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

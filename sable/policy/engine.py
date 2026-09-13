@@ -15,33 +15,20 @@ import re
 import sys
 from collections import Counter
 
-DESTRUCTIVE_PATTERNS: list[str] = [
-    # Disk/filesystem destruction
-    r"\bdd\s+if=.*of=/dev/",          # dd writing to a device
-    r"\bmkfs\b",                       # format filesystem
-    r"\bfdisk\b.*(/dev/)",             # partition a device
-    r">\s*/dev/sd[a-z]\b",            # redirect into raw disk
-    r">\s*/dev/nvme\d",               # redirect into nvme disk
-    # Recursive deletion any path
-    r"\brm\s+-[^\s]*r[^\s]*\s+\S",   # rm -rf <anything>
-    # Pipe-to-shell (arbitrary code execution from network)
-    r"\bcurl\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b",
-    r"\bwget\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b",
-    # System state changes
-    r"\bshutdown\b",
-    r"\breboot\b",
-    r"\biptables\s+-F\b",             # flush all firewall rules
-]
+from sable.policy import rules
 
-SECRET_PATTERNS: list[str] = [
-    r"AKIA[A-Z0-9]{16}",
-    r"(?i)secret[_\s]?key[\s:=]+\S{20,}",
-    r"eyJ[A-Za-z0-9\-_]{20,}\.[A-Za-z0-9\-_]+",
-    r"-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----",
-    r"(?i)bearer\s+[A-Za-z0-9\-_\.]{20,}",
-    r"(?i)api[_\-]?key[\s:=]+[A-Za-z0-9\-_\.]{20,}",
-    r'"type"\s*:\s*"service_account"',
-]
+# The rules themselves live in defaults/policy.toml (Phase 0.5 step 4), so a
+# pattern can be read and audited without reading code, and so each one
+# carries the `why` that Phase 3's `/policy explain` will show the user.
+#
+# These two names stay: they are the public surface the rest of the codebase
+# and the tests use, and they are still plain lists of regex strings in file
+# order. A broken or missing policy file raises at import rather than
+# yielding an empty list, because an empty blocklist is a shell that runs
+# destructive commands without asking.
+DESTRUCTIVE_PATTERNS: list[str] = [rule.pattern for rule in rules.destructive_rules()]
+
+SECRET_PATTERNS: list[str] = [rule.pattern for rule in rules.secret_rules()]
 
 
 def shannon_entropy(s: str) -> float:

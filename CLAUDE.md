@@ -40,11 +40,15 @@ sable/
     config/        schema.py, wizard.py, keyring.py
   llm/           base.py (ABC + LLMResponse), ollama, openai, anthropic,
                  registry.py (build_backend), pricing.json
-  policy/        engine.py  (blocklist, entropy check, confirm flow)
+    prompts/       system prompts as editable *.md, loaded by name
+  policy/        engine.py  (entropy check, confirm flow)
+    rules.py       loads the policy file; raises rather than run unguarded
+    defaults/policy.toml  the destructive and secret patterns, as data
   agents/        orchestrator.py, worker.py, manager.py, reconcile.py,
                  sandbox.py, router.py, planner.py
   skills/        index.py, watcher.py, crystalliser.py, loader.py
   memory/        session.py, task.py, compressor.py
+  data/          spinner_verbs.txt, intent_stopwords.txt (one entry per line)
   ui/            everything a human sees
     console.py     shared out() helper
     prompt/        completer, powerline prompt, key bindings
@@ -170,6 +174,11 @@ conn.execute("PRAGMA synchronous=NORMAL")
 prompt_toolkit, pygments, ptyprocess, httpx, httpx-sse,
 rich, tiktoken==0.9.0, libtmux>=0.55<0.56, token-reducer, secretstorage
 ```
+
+Data files are read with `tomllib`, which is stdlib from Python 3.11 and so
+adds no dependency. Do not add a YAML parser for them: `sable/policy/defaults/
+policy.toml` gates every command, and that path should not grow a third-party
+parser without a strong reason.
 
 ---
 

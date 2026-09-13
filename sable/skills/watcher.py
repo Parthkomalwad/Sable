@@ -13,10 +13,10 @@ import sqlite3
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from sable import data
 
-STOPWORDS = frozenset({
-    "the", "a", "an", "in", "at", "to", "for", "of", "and", "or", "is", "it"
-})
+# Loaded from sable/data/intent_stopwords.txt (Phase 0.5 step 4).
+STOPWORDS = data.load_set("intent_stopwords")
 THRESHOLD = 3
 
 
