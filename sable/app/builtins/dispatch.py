@@ -193,7 +193,13 @@ def handle_builtin(
     if cmd in ("/exit", "/quit"):
         import pathlib
         pathlib.Path.home().joinpath(".local", "share", "agentic-shell", "exit_requested").touch()
-        # Run pattern watcher at exit
+        # Detect repeated command patterns and draft them as skills.
+        #
+        # Phase 2 (Task 7) changed what happens next. This used to write the
+        # skill enabled, so a pattern crossing the 3x threshold started
+        # reaching a model's context with nobody having approved it, and the
+        # user was told as their shell closed, with no way to act on the
+        # message. Drafting still happens here; enabling is a human's job.
         try:
             from sable.skills.watcher import PatternWatcher
             from sable.skills.crystalliser import SkillCrystalliser
@@ -202,8 +208,9 @@ def handle_builtin(
             if patterns:
                 crystalliser = SkillCrystalliser(config=config)
                 for p in patterns:
-                    path = crystalliser.crystallise(p)
-                    _out(f"[skill] auto-generated: {path.name}")
+                    path = crystalliser.crystallise(p, status="pending")
+                    _out(f"[skill] draft saved: {path.name} "
+                         f"(/skill list to review, /skill approve to enable)")
         except (ImportError, OSError, sqlite3.Error, ValueError):
             # Crystallisation runs on the way out. A failure here must not stop
             # the user exiting their shell.

@@ -43,8 +43,14 @@ class SkillCrystalliser:
         self._config = config
         self._db_path = db_path or str(DB_PATH)
 
-    def crystallise(self, pattern: dict) -> Path:
-        """Generate skill file from pattern. Returns path to written file."""
+    def crystallise(self, pattern: dict, status: str = "enabled") -> Path:
+        """Generate skill file from pattern. Returns path to written file.
+
+        `status` defaults to "enabled" so every existing caller and test is
+        unchanged. The `/exit` path passes "pending" (Task 7): a pattern
+        crossing the 3x threshold is evidence worth keeping, not a decision
+        to start feeding a model text nobody approved.
+        """
         from sable.skills.index import SkillIndex
 
         commands = pattern.get("command_sequence", "").split("|")
@@ -86,6 +92,7 @@ class SkillCrystalliser:
             file=str(out_path),
             keywords=keywords,
             auto_generated=True,
+            status=status,
         )
 
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
