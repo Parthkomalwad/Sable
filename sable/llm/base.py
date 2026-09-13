@@ -24,6 +24,25 @@ class LLMResponse:
     done: bool = False           # set by task agent backends when LLM returns "done": true
     spawn: dict | None = None    # {"name": "task-name", "goal": "..."} for autonomous spawning
     action: str = ""             # raw action field from orchestrator JSON (run | spawn | done)
+    #: Exactly what the model said, before it was mapped onto the fields
+    #: above. Every backend sets it.
+    #:
+    #: The typed fields are shaped around the base schema in contracts.md
+    #: §1.1, and each backend fills them with `parsed.get(...)` on those
+    #: names. A model answering a question *outside* that schema therefore
+    #: had its whole answer discarded: the caller got a well-formed, wholly
+    #: empty response, with no way to tell "the model said nothing" from
+    #: "the model said something we dropped".
+    #:
+    #: That is not hypothetical. B3 asks the summariser whether a finished
+    #: run is a reusable procedure, and the answer carries `reusable`,
+    #: `name`, `triggers`, `validate` and `body`, none of which is in the
+    #: schema. On a live run the model answered correctly, 166 completion
+    #: tokens were billed, and the crystalliser drafted nothing at all.
+    #:
+    #: Callers asking a non-schema question read this; callers on the base
+    #: schema keep reading the typed fields and are unaffected.
+    raw: str = ""
 
 
 class LLMBackend(ABC):
