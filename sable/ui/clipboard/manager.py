@@ -26,7 +26,7 @@ def _get_tmux_session() -> str:
             capture_output=True, text=True, timeout=1
         )
         return result.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return ""
 
 

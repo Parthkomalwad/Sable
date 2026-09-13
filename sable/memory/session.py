@@ -5,6 +5,9 @@ Used on login (resume) and after each compression cycle.
 """
 from __future__ import annotations
 
+import json
+import sqlite3
+
 MAX_RESUME_TOKENS = 500
 MAX_REVERT_TOKENS = 4000  # allow larger snapshots for revert
 
@@ -34,7 +37,9 @@ def load_session_context(username: str) -> str | None:
             return None
 
         return row["compressed"]
-    except Exception:
+    except (sqlite3.Error, OSError, KeyError, TypeError):
+        # No database yet, or a row shaped differently by an older version.
+        # Resume is a convenience: starting without it beats not starting.
         return None
 
 
@@ -64,7 +69,7 @@ def list_versions(username: str) -> list[dict]:
             }
             for r in rows
         ]
-    except Exception:
+    except (sqlite3.Error, OSError, IndexError, TypeError):
         return []
 
 
@@ -75,7 +80,6 @@ def load_version(version_id: int, username: str) -> dict | None:
     """
     try:
         from sable.core.db import Database
-        import json
         db = Database()
         row = db._conn.execute(
             """SELECT compressed, raw_turns FROM session_memory
@@ -89,10 +93,11 @@ def load_version(version_id: int, username: str) -> dict | None:
         if row[1]:
             try:
                 raw_turns = json.loads(row[1])
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
+                # A corrupt archive still leaves the compressed summary usable.
                 pass
         return {"compressed": row[0] or "", "raw_turns": raw_turns}
-    except Exception:
+    except (sqlite3.Error, OSError, IndexError, TypeError):
         return None
 
 
@@ -122,5 +127,7 @@ def save_session_context(
             token_count=token_count,
         )
         db.close()
-    except Exception:
-        pass  # Fail silently memory persistence is best-effort
+    except (sqlite3.Error, OSError):
+        # Best effort: losing a context snapshot costs continuity next login,
+        # not this session's work.
+        pass

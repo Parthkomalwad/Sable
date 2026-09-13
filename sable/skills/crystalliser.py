@@ -57,7 +57,9 @@ class SkillCrystalliser:
             # LLMResponse has no .content the markdown skill text comes back
             # in .explanation (backends put free-form text there when no JSON found)
             content = response.explanation or response.command or str(response)
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError, AttributeError) as exc:
+            # The skill file is still written, carrying the reason it is empty,
+            # so a failed crystallisation is visible on disk rather than absent.
             content = f"# auto-skill\n\n<!-- generation failed: {exc} -->\n"
 
         slug = _slugify(keywords[0] if keywords else "skill")

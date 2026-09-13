@@ -4,6 +4,7 @@ The non-interactive bypass MUST remain the first executable code.
 Handles startup, config loading, session resume, and launches the REPL.
 """
 import os
+import sqlite3
 import sys
 
 # --- Non-interactive bypass: must be first executable lines, non-negotiable ---
@@ -155,7 +156,7 @@ def main(argv: list[str] | None = None) -> None:
         try:
             raw = json.loads(config_path.read_text())
             config = ShellConfig.from_dict(raw)
-        except Exception:
+        except (OSError, json.JSONDecodeError, ValueError, KeyError):
             config = ShellConfig.defaults()
 
     # Reconcile: mark tasks whose tmux window is gone as lost
@@ -166,7 +167,9 @@ def main(argv: list[str] | None = None) -> None:
         for task_name in lost_tasks:
             sys.stdout.write(f"[warning] task '{task_name}' was lost while disconnected\n")
         sys.stdout.flush()
-    except Exception:
+    except (ImportError, sqlite3.Error, OSError):
+        # No tmux, no database, or no tasks table yet. Reconcile is a tidy-up
+        # on the way in, never a reason to refuse the login shell.
         pass
 
     # --- Session resume: load compressed context if available ---
@@ -180,7 +183,7 @@ def main(argv: list[str] | None = None) -> None:
                 preview = ctx[:300] + ("..." if len(ctx) > 300 else "")
                 sys.stdout.write(f"session resumed ({len(ctx)} chars)\n{preview}\n")
                 sys.stdout.flush()
-        except Exception:
+        except (ImportError, sqlite3.Error, OSError):
             pass  # Session resume is best-effort
 
     # --- Launch tmux session with sidebar (no-op if already in tmux or tmux unavailable) ---
@@ -189,7 +192,7 @@ def main(argv: list[str] | None = None) -> None:
             from sable.ui.tmux.layout import create_session
             create_session(username)
             # create_session calls os.execvp to attach if we reach here, tmux unavailable
-        except Exception:
+        except (ImportError, OSError):
             pass
 
     from sable.app import repl as loop# lazy import to avoid circular imports

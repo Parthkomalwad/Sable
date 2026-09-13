@@ -124,7 +124,15 @@ class TestCrystallise:
         async def _complete(messages, system):
             seen["prompt"] = messages[0]["content"]
             seen["system"] = system
-            return LLMResponse(command="", explanation="# s", safe=True, plan=None)
+            # prompt_tokens, completion_tokens and cost_usd are required
+            # positional fields. Omitting them raised TypeError, which the
+            # crystalliser's old `except Exception` swallowed: the test passed
+            # by silently taking the generation-failed branch. The Phase 1
+            # exception sweep narrowed that handler and surfaced it.
+            return LLMResponse(
+                command="", explanation="# s", safe=True, plan=None,
+                prompt_tokens=0, completion_tokens=0, cost_usd=0.0,
+            )
 
         backend.complete = _complete
         _crystallise(PATTERN, db_path, backend)

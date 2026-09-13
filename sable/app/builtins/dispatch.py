@@ -16,6 +16,7 @@ list is a parameter. Nothing here mutates another module's namespace.
 from __future__ import annotations
 
 import os
+import sqlite3
 import sys
 
 from sable.app import budget
@@ -99,7 +100,9 @@ def handle_builtin(
                 for p in patterns:
                     path = crystalliser.crystallise(p)
                     _out(f"[skill] auto-generated: {path.name}")
-        except Exception:
+        except (ImportError, OSError, sqlite3.Error, ValueError):
+            # Crystallisation runs on the way out. A failure here must not stop
+            # the user exiting their shell.
             pass
         raise SystemExit(0)
 
@@ -128,7 +131,7 @@ def handle_builtin(
             if new_config is not None:
                 for field in vars(new_config):
                     setattr(config, field, getattr(new_config, field))
-        except Exception as exc:
+        except (ImportError, OSError, ValueError, AttributeError) as exc:
             _out(f"Settings panel error: {exc}")
         return True
 

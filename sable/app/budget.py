@@ -12,6 +12,8 @@ as before, and `/budget reset` clears it.
 """
 from __future__ import annotations
 
+import sqlite3
+
 from sable.core.config.schema import ShellConfig
 from sable.ui.console import out as _out
 
@@ -46,7 +48,7 @@ def check_and_enforce(db, config: ShellConfig, session_id: str) -> bool:
         return True
     try:
         status = db.check_budget(config, session_id)
-    except Exception:
+    except (sqlite3.Error, AttributeError, TypeError, ZeroDivisionError):
         # Budget accounting is best effort; an unreadable DB should not stop
         # the user working. Left broad deliberately, matching the behaviour
         # this replaced, and covered by the Phase 1 exception cleanup.

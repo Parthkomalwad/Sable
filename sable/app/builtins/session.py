@@ -20,7 +20,7 @@ def _start_new_session() -> None:
     try:
         result = subprocess.run(["tmux", "display-message", "-p", "#S"], capture_output=True, text=True)
         current_session = result.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         current_session = ""
 
     new_name = f"sable-{int(time.time()) % 10000}"
@@ -71,5 +71,7 @@ def _start_new_session() -> None:
         subprocess.run(["tmux", "switch-client", "-t", new_name], check=True)
         # Do NOT kill the old session the SSH client is attached to it.
         # Killing it would drop the connection. User can kill old sessions manually.
-    except Exception as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
+        # check=True makes a non-zero tmux exit a CalledProcessError, which is
+        # a SubprocessError.
         _out(f"Failed to create new session: {exc}")

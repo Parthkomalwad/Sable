@@ -247,7 +247,7 @@ System prompts (`llm/prompts/orchestrator.md`, `worker.md`, `skill_writer.md`, `
 
 These are UX rules every feature spec must satisfy. They're what turn "an agent did something" into "I watched it and could have stopped it".
 
-1. **Every state change is an event, every event is visible.** Agents, daemon, policy engine, and skill index all publish to the bus. The sidebar AGENTS panel, `/dash`, `/task <n> events`, and `/audit` are four views over the same stream. Nothing happens "silently".
+1. **Every state change is an event, every event is visible.** Agents, daemon, policy engine, and skill index all publish to the bus. The sidebar AGENTS panel, `/dash`, `/task events <n>`, and `/audit` are four views over the same stream. Nothing happens "silently".
 2. **Before, during, after always three moments shown.**
    - *Before*: the confirm block shows the command, the one-line reason, the blast-radius colour, the policy tier that applied and **which rule**, and which skill (if any) it came from.
    - *During*: a badge (`thinking · running 12s · waiting on worker-2 · blocked: needs approval`), streamed reasoning text, live output.

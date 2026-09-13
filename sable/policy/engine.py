@@ -83,6 +83,16 @@ def confirm_destructive(command: str, reason: str = "") -> bool:
     return answer == "YES"
 
 
+def redact_text(text: str) -> str:
+    """`strip_secrets` without the count, as a plain text-in/text-out callable.
+
+    The shape `core/events/replay.py` wants: that module sits below `policy` in
+    the layering rule, so it cannot import this one and takes a redactor as an
+    argument instead. Agents pass this function.
+    """
+    return strip_secrets(text)[0]
+
+
 def strip_secrets(text: str) -> tuple[str, int]:
     """Redact secrets from text before sending to LLM.
 
