@@ -316,8 +316,35 @@ def _render_all(db, model) -> str:
     bc.print(_panel_git())
     bc.print(_panel_processes())
     bc.print(_panel_tokens(db))
+    # Rendered only when it has something to say. The sidebar prints into a
+    # pane of fixed height and has no notion of how much of it is left, so a
+    # seventh panel pushes the session panel off the top at 45 rows: nothing
+    # errors, the panel is simply gone. This is a stop-gap that restores the
+    # default view, NOT a fix for the underlying problem.
+    #
+    # The real fix is `ui.sidebar.panels` from config plus a renderer that
+    # measures the space it has and says what it dropped (structure.md §3.3,
+    # Phase 4 G1/G6). Until then, a user with corrections is still at seven
+    # panels, which is why test_sidebar_panels.py pins the session panel
+    # surviving a full render rather than trusting this to be enough.
+    if _has_corrections(db):
+        bc.print(_panel_corrections(db))
     bc.print(_panel_clipboard(db))
     return buf.getvalue()
+
+
+def _has_corrections(db) -> bool:
+    """True when the corrections panel would show anything but a hint.
+
+    Defaults to False: a sidebar that cannot read the count should show one
+    panel fewer, not crowd out the session panel to display a zero.
+    """
+    from sable.skills.corrections import weekly_count, withheld_count
+
+    try:
+        return bool(weekly_count(db) or withheld_count(db))
+    except (sqlite3.Error, AttributeError, TypeError):
+        return False
 
 
 def _diff_write(prev_lines: List[str], new_lines: List[str]) -> None:
@@ -438,6 +465,38 @@ def _panel_clipboard(db) -> Panel:
             t.append(f"\n  ↑↓ scroll  {_clip_selected+1}/{total}", style="color(55)")
 
     return Panel(t, title="[color(141) bold]◈ clipboard[/color(141) bold]", border_style="color(55)", padding=(0, 1))
+
+
+def _panel_corrections(db) -> Panel:
+    """The week's corrections, and how many were withheld for carrying a secret.
+
+    Withheld rows are shown rather than hidden: a user who made five
+    corrections and sees three should be able to find out where the other two
+    went. See skills/corrections.py for why they are dropped rather than
+    stored in redacted form.
+    """
+    from sable.skills.corrections import weekly_count, withheld_count
+
+    kept = weekly_count(db)
+    withheld = withheld_count(db)
+
+    t = Text()
+    t.append("This week ", style="color(238)")
+    t.append(f"{kept}\n", style="color(141) bold" if kept else "color(238)")
+    if withheld:
+        t.append("Withheld  ", style="color(238)")
+        t.append(f"{withheld}", style="color(221)")
+        t.append(" (secret)\n", style="color(238)")
+    if not kept and not withheld:
+        t.append("edit a command with ", style="color(238)")
+        t.append("e", style="color(141)")
+        t.append(" to teach it\n", style="color(238)")
+    return Panel(
+        t,
+        title="[color(141) bold]✎ corrections[/color(141) bold]",
+        border_style="color(55)",
+        padding=(0, 1),
+    )
 
 
 def run():
