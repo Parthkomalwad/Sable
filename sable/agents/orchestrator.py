@@ -144,9 +144,17 @@ class OrchestratorAgent:
                 spinner.stop()
                 # I7: say what is reduced and what still works, rather than
                 # printing an exception and leaving the user to infer it.
-                from sable.core.health import llm_unreachable
+                #
+                # A ValueError here means the model answered and the answer was
+                # unusable, which is NOT the network being down. Labelling it
+                # "LLM unreachable" sent a real user to check their backend
+                # while the API was responding fine.
+                from sable.core.health import llm_unparseable, llm_unreachable
 
-                degradation = llm_unreachable(str(exc))
+                if isinstance(exc, ValueError) and not isinstance(exc, runtime.AgentError):
+                    degradation = llm_unparseable(str(exc))
+                else:
+                    degradation = llm_unreachable(str(exc))
                 _out(f"[orchestrator] {degradation.line()}")
                 _out(f"  {degradation.hint}")
                 break

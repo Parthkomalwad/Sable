@@ -216,7 +216,13 @@ def parse_json_action(raw: str, default: dict[str, Any] | None = None) -> dict[s
     try:
         parsed = json.loads(cleaned)
     except (json.JSONDecodeError, TypeError):
-        return dict(default) if default is not None else {}
+        # Two objects back to back is valid JSON followed by more valid JSON,
+        # which json.loads rejects as "Extra data". One action per turn is the
+        # contract, so the first complete object is the answer.
+        try:
+            parsed, _ = json.JSONDecoder().raw_decode(cleaned)
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return dict(default) if default is not None else {}
     if not isinstance(parsed, dict):
         return dict(default) if default is not None else {}
     return parsed
