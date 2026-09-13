@@ -224,6 +224,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 config=config,
                 db_path=str(DB_PATH),
                 task_manager=task_manager,
+                session_id=session_id,
             )
             try:
                 agent.run()
