@@ -199,10 +199,86 @@ class TestAnnouncement:
         assert capsys.readouterr().out.count("using skill") == 1
 
 
+class TestADoneThatDidNothing:
+    """A `done` before any command ran is a refusal, not a completion.
+
+    Seen in the playground: asked to build a snake game inside the Sable
+    repo, the model answered on turn one with
+
+        {"action": "done",
+         "explanation": "This task requires multiple steps and may take
+                         longer than 30 seconds."}
+
+    which is valid JSON and a valid action, so the loop accepted it and
+    printed it with the same success mark a finished goal gets. Nothing
+    ran, nothing was spawned, no tokens showed in the sidebar, and the
+    user had to run `/why` to discover the model had declined rather than
+    finished. A refusal that renders as a success is the same silent
+    failure shape as a dropped panel or a discarded model answer.
+
+    The model's own words are kept, because they are the useful part: they
+    say what it thought was in the way.
+    """
+
+    def test_a_done_with_nothing_run_says_it_declined(self, config, tmp_path, capsys):
+        agent = _agent(config, tmp_path)
+
+        agent._handle_done({"explanation": "this would take too long"})
+
+        out = capsys.readouterr().out.lower()
+        assert "declined" in out or "did not run" in out
+        assert "this would take too long" in out
+
+    def test_it_does_not_use_the_success_mark(self, config, tmp_path, capsys):
+        """The tick is what makes a refusal look like a finished goal."""
+        agent = _agent(config, tmp_path)
+
+        agent._handle_done({"explanation": "nope"})
+
+        assert "✦" not in capsys.readouterr().out
+
+    def test_a_done_after_a_command_is_a_normal_completion(self, config, tmp_path, capsys):
+        agent = _agent(config, tmp_path)
+        agent._commands_run = 1
+
+        agent._handle_done({"explanation": "created the file"})
+
+        out = capsys.readouterr().out
+        assert "✦" in out
+        assert "declined" not in out.lower()
+
+    def test_a_done_after_only_a_spawn_is_a_completion(self, config, tmp_path, capsys):
+        """Delegating the work is doing it. The sub-agent carries on."""
+        agent = _agent(config, tmp_path)
+        agent._commands_run = 1
+
+        agent._handle_done({"explanation": "handed off to a worker"})
+
+        assert "declined" not in capsys.readouterr().out.lower()
+
+    def test_a_refusal_suggests_what_to_do(self, config, tmp_path, capsys):
+        """A message with no next step is the thing that wasted the user's time."""
+        agent = _agent(config, tmp_path)
+
+        agent._handle_done({"explanation": "too vague"})
+
+        assert "/why" in capsys.readouterr().out
+
+    def test_a_refusal_grades_no_skills(self, config, tmp_path):
+        """Nothing ran, so a skill has demonstrated nothing either way."""
+        index = _Index()
+        agent = _agent(config, tmp_path, loader=_Loader([_skill()]), index=index)
+
+        agent._handle_done({"explanation": "declined"})
+
+        assert index.nudges == []
+
+
 class TestGrading:
     def test_a_finished_goal_nudges_the_skills_it_used(self, config, tmp_path):
         index = _Index()
         agent = _agent(config, tmp_path, loader=_Loader([_skill()]), index=index)
+        agent._commands_run = 1      # a real completion, not a refusal
 
         agent._handle_done({"explanation": "deployed"})
 
