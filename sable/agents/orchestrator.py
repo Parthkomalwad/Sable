@@ -152,6 +152,13 @@ class OrchestratorAgent:
         # high confidence.
         self._command_was_edited = False
 
+        # Commands executed and sub-agents spawned. A `done` arriving with
+        # this still at zero is a refusal, not a completion: the model
+        # declined the goal on turn one. Rendering that with the success
+        # mark is what sent a user to `/why` to find out nothing had
+        # happened.
+        self._commands_run = 0
+
         # Sub-agent progress arrives on the bus, not by polling status.md.
         # The cursor starts at the current head so this run only ever sees
         # events published after it began; without that, a re-run under the
@@ -245,6 +252,7 @@ class OrchestratorAgent:
         if output.strip():
             sys.stdout.write(f'\n{output.rstrip()}\n\n')
             sys.stdout.flush()
+        self._commands_run += 1
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": output or "(no output)"})
 
@@ -318,11 +326,27 @@ class OrchestratorAgent:
             # was refused.
             _out(f"[orchestrator] failed to spawn '{name}': {exc}")
 
+        # Delegating the work counts as doing it: the sub-agent carries on
+        # after this loop ends, so a `done` following a spawn is a real
+        # completion rather than a refusal.
+        self._commands_run += 1
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": f"[agent '{name}' spawned]"})
 
     def _handle_done(self, action: dict) -> None:
         explanation = action.get("explanation", "")
+
+        if self._commands_run == 0:
+            # Nothing ran and nothing was spawned, so the model declined the
+            # goal rather than achieving it. Said plainly, with its own
+            # words, because those say what it thought was in the way.
+            # Skills are not graded: nothing was demonstrated either way.
+            _out(f"\n  \u2298 the model declined this goal and did not run anything")
+            if explanation:
+                _out(f"    its reason: {explanation}")
+            _out("    try a more specific goal, or /why to see what it was sent\n")
+            return
+
         _out(f"\n  \u2726 {explanation}\n")
         self._grade_skills()
         if self._task_dir:
