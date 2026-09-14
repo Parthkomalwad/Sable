@@ -283,6 +283,9 @@ def test_handle_done_writes_result(tmp_path):
     orch = _make_orchestrator(tmp_path, goal="build an app")
     orch._task_dir = tmp_path / "tasks" / orch._slug
     (orch._task_dir / ".agentic").mkdir(parents=True)
+    # A `done` with nothing run is a refusal and writes no result; this test
+    # covers the completion path, so say a command ran.
+    orch._commands_run = 1
 
     action = {"action": "done", "explanation": "all done, react app is running"}
     orch._handle_done(action)
