@@ -175,6 +175,7 @@ of. An unknown kind is carried, not rejected.
 | `turn` | one model turn, for replay | see §3 |
 | `command` | a command was executed | `{command, exit_code}` |
 | `guidance` | a human steered it (Ctrl+G) | `{text}` |
+| `skill_used` | a skill was injected into an agent's context | `{skills: [{name, confidence}]}`, plus `{step}` from a worker |
 
 `completed`, `failed` and `lost` are terminal: `EventKind.TERMINAL`. After one
 of them, no further events are expected from that agent.
@@ -366,3 +367,183 @@ regex.
 A missing or malformed policy file **raises at import**. It does not degrade to
 an empty list, because an empty blocklist is a shell that runs `rm -rf /`
 without asking.
+
+---
+
+## 8. Skills, corrections and aliases
+
+Phase 2 (B1, B2, B3, B5, K3, K4). Four contracts: the `SKILL.md` file, the
+`skills_index.json` entry, and two SQLite tables.
+
+### 8.1 `SKILL.md`
+
+`~/skills/<slug>/SKILL.md`, parsed and rendered by `skills/model.py`, which is
+the only module that knows the format. Frontmatter is **TOML in a `+++` fence**,
+followed by a blank line and a markdown body.
+
+```markdown
++++
+name = "deploy-api"
+description = "build, push and restart the api container"
+triggers = ["deploy", "api", "release"]
+preconditions = ["docker is running"]
+validate = "curl -sf localhost:8080/health"
+status = "pending"
+source = "crystallised"
++++
+
+1. `docker build -t api .`
+2. `docker push registry/api`
+3. `docker compose up -d api`
+```
+
+| field | type | required | meaning |
+|---|---|---|---|
+| `name` | string | yes | identity; matches the folder slug and the index entry |
+| `description` | string | yes | what `/skill list` and ranking show |
+| `triggers` | list of strings | no | keywords the index matches a goal against |
+| `preconditions` | list of strings | no | stated in the body's context, not enforced |
+| `validate` | string | no | a shell command B5 runs to grade a use |
+| `status` | `pending` \| `enabled` \| `disabled` | no, default `pending` | only `enabled` is ever injected |
+| `source` | `user` \| `crystallised` \| `imported` | no, default `user` | Phase 8's K8 sets a trust floor by source |
+
+Four decisions the format depends on:
+
+- **TOML, not YAML.** CLAUDE.md's approved dependency list has no YAML parser and
+  `tomllib` is stdlib. The fence is `+++` rather than `---` so a reader never
+  mistakes it for YAML frontmatter that happens to parse: `triggers = ["a"]` is
+  valid in both and means the same thing, which is how a format drifts into
+  being half-YAML by accident.
+- **`status` defaults to `pending`.** The value that stays inert is the safe one
+  to assume when a field is absent.
+- **Unknown keys survive** in `Skill.extra` and render back verbatim. B7 imports
+  skills written against a later contract; a parser that dropped what it did not
+  understand would corrupt them on the first `/skill edit`.
+- **A malformed skill raises `SkillFormatError`**, naming the file, rather than
+  yielding a half-built `Skill` that injects an empty body. Unlike the policy
+  file this does not exit: a missing blocklist means running `rm -rf /` unasked,
+  a missing skill just means doing the work by hand.
+
+**Legacy flat files.** `~/skills/instructions/<slug>.md` is the pre-B2 shape:
+bare markdown, no frontmatter. It still parses, taking its name from the
+filename, its description from the first heading, and `status = "enabled"` —
+a skill that already worked stays working, and sending every existing skill to
+`pending` would be indistinguishable from the migration losing them.
+`skills/migrate.py` copies them into the folder layout and keeps the originals.
+
+### 8.2 `skills_index.json`
+
+`~/skills/skills_index.json`, a JSON array managed by `skills/index.py`. Created
+empty on first use.
+
+```json
+{
+  "name": "deploy-api",
+  "file": "/home/u/skills/deploy-api/SKILL.md",
+  "keywords": ["deploy", "api"],
+  "auto_generated": true,
+  "confidence": 0.55,
+  "use_count": 2,
+  "last_used": "2026-09-13T09:41:07+00:00",
+  "needs_update": false,
+  "status": "enabled",
+  "created_at": "2026-09-12T18:02:55+00:00"
+}
+```
+
+`status` is stored in **both** the file and the index, and `_set_status` writes
+the file first. The index is what `/skill list` and the startup pending-count
+read cheaply; the file is what keeps the gate honest when the index is deleted.
+A crash between the two writes leaves the skill withheld, which is the safe
+direction to fail.
+
+An entry written before Phase 2 has no `status` key. **A missing status reads as
+`enabled`**, for the same reason a legacy flat file does.
+
+**Confidence.** Starts at 0.5 auto-generated, 1.0 manual. `nudge(name, success)`
+moves it +0.05 on success, -0.1 on failure, clamped to [0.0, 1.0]. Approval does
+not touch it: approval says "you may run this", not "I vouch for it".
+
+**Ranking is a product, not a sort**: `confidence x recency x use_count x match`.
+Every factor is floored above zero (`recency >= 0.25`, `use_weight >= 1.0`), so a
+newly approved skill with no uses can still be retrieved and earn its first
+success. Recency decays with a 30-day half-life; `use_weight` is
+`1 + sqrt(use_count)`, so a much-used skill cannot drown out a better match;
+`match` is the fraction of the goal's keywords the skill claims, and a zero match
+excludes the skill outright. `get_ranked()` returns **only `enabled` entries** —
+that single filter is the whole of the approval gate. Ties sort by index position
+so an announcement does not name a different skill each run. The weights are a
+heuristic; tests pin orderings, not scores.
+
+### 8.3 `skill_corrections` (K3)
+
+```sql
+CREATE TABLE skill_corrections (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        TEXT NOT NULL,             -- ISO 8601
+    kind      TEXT NOT NULL,             -- 'edit' | 'route'
+    proposed  TEXT,                      -- what the model offered
+    corrected TEXT,                      -- what the user ran instead
+    withheld  INTEGER NOT NULL DEFAULT 0 -- 1 = redaction fired, both sides NULL
+);
+CREATE INDEX idx_skill_corrections_withheld_ts
+    ON skill_corrections (withheld, ts);
+```
+
+`kind` is `edit` (an `e`-edit at the confirm prompt) or `route` (a `[b/a]`
+answer, which still writes its TSV corpus row as well). Plain strings for the
+same reason `EventKind` uses them.
+
+**Rows that are kept are byte-exact.** §3's redaction rule is not applied
+literally here: `policy/engine.py:strip_secrets` ends in `" ".join(tokens)` and
+so normalises whitespace, which is harmless for prose and corrupting for a
+command — `awk -F'\t'` comes back altered. A pair whose redaction fires anything
+is therefore **withheld entirely**: `withheld = 1`, both text columns NULL. The
+count is kept so `/corrections` can say why the number is lower than expected.
+
+`record_correction` never raises and returns False without writing when the
+correction is empty, changed nothing of substance, or carried a secret.
+
+### 8.4 `skill_aliases` (K4)
+
+```sql
+CREATE TABLE skill_aliases (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    phrase           TEXT NOT NULL,        -- as the user typed it
+    normalised       TEXT NOT NULL UNIQUE, -- lowercased, depunctuated, collapsed
+    command          TEXT NOT NULL,
+    use_count        INTEGER NOT NULL DEFAULT 0,
+    promoted_offered INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
+);
+```
+
+Matched in `app/repl.py` **before** `classify()`, so a hit costs no model call;
+anywhere further in and it would already have cost a turn. Matching is
+`difflib` over the normalised form, threshold **0.9** — high on purpose, since
+silently running the wrong command because a sentence looked a bit like a stored
+phrase is far worse than retyping. `normalised` is UNIQUE: re-adding a phrase
+replaces its command, because two rows for one phrase make matching ambiguous.
+
+**An alias is not a safety bypass.** Resolving one yields a command string and
+nothing else; the caller runs it down the ordinary bash path where
+`is_destructive` gates it. `rm -rf` behind a friendly phrase still asks.
+
+**Promotion is offered, never taken.** At `use_count >= 3`
+(`PROMOTION_THRESHOLD`) `should_offer_promotion` reports that the alias is worth
+turning into a skill; `mark_promotion_offered` records that we asked, so an
+ignored offer does not nag on every later use.
+
+### 8.5 Crystallisation (B3)
+
+A run that ends `done` with >= 3 executed steps, or a `PatternWatcher` pattern
+crossing its 3x threshold, asks the summariser model for a reusable procedure.
+The draft is written with `status = "pending"` and `source = "crystallised"`,
+and is withheld from `get_ranked()` until a human runs `/skill approve`. Nothing
+a model drafted unattended reaches another model's context without that step.
+
+### 8.6 Not implemented
+
+**B6, semantic skill search.** Retrieval is keyword `match` against `triggers`
+and `keywords` only. Embedding-based retrieval is scheduled for a later phase
+and nothing depends on it today.
