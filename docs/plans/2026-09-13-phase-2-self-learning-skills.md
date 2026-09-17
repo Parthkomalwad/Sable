@@ -121,41 +121,41 @@ docstring. Task 4 replaces the body and the docstring together.
 
 **Files:** Create `sable/skills/model.py`, `tests/unit/test_skill_model.py`
 
-- [ ] **Step 1: failing tests.** Round-trip a `SKILL.md`: frontmatter parses to
+- [x] **Step 1: failing tests.** Round-trip a `SKILL.md`: frontmatter parses to
       a `Skill`; rendering it back produces byte-identical frontmatter; unknown
       keys survive a round trip; a missing required key raises a typed
       `SkillFormatError`; a body with no frontmatter at all parses as a legacy
       skill with inferred `name` and empty `triggers`.
-- [ ] **Step 2: run, confirm they fail** (module does not exist).
-- [ ] **Step 3: implement.** Frontmatter fields per roadmap: `name`,
+- [x] **Step 2: run, confirm they fail** (module does not exist).
+- [x] **Step 3: implement.** Frontmatter fields per roadmap: `name`,
       `description`, `triggers`, `preconditions`, `validate`, plus `status`
       (`pending|enabled|disabled`) and `source` (`user|crystallised`). Parse
       with `tomllib` inside a `+++` fence, **not** YAML: CLAUDE.md forbids
       adding a YAML parser and `tomllib` is stdlib. Record this choice in the
       docstring, as `policy/rules.py` does for `policy.toml`.
-- [ ] **Step 4:** `pytest tests/unit/ -q` green. Commit: `feat(skills): Skill model and SKILL.md frontmatter contract`
+- [x] **Step 4:** `pytest tests/unit/ -q` green. Commit: `feat(skills): Skill model and SKILL.md frontmatter contract`
 
 ## Task 2: Migration from flat files to folders (B2, I6-lite)
 
 **Files:** Create `sable/skills/migrate.py`, `tests/unit/test_skill_migrate.py`
 
-- [ ] **Step 1: failing tests.** A flat `instructions/foo.md` becomes
+- [x] **Step 1: failing tests.** A flat `instructions/foo.md` becomes
       `~/skills/foo/SKILL.md` with inferred frontmatter; **the original file
       still exists**; migration is idempotent; a folder that already exists is
       not overwritten; an unreadable file is skipped and reported, not fatal.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** `migrate_flat_skills() -> list[MigrationResult]`.
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** `migrate_flat_skills() -> list[MigrationResult]`.
       Infer `name` from the stem and `description` from the first heading line,
       the same two facts `loader.py` already reads today. `status` is inherited
       from the index if present, else `enabled` (a skill the user already had
       working must not silently go pending).
-- [ ] **Step 4:** green. Commit: `feat(skills): migrate flat skill files to folders, keeping originals`
+- [x] **Step 4:** green. Commit: `feat(skills): migrate flat skill files to folders, keeping originals`
 
 ## Task 3: Pending state and the ranking formula (B1, B3 approval)
 
 **Files:** Modify `sable/skills/index.py`, `tests/unit/test_skill_index.py`
 
-- [ ] **Step 1: failing tests.** New: `add(..., status="pending")` is the
+- [x] **Step 1: failing tests.** New: `add(..., status="pending")` is the
       default for auto-generated skills; `get_ranked()` **excludes** pending and
       disabled; `approve()` flips pending -> enabled; `reject()` removes the
       entry and leaves the folder on disk; `nudge(name, success)` moves
@@ -165,95 +165,95 @@ docstring. Task 4 replaces the body and the docstring together.
       **Updated deliberately:** the 3 existing `get_ranked` tests now assert the
       new ordering and the pending filter. Note in the commit message that these
       changed and why.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** `nudge()` is a thin, named alias over the existing
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** `nudge()` is a thin, named alias over the existing
       `record_use()` deltas rather than a second scoring path. Keep the
       documented numbers: +0.05 success, -0.10 failure, clamped to [0, 1].
       Recency is a bounded decay so an old high-confidence skill cannot
       permanently outrank a fresh relevant one.
-- [ ] **Step 4:** green. Commit: `feat(skills): pending approval state and confidence-ranked retrieval`
+- [x] **Step 4:** green. Commit: `feat(skills): pending approval state and confidence-ranked retrieval`
 
 ## Task 4: The loader consults the index (B1)
 
 **Files:** Modify `sable/skills/loader.py`, `tests/unit/test_skill_loader.py` (create)
 
-- [ ] **Step 1: failing tests.** `load_relevant()` returns folder skills ranked
+- [x] **Step 1: failing tests.** `load_relevant()` returns folder skills ranked
       by the index; a pending skill is never returned; a local task skill still
       overrides a global one by name; the returned dicts keep today's
       `{name, content, hash, source}` shape so `worker.py`'s de-duplication
       keeps working unchanged; an index that does not exist degrades to the old
       keyword match rather than raising.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** Replace the body **and** the stale docstring
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** Replace the body **and** the stale docstring
       ("keyword-only stub in Phase 3. Phase 5 will upgrade it"). The index is an
       injected collaborator with a default, matching how `worker.py` takes
       `memory` and `skill_loader`, so no new layering edge appears.
-- [ ] **Step 4:** green. Commit: `feat(skills): rank loaded skills by confidence instead of keywords alone`
+- [x] **Step 4:** green. Commit: `feat(skills): rank loaded skills by confidence instead of keywords alone`
 
 ## Task 5: Close the feedback loop (B1, B5)
 
 **Files:** Create `sable/skills/validate.py`; modify `sable/agents/worker.py`;
 create `tests/unit/test_skill_validate.py`, `tests/unit/test_skill_feedback.py`
 
-- [ ] **Step 1: failing tests.** A skill with a `validate` command is graded by
+- [x] **Step 1: failing tests.** A skill with a `validate` command is graded by
       running it: exit 0 is success, non-zero failure; a skill **without**
       `validate` falls back to the run's own outcome; a validator that times out
       grades as failure and says so; after a run that used skill S, `nudge(S, ...)`
       is called exactly once per skill, not once per step.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** The validator runs through
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** The validator runs through
       `agents/runtime.run_command` inside the worker's existing sandbox: it is
       model-authored text and must not run unwrapped. Nudges fire once, at
       terminal state, from the same place the `completed`/`failed` event is
       published, so the bus and the confidence loop can never disagree.
-- [ ] **Step 4:** green. Commit: `feat(skills): grade skill use by validator or exit code and nudge confidence`
+- [x] **Step 4:** green. Commit: `feat(skills): grade skill use by validator or exit code and nudge confidence`
 
 ## Task 6: Post-task crystallisation (B3)
 
 **Files:** Modify `sable/skills/crystalliser.py`, create
 `sable/llm/prompts/crystallise_check.md`, `tests/unit/test_crystallise_from_run.py`
 
-- [ ] **Step 1: failing tests.** A run that ends `done` with >= 3 executed steps
+- [x] **Step 1: failing tests.** A run that ends `done` with >= 3 executed steps
       asks the summariser once; a run with 2 steps asks nothing; a **failed**
       run asks nothing; a "no, not reusable" answer writes no file; a "yes"
       answer writes `<slug>/SKILL.md` with `status: pending` and
       `source: crystallised`; the summariser role is used, not the orchestrator's.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** `SkillCrystalliser.from_run(...)`. Reuses the
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** `SkillCrystalliser.from_run(...)`. Reuses the
       existing failure posture: a generation failure writes a file carrying the
       reason rather than vanishing. Existing `crystallise()` tests stay green;
       the only change to that path is the new pending default.
-- [ ] **Step 4:** green. Commit: `feat(skills): draft a pending skill from a completed multi-step run`
+- [x] **Step 4:** green. Commit: `feat(skills): draft a pending skill from a completed multi-step run`
 
 ## Task 7: `/exit` drafts, it no longer enables (behaviour change, 0.1)
 
 **Files:** Modify `sable/app/builtins/dispatch.py`, `sable/app/repl.py`;
 create `tests/unit/test_exit_crystallisation.py`
 
-- [ ] **Step 1: failing tests.** At `/exit`, a threshold-crossing pattern writes
+- [x] **Step 1: failing tests.** At `/exit`, a threshold-crossing pattern writes
       a **pending** skill; the message says "draft" and names the approval
       command; a pending skill is not returned by `load_relevant()`; a
       crystallisation failure still exits cleanly (the existing guard holds);
       startup prints the pending count when > 0 and prints nothing when 0.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** The narrow change is the status the draft is
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** The narrow change is the status the draft is
       written with, plus the wording. Keep the exception tuple exactly as it is:
       it is already specific and already documented.
-- [ ] **Step 4:** green. Commit: `fix(skills)!: crystallised skills are drafts pending approval, not auto-enabled`
+- [x] **Step 4:** green. Commit: `fix(skills)!: crystallised skills are drafts pending approval, not auto-enabled`
 
 ## Task 8: `/skill show|edit|disable|stats|approve|reject` (B2)
 
 **Files:** Modify `sable/app/builtins/skill.py`, `tests/unit/test_skill_builtin.py`
 
-- [ ] **Step 1: failing tests.** `list` marks pending drafts and shows
+- [x] **Step 1: failing tests.** `list` marks pending drafts and shows
       confidence; `show <slug>` renders frontmatter and body; `approve <slug>`
       enables and reports the confidence it starts at; `reject <slug>` removes
       the index entry and says the folder was kept; `disable <slug>` is
       reversible; `stats` shows use_count, confidence and last_used; an unknown
       slug is a clear message, not a traceback. Existing 12 tests stay green.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** Rich via `ui/console.out`, never `print()`.
-- [ ] **Step 4:** green. Commit: `feat(skills): /skill show, edit, disable, stats, approve and reject`
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** Rich via `ui/console.out`, never `print()`.
+- [x] **Step 4:** green. Commit: `feat(skills): /skill show, edit, disable, stats, approve and reject`
 
 ## Task 9: Learn from your edits (K3)
 
@@ -261,17 +261,17 @@ create `tests/unit/test_exit_crystallisation.py`
 `sable/agents/orchestrator.py`, `sable/app/builtins/dispatch.py`,
 `sable/ui/sidebar/watch.py`; create `tests/unit/test_corrections.py`
 
-- [ ] **Step 1: failing tests.** An `e`-edit stores `(proposed, corrected)`;
+- [x] **Step 1: failing tests.** An `e`-edit stores `(proposed, corrected)`;
       **both are redacted** through `policy/engine.py` before the write, so a
       key typed into an edit prompt never reaches the table; an edit that
       changes nothing stores nothing; the existing `[b/a]` recorder keeps
       writing its corpus row **and** now writes a correction; `/corrections`
       lists and deletes; the sidebar counter reads the week's count.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** New `skill_corrections` table. The redaction call
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** New `skill_corrections` table. The redaction call
       is the same `redact_text` the replay log uses, so one rule governs every
       table that stores model-adjacent text.
-- [ ] **Step 4:** green. Commit: `feat(skills): record command edits and routing answers as corrections`
+- [x] **Step 4:** green. Commit: `feat(skills): record command edits and routing answers as corrections`
 
 ## Task 10: Natural-language aliases (K4)
 
@@ -279,60 +279,67 @@ create `tests/unit/test_exit_crystallisation.py`
 `sable/app/repl.py`, `sable/app/builtins/dispatch.py`;
 create `tests/unit/test_aliases.py`
 
-- [ ] **Step 1: failing tests.** `/alias "restart the api" = docker compose restart api`
+- [x] **Step 1: failing tests.** `/alias "restart the api" = docker compose restart api`
       stores it; the phrase matches **before** the router runs and makes no LLM
       call; matching is normalised and fuzzy at >= 0.9; a near-miss below the
       threshold falls through to the router untouched; an alias reaching 3 uses
       is **offered** for promotion, never auto-promoted; the resolved command
       still passes the destructive check before running.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** Matching is deterministic string work with
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** Matching is deterministic string work with
       `difflib` (stdlib), no new dependency. It sits in `repl.py` ahead of
       `classify()`, which is the only place it can be both instant and free.
-- [ ] **Step 4:** green. Commit: `feat(skills): natural-language aliases matched before the router`
+- [x] **Step 4:** green. Commit: `feat(skills): natural-language aliases matched before the router`
 
 ## Task 11: Announce the skill in use (gate line 2)
 
 **Files:** Modify `sable/agents/orchestrator.py`, `sable/agents/worker.py`;
 create `tests/unit/test_skill_announcement.py`
 
-- [ ] **Step 1: failing tests.** When a skill is injected, the first turn's
+- [x] **Step 1: failing tests.** When a skill is injected, the first turn's
       visible output contains `using skill <name> (<confidence>)` to two
       decimals; nothing is printed when no skill matched; the announcement is
       also a bus event so the sidebar and `/task events` can see it.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** This is the gate's literal wording. Publish a
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** This is the gate's literal wording. Publish a
       `skill_used` event kind; `contracts.md` §2.1 already promises an unknown
       kind is carried, not rejected, so the sidebar needs no change to survive it.
-- [ ] **Step 4:** green. Commit: `feat(agents): announce which skill an agent is using and at what confidence`
+- [x] **Step 4:** green. Commit: `feat(agents): announce which skill an agent is using and at what confidence`
 
 ## Task 12: Re-label the misfiled integration placeholders (0.4)
 
 **Files:** Modify `tests/integration/test_full_loop.py`,
 `test_llm_backends.py`, `test_session_resume.py`
 
-- [ ] **Step 1:** No new tests. Change each `xfail` reason from "Phase 2" to the
+- [x] **Step 1:** No new tests. Change each `xfail` reason from "Phase 2" to the
       phase that actually owns it, with a one-line comment saying why it is not
       Phase 2 work. `strict=True` and `raises=NotImplementedError` stay, so an
       accidental implementation still fails the build.
-- [ ] **Step 2:** `pytest tests/integration/ -q` still 76 passed / 15 xfailed.
-- [ ] **Step 3:** Commit: `docs(tests): re-label integration placeholders to their owning phase`
+- [x] **Step 2:** `pytest tests/integration/ -q` still 76 passed / 15 xfailed.
+- [x] **Step 3:** Commit: `docs(tests): re-label integration placeholders to their owning phase`
 
 ## Task 13: Docs, contracts, and the real run
 
 **Files:** Modify `docs/contracts.md`, `CHANGELOG.md`, `README.md`
 
-- [ ] **Step 1:** Document in `contracts.md`: the `SKILL.md` frontmatter
+- [x] **Step 1:** Document in `contracts.md`: the `SKILL.md` frontmatter
       contract and why it is TOML; the `skills_index.json` schema including
       `status`; `skill_corrections` and `skill_aliases` DDL; the `skill_used`
       event kind. Mark B6 as not implemented, the way §1.3 marks `wait`/`ask`.
-- [ ] **Step 2:** Run the **whole gate by hand** in the playground with a real
-      key, not only the suite. Phase 1 found three real bugs this way that 665
-      unit tests missed. Specifically confirm: the draft appears pending after
-      run 1; approval enables it; run 2 announces the skill and uses fewer
-      turns; run 3 reaches 0.60; a deliberate break drops it to 0.50;
-      `cat ~/skills/deploy-api/SKILL.md` has valid frontmatter. Use `/why` and
-      `agent_turns` to diagnose anything that misbehaves.
+- [ ] **Step 2: DEFERRED, not done.** Run the **whole gate by hand** in the
+      playground with a real key, not only the suite. Phase 1 found three real
+      bugs this way that 665 unit tests missed. Specifically confirm: the draft
+      appears pending after run 1; approval enables it; run 2 announces the
+      skill and uses fewer turns; run 3 reaches 0.60; a deliberate break drops
+      it to 0.50; `cat ~/skills/deploy-api/SKILL.md` has valid frontmatter. Use
+      `/why` and `agent_turns` to diagnose anything that misbehaves.
+
+      Deferred for want of an API key, with Phase 3 started ahead of it. What
+      stands in its place is weaker and known to be weaker: 944 unit and 76
+      integration tests green in the playground image. B3 shipped *silently
+      dead* with all 18 of its unit tests passing, so a green suite is not
+      evidence this loop works end to end. Phase 2 is therefore **unverified**,
+      not complete, and this step is owed before v0.4 closes.
 - [ ] **Step 3:** Commit: `docs: Phase 2 contracts for skills, corrections and aliases`
 
 ---
