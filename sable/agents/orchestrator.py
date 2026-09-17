@@ -101,6 +101,7 @@ class OrchestratorAgent:
         corrections_db=None,
         skill_loader=None,
         skill_index=None,
+        crystalliser=None,
     ) -> None:
         self._goal = goal
         self._cwd = cwd
@@ -129,6 +130,16 @@ class OrchestratorAgent:
         # test_layering.py's strict xfail. A caller passing nothing gets the
         # pre-Phase-2 behaviour of no skills at all.
         self._skill_index = skill_index
+        # B3's post-task half. Injected for the same layering reason as the
+        # two above. Phase 2 built `from_run` and wired nothing to it, so a
+        # completed multi-step goal drafted nothing and the phase's own gate
+        # could not be reached; the unit tests missed it because they called
+        # `from_run` directly, which is precisely what production did not.
+        self._crystalliser = crystalliser
+        #: Commands that actually ran, in order, for `from_run` to summarise.
+        #: `_commands_run` counts spawns too, so it cannot answer "which
+        #: commands", and a count is not a procedure.
+        self._steps: list[dict] = []
         self._skills: list[dict] = []
         if skill_loader is not None:
             try:
@@ -253,6 +264,7 @@ class OrchestratorAgent:
             sys.stdout.write(f'\n{output.rstrip()}\n\n')
             sys.stdout.flush()
         self._commands_run += 1
+        self._record_step(confirmed_cmd, output)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": output or "(no output)"})
 
@@ -333,6 +345,43 @@ class OrchestratorAgent:
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": f"[agent '{name}' spawned]"})
 
+    def _record_step(self, command: str, output: str = "") -> None:
+        """Remember one executed command for B3.
+
+        Output is capped: `from_run` sends these to a summariser, and a step
+        that dumped a large file would otherwise spend the whole prompt on
+        one command's stdout.
+        """
+        self._steps.append({"command": command, "output": (output or "")[:2000]})
+
+    def _maybe_draft_skill(self) -> None:
+        """Offer this run to the crystalliser (B3).
+
+        `from_run` decides whether the run qualifies: it holds the step
+        threshold and the "is this reusable?" question, and duplicating
+        either here would give the rule two homes that could disagree.
+        """
+        if self._crystalliser is None:
+            return
+        if self._command_was_edited:
+            # The same evidence `_grade_skills` refuses to grade on. The
+            # human rewrote a command, so the procedure that worked is partly
+            # theirs, and drafting it would file their fix as the model's.
+            return
+        try:
+            path = self._crystalliser.from_run(self._goal, list(self._steps), True)
+        except (OSError, ValueError, KeyError, sqlite3.Error):
+            # Drafting runs after the work is done. A failure here must not
+            # turn a finished goal into a failed one.
+            return
+        if path is None:
+            return
+        # `from_run` returns the SKILL.md path; the skill's name is its
+        # folder, which is what `/skill approve` takes.
+        name = Path(path).parent.name
+        _out(f"\n  [skill] draft saved: {name} "
+             f"(/skill list to review, /skill approve {name} to enable)")
+
     def _handle_done(self, action: dict) -> None:
         explanation = action.get("explanation", "")
 
@@ -349,6 +398,7 @@ class OrchestratorAgent:
 
         _out(f"\n  \u2726 {explanation}\n")
         self._grade_skills()
+        self._maybe_draft_skill()
         if self._task_dir:
             try:
                 result_path = self._task_dir / ".agentic" / "result.md"
