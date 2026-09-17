@@ -513,7 +513,11 @@ class TaskAgent:
 
             self._memory.add_turns([
                 {"role": "assistant", "content": json.dumps(parsed)},
-                {"role": "user", "content": output or "(no output)"},
+                # See orchestrator.py: `runtime.run_command` reports the exit
+                # status for a command that printed nothing, so there is no
+                # silence left to substitute for. A worker runs unattended,
+                # so a goal abandoned this way would have nobody watching.
+                {"role": "user", "content": output},
             ])
             self._memory.save_snapshot()
 
