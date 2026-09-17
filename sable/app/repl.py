@@ -90,6 +90,25 @@ _active_turns: list[dict] = []
 
 
 
+def _crystalliser_or_none(config):
+    """A `SkillCrystalliser` for the orchestrator to draft with (B3).
+
+    Built here rather than inside the agent because `agents` sits below
+    `skills` in the layering rule, the same inversion `skill_loader`,
+    `skill_index` and `corrections_db` already use.
+
+    Returns None if it cannot be built, which gives the pre-B3 behaviour of
+    drafting nothing. A shell that will not start because the skills
+    directory is unreadable would be a poor trade for a feature that only
+    ever runs after the work is finished.
+    """
+    try:
+        from sable.skills.crystalliser import SkillCrystalliser
+        return SkillCrystalliser(config=config)
+    except (ImportError, OSError, ValueError):
+        return None
+
+
 def _match_alias(db, line: str):
     """Resolve a line to a stored alias, or None. Never raises.
 
@@ -336,6 +355,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 corrections_db=db,
                 skill_loader=TaskSkillLoader("orchestrator", _tasks_base),
                 skill_index=SkillIndex(),
+                crystalliser=_crystalliser_or_none(config),
             )
             try:
                 agent.run()
