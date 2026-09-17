@@ -326,21 +326,67 @@ create `tests/unit/test_skill_announcement.py`
       contract and why it is TOML; the `skills_index.json` schema including
       `status`; `skill_corrections` and `skill_aliases` DDL; the `skill_used`
       event kind. Mark B6 as not implemented, the way §1.3 marks `wait`/`ask`.
-- [ ] **Step 2: DEFERRED, not done.** Run the **whole gate by hand** in the
-      playground with a real key, not only the suite. Phase 1 found three real
-      bugs this way that 665 unit tests missed. Specifically confirm: the draft
-      appears pending after run 1; approval enables it; run 2 announces the
-      skill and uses fewer turns; run 3 reaches 0.60; a deliberate break drops
-      it to 0.50; `cat ~/skills/deploy-api/SKILL.md` has valid frontmatter. Use
-      `/why` and `agent_turns` to diagnose anything that misbehaves.
+- [x] **Step 2: RUN. Five of six lines pass; the sixth is untested.** The whole
+      gate, by hand, against `gpt-4o-mini` in the playground. It found three
+      real bugs that 944 green unit tests did not, which is the second time on
+      this project that a live run has caught what the suite could not.
 
-      Deferred for want of an API key, with Phase 3 started ahead of it. What
-      stands in its place is weaker and known to be weaker: 944 unit and 76
-      integration tests green in the playground image. B3 shipped *silently
-      dead* with all 18 of its unit tests passing, so a green suite is not
-      evidence this loop works end to end. Phase 2 is therefore **unverified**,
-      not complete, and this step is owed before v0.4 closes.
-- [ ] **Step 3:** Commit: `docs: Phase 2 contracts for skills, corrections and aliases`
+      | Gate line | Result |
+      |---|---|
+      | Run 1 drafts `deploy-api`, pending | pass, 4 turns, confidence 0.50 |
+      | Approval enables it | pass, withheld by `get_ranked` while pending |
+      | Run 2 announces the skill | pass, `◈ using skill deploy-api (0.50)`, 0.55 |
+      | Run 3 reaches 0.60 | pass, `use_count=2` |
+      | A deliberate break drops it to 0.50 | pass, exactly 0.50 |
+      | `cat ~/skills/deploy-api/SKILL.md` | pass, valid `+++` TOML frontmatter |
+      | Run 2 uses **fewer turns** than run 1 | **untested, see below** |
+
+      The bugs, each fixed test-first and re-verified live:
+
+      - `cd789cb` **B3 had no call site.** `SkillCrystalliser.from_run` was
+        built in Task 6, covered by 18 unit tests, and called from nowhere in
+        `sable/`. A completed multi-step goal drafted nothing, so gate line 1
+        was unreachable by any code path. The 18 tests passed throughout
+        because each called `from_run` directly, which is exactly what
+        production did not do.
+      - `dbdd082` **A silent command read as "still running".** A deploy
+        script that wrote files and printed nothing reached the model as
+        `(no output)`; it answered with a `done` that abandoned the goal after
+        one of three steps, 4 runs out of 4. `_reap` had been collecting the
+        exit status and discarding it.
+      - `9ace438` **Confidence could only rise.** `_grade_skills` passed a
+        hardcoded `True`, so the break-on-purpose line could not pass on the
+        orchestrator path. The worker's `grade_skills_used` had done this
+        properly since Task 5 and was called from `worker.py` alone.
+
+      The **turn-count line is untested, not passed and not failed.** Two
+      attempts were both invalid by construction: a goal naming all three
+      commands leaves a skill nothing to save (4 turns either way), and a bare
+      "deploy the api" is undiscoverable from the agent's cwd, so run 1
+      invented a placeholder command and failed at turn one (2 turns either
+      way). A valid test needs a goal that is vague *and* discoverable, so
+      run 1 pays turns to explore and run 2 gets the procedure from the skill.
+      It is owed, and it measures model behaviour more than it measures this
+      feature, which is why the phase is being closed without it rather than
+      on it.
+
+      Three further findings, recorded rather than fixed here:
+
+      - **Validators do not run on the orchestrator path**, by choice. The
+        worker validates inside `bwrap`; the orchestrator runs unsandboxed in
+        the user's real cwd, so auto-executing a model-authored `validate`
+        command there needs Phase 3's policy tiers first. Grading therefore
+        catches a run that failed visibly and not one the model wrongly
+        believes succeeded (B5's stated purpose), and `_run_failed` says so.
+      - **The same shape recurred three times**: B1, B3 and B5 were each
+        built, tested and wired into the *worker*, and each was missing from
+        the orchestrator, which is the path a typed goal actually takes.
+        `test_loop_orchestrator_wiring.py` now asserts the REPL passes every
+        collaborator the agent accepts, which is the seam unit tests cannot
+        see.
+      - **`sqlite3` is not installed in the playground image.** Debugging
+        commands that use it fail silently and read as empty state.
+- [x] **Step 3:** Commit: `docs: Phase 2 contracts for skills, corrections and aliases`
 
 ---
 
