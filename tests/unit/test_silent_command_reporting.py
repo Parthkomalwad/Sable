@@ -60,6 +60,31 @@ class TestExitStatusIsReported:
 
         assert "broken" in out
 
+    def test_a_command_that_printed_and_failed_also_reports_the_failure(self, tmp_path):
+        """Output is not an outcome, and the first fix read as if it were.
+
+        The gate's break-on-purpose step exposed this. A deploy script that
+        wrote "deploy failed: registry unreachable" to stderr and exited 1
+        took the early return for commands that printed something, so its
+        status was dropped. The model was told the deploy had failed and the
+        *runtime* was not, so grading saw no failed step and nudged the
+        skill's confidence up, on the run that was supposed to push it down.
+
+        A failure has to be legible to both readers: as prose for the model
+        and as a marker for the code that grades the run.
+        """
+        out = runtime.run_command("echo broken >&2; exit 1", cwd=str(tmp_path))
+
+        assert "broken" in out
+        assert "exit 1" in out
+
+    def test_a_success_that_printed_is_not_annotated(self, tmp_path):
+        """Only failure is worth interrupting the output to say."""
+        out = runtime.run_command("echo fine", cwd=str(tmp_path))
+
+        assert "fine" in out
+        assert "exit" not in out
+
     def test_an_empty_command_is_unchanged(self, tmp_path):
         """Nothing ran, so there is no status to report."""
         out = runtime.run_command("   ", cwd=str(tmp_path))
