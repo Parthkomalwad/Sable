@@ -266,7 +266,13 @@ class OrchestratorAgent:
         self._commands_run += 1
         self._record_step(confirmed_cmd, output)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
-        self._history.append({"role": "user", "content": output or "(no output)"})
+        # No `or "(no output)"` fallback: `runtime.run_command` now reports
+        # the exit status when a command printed nothing, so the silence a
+        # model used to read as "still running" no longer reaches it. The
+        # `or` is kept off deliberately rather than left as a harmless
+        # belt-and-braces, because a second source of that exact string is
+        # how the behaviour would come back.
+        self._history.append({"role": "user", "content": output})
 
         try:
             from sable.core.audit import write_command

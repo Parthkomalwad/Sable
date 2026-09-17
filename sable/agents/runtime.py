@@ -140,8 +140,20 @@ def run_command(
                     # fd went away underneath us; whatever was read still counts.
                     break
 
-            _reap(proc)
-            return "".join(chunks)
+            status = _reap(proc)
+            output = "".join(chunks)
+            if output.strip():
+                return output
+            # A command that printed nothing still finished, and its status
+            # says whether it worked. Returning bare silence made the caller
+            # substitute "(no output)", which a model reads as "this may
+            # still be running": in the Phase 2 gate that produced a `done`
+            # abandoning the goal after one of three steps, 4 runs out of 4.
+            # The same goal with a command that echoed a line completed every
+            # time, so the silence was the trigger rather than the model.
+            if status is None:
+                return "(no output; exit status unavailable)"
+            return f"(no output; exit {status})"
         finally:
             try:
                 os.unlink(script_path)
@@ -159,12 +171,16 @@ def _kill(proc) -> None:
         pass
 
 
-def _reap(proc) -> None:
-    """Collect the exit status, ignoring a process that has already gone."""
+def _reap(proc) -> int | None:
+    """Collect the exit status, ignoring a process that has already gone.
+
+    Returns None when the status cannot be had, which is not the same as 0
+    and must not be reported as success.
+    """
     try:
-        proc.wait()
+        return proc.wait()
     except (OSError, ProcessLookupError, ChildProcessError):
-        pass
+        return None
 
 
 def call_llm(backend, messages: list[dict], system: str, timeout: float = LLM_TIMEOUT):
