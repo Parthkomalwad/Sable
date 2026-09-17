@@ -351,6 +351,35 @@ class OrchestratorAgent:
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": f"[agent '{name}' spawned]"})
 
+    #: A step's output that says the step did not work. Matched against the
+    #: markers the runtime and the policy check produce, never against the
+    #: command's own prose: "2 errors found" is output, not an outcome.
+    _FAILED_STEP = re.compile(
+        r"\(no output; exit (?!0\))\d+\)"     # a silent command that exited non-zero
+        r"|\(no output; exit status unavailable\)"
+        r"|\[exit (?!0\])\d+\]"               # a command that printed and then failed
+        r"|\[exit status unavailable\]"
+        r"|\[timeout after"
+        r"|\[blocked:"
+        r"|\[error:"
+    )
+
+    def _run_failed(self) -> bool:
+        """Did any executed step report a failure?
+
+        Exit status only. The orchestrator does not run a skill's `validate`
+        command the way the worker does: the worker validates inside bwrap,
+        while this runs unsandboxed in the user's real cwd, so executing a
+        model-authored validator here would auto-run model output with no
+        sandbox and no confirmation. That belongs behind Phase 3's policy
+        tiers.
+
+        The limit is worth naming: this catches a run that failed visibly and
+        not one the model wrongly believes succeeded. Catching the second is
+        what validators are for, and it stays unavailable on this path.
+        """
+        return any(self._FAILED_STEP.search(s.get("output", "")) for s in self._steps)
+
     def _record_step(self, command: str, output: str = "") -> None:
         """Remember one executed command for B3.
 
@@ -375,7 +404,9 @@ class OrchestratorAgent:
             # theirs, and drafting it would file their fix as the model's.
             return
         try:
-            path = self._crystalliser.from_run(self._goal, list(self._steps), True)
+            path = self._crystalliser.from_run(
+                self._goal, list(self._steps), not self._run_failed()
+            )
         except (OSError, ValueError, KeyError, sqlite3.Error):
             # Drafting runs after the work is done. A failure here must not
             # turn a finished goal into a failed one.
@@ -442,9 +473,15 @@ class OrchestratorAgent:
         if self._command_was_edited:
             return
 
+        # Graded on the run's own outcome, so confidence can fall as well as
+        # rise. It used to pass a hardcoded True, which made the number
+        # unfalsifiable: a skill that broke every time it was used still
+        # climbed towards 1.0.
+        succeeded = not self._run_failed()
+
         for name in dict.fromkeys(s["name"] for s in self._skills):
             try:
-                self._skill_index.nudge(name, True)
+                self._skill_index.nudge(name, succeeded)
             except (OSError, ValueError, sqlite3.Error) as exc:
                 _out(f"[orchestrator] could not record confidence for {name}: {exc}")
 

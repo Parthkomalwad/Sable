@@ -142,18 +142,34 @@ def run_command(
 
             status = _reap(proc)
             output = "".join(chunks)
-            if output.strip():
-                return output
-            # A command that printed nothing still finished, and its status
-            # says whether it worked. Returning bare silence made the caller
-            # substitute "(no output)", which a model reads as "this may
-            # still be running": in the Phase 2 gate that produced a `done`
-            # abandoning the goal after one of three steps, 4 runs out of 4.
+
+            # Two separate problems, both solved by reporting the status the
+            # pty already collected and this function used to discard.
+            #
+            # Silence read as "still running". A command that printed nothing
+            # came back empty, the caller substituted "(no output)", and in
+            # the Phase 2 gate the model answered that with a `done` that
+            # abandoned the goal after one of three steps, 4 runs out of 4.
             # The same goal with a command that echoed a line completed every
             # time, so the silence was the trigger rather than the model.
-            if status is None:
-                return "(no output; exit status unavailable)"
-            return f"(no output; exit {status})"
+            #
+            # Failure read as success. A deploy that wrote its error to
+            # stderr and exited 1 returned only its prose, so the *model* was
+            # told it had failed and the runtime was not. Grading looks for a
+            # marker, found none, and nudged the skill's confidence up on the
+            # run that was meant to push it down. Output is not an outcome:
+            # a failure has to be legible to the code as well as the model.
+            failed = status is None or status != 0
+            if not output.strip():
+                if status is None:
+                    return "(no output; exit status unavailable)"
+                return f"(no output; exit {status})"
+            if failed:
+                suffix = (
+                    "exit status unavailable" if status is None else f"exit {status}"
+                )
+                return f"{output.rstrip()}\n[{suffix}]"
+            return output
         finally:
             try:
                 os.unlink(script_path)
