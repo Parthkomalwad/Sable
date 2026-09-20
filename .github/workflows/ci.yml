@@ -101,6 +101,15 @@ jobs:
           print("OK: bypass covers both the argv and the environment path")
           EOF
 
+      # The README's artwork is generated: scripts/assets/*.template.svg is
+      # rendered once per theme into docs/assets/. An SVG loaded through <img>
+      # cannot read the page's colour scheme, so light and dark have to be two
+      # committed files, and two files drift. Editing the output by hand, or
+      # editing a template and forgetting to re-render, both show up as a
+      # README that looks right in one theme and wrong in the other.
+      - name: README assets match their templates
+        run: python3 scripts/build-assets.py --check
+
   unit:
     name: Unit tests
     runs-on: ubuntu-latest

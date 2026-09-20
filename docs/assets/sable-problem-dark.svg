@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300" role="img" aria-label="Without Sable, an ops task means recalling flags, searching the web, pasting a command you have not read, and hoping. With Sable, you state the goal, every command is shown before it runs, destructive ones need the word YES, long work goes to a sandboxed sub-agent, and the procedure is kept as a reusable skill.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B0F14"/><stop offset="1" stop-color="#131C27"/>
+    </linearGradient>
+    <style>
+      text{font-family:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace}
+      .h{font-size:11px;letter-spacing:2px}
+      .t{fill:#D8DEE6;font-size:12.5px}.s{fill:#7C8794;font-size:12px}
+      .bad{fill:#E7B24B}.good{fill:#5FCB7A}
+      .row{opacity:0;animation:slide .45s ease-out forwards}
+      @keyframes slide{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+      @keyframes slideR{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+      @keyframes tick{0%{stroke-dashoffset:22}60%{stroke-dashoffset:0}100%{stroke-dashoffset:0}}
+      .rowR{opacity:0;animation:slideR .45s ease-out forwards}
+      .chk{stroke-dasharray:22;animation:tick .5s ease-out forwards}
+      @media (prefers-reduced-motion:reduce){.row,.rowR{opacity:1;animation:none}.chk{stroke-dashoffset:0;animation:none}}
+    </style>
+  </defs>
+  <rect width="900" height="300" rx="14" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="899" height="299" rx="14" fill="none" stroke="#1F2730"/>
+  <line x1="450" y1="26" x2="450" y2="274" stroke="#1F2730"/>
+
+  <text x="36" y="44" class="h bad">WITHOUT SABLE</text>
+  <g class="row" style="animation-delay:.1s"><text x="36" y="78" class="s"><tspan class="bad">✗</tspan>  "what was the flag for that again?"</text></g>
+  <g class="row" style="animation-delay:.22s"><text x="36" y="108" class="s"><tspan class="bad">✗</tspan>  open a browser, search, find a 2019 answer</text></g>
+  <g class="row" style="animation-delay:.34s"><text x="36" y="138" class="s"><tspan class="bad">✗</tspan>  paste a command you have not fully read</text></g>
+  <g class="row" style="animation-delay:.46s"><text x="36" y="168" class="s"><tspan class="bad">✗</tspan>  hope it was not <tspan fill="#D8DEE6">rm -rf</tspan> on the wrong path</text></g>
+  <g class="row" style="animation-delay:.58s"><text x="36" y="198" class="s"><tspan class="bad">✗</tspan>  babysit it for twenty minutes</text></g>
+  <g class="row" style="animation-delay:.70s"><text x="36" y="228" class="s"><tspan class="bad">✗</tspan>  next month, relearn the whole thing</text></g>
+  <g class="row" style="animation-delay:.82s"><text x="36" y="262" class="s" fill="#7C8794">and your laptop AI tool cannot see this box.</text></g>
+
+  <text x="486" y="44" class="h good">WITH SABLE</text>
+  <g class="rowR" style="animation-delay:.16s">
+    <path class="chk" d="M488 73 l5 5 l9 -11" fill="none" stroke="#5FCB7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:.16s"/>
+    <text x="512" y="78" class="s">say the goal in English</text>
+  </g>
+  <g class="rowR" style="animation-delay:.28s">
+    <path class="chk" d="M488 103 l5 5 l9 -11" fill="none" stroke="#5FCB7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:.28s"/>
+    <text x="512" y="108" class="s">read the command <tspan fill="#D8DEE6">before</tspan> it runs</text>
+  </g>
+  <g class="rowR" style="animation-delay:.40s">
+    <path class="chk" d="M488 133 l5 5 l9 -11" fill="none" stroke="#5FCB7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:.40s"/>
+    <text x="512" y="138" class="s">destructive? it demands <tspan fill="#D8DEE6">YES</tspan></text>
+  </g>
+  <g class="rowR" style="animation-delay:.52s">
+    <path class="chk" d="M488 163 l5 5 l9 -11" fill="none" stroke="#5FCB7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:.52s"/>
+    <text x="512" y="168" class="s">long work → sandboxed sub-agent</text>
+  </g>
+  <g class="rowR" style="animation-delay:.64s">
+    <path class="chk" d="M488 193 l5 5 l9 -11" fill="none" stroke="#5FCB7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:.64s"/>
+    <text x="512" y="198" class="s">every run lands in an audit log</text>
+  </g>
+  <g class="rowR" style="animation-delay:.76s">
+    <path class="chk" d="M488 223 l5 5 l9 -11" fill="none" stroke="#5FCB7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay:.76s"/>
+    <text x="512" y="228" class="s">the third time, it is a <tspan fill="#D8DEE6">skill</tspan></text>
+  </g>
+  <g class="rowR" style="animation-delay:.88s"><text x="486" y="262" class="s" fill="#8B7CF6">it lives on the server, where the work is.</text></g>
+</svg>
