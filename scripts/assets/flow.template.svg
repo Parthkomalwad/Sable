@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360" role="img" aria-label="How a line of input flows through Sable: SSH non-interactive commands bypass straight to bash; an interactive line is routed either to bash or to the orchestrator agent, which plans it, checks it against the policy engine, and runs it in a pty, spawning sandboxed sub-agents for long work while writing to the audit log and learning skills.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="__BG0__"/><stop offset="1" stop-color="__BG1__"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="__CARD0__"/><stop offset="1" stop-color="__CARD1__"/>
+    </linearGradient>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="__RULE2__"/>
+    </marker>
+    <style>
+      text{font-family:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace}
+      .t{fill:__INK__;font-size:12.5px}.s{fill:__DIM__;font-size:10.5px}.lbl{fill:__DIM__;font-size:10px;letter-spacing:1.2px}
+      .edge{stroke:__RULE2__;stroke-width:1.6;fill:none;marker-end:url(#ar)}
+      .flow{stroke:__ACC__;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-dasharray:7 210;opacity:.95}
+      .flow2{stroke:__OK__;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-dasharray:7 150;opacity:.95}
+      @keyframes dash{to{stroke-dashoffset:-217}}
+      @keyframes dash2{to{stroke-dashoffset:-157}}
+      @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes glow{0%,100%{opacity:.30}50%{opacity:.75}}
+      .flow{animation:dash 2.6s linear infinite}
+      .flow2{animation:dash2 2.2s linear infinite}
+      .card{opacity:0;animation:rise .5s ease-out forwards}
+      .halo{animation:glow 2.4s ease-in-out infinite}
+      @media (prefers-reduced-motion:reduce){
+        .flow,.flow2,.halo{animation:none}
+        .card{opacity:1;animation:none}
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="360" rx="14" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="899" height="359" rx="14" fill="none" stroke="__RULE__"/>
+
+  <!-- ══ input ══ -->
+  <g class="card" style="animation-delay:.05s">
+    <rect x="24" y="150" width="128" height="58" rx="9" fill="url(#face)" stroke="__RULE2__"/>
+    <text x="40" y="174" class="t">you type</text>
+    <text x="40" y="192" class="s">a line of input</text>
+  </g>
+
+  <!-- ══ ssh bypass (top rail) ══ -->
+  <g class="card" style="animation-delay:.4s">
+    <rect x="236" y="26" width="290" height="54" rx="9" fill="url(#face)" stroke="__OK__" stroke-opacity=".55"/>
+    <text x="252" y="48" class="t"><tspan fill="__OK__">⤳</tspan> SSH_ORIGINAL_COMMAND</text>
+    <text x="252" y="66" class="s">scp · rsync · git push — never sees an LLM</text>
+  </g>
+  <g class="card" style="animation-delay:.55s">
+    <rect x="574" y="26" width="120" height="54" rx="9" fill="url(#face)" stroke="__RULE2__"/>
+    <text x="590" y="50" class="t">/bin/bash</text>
+    <text x="590" y="68" class="s">execvp, exits</text>
+  </g>
+  <path class="edge" d="M152 168 C 196 168 196 53 232 53"/>
+  <path class="flow2" d="M152 168 C 196 168 196 53 232 53"/>
+  <path class="edge" d="M526 53 L 570 53"/>
+  <path class="flow2" d="M526 53 L 570 53" style="animation-delay:.5s"/>
+  <text x="236" y="18" class="lbl">NON-INTERACTIVE · FIRST LINE OF main.py</text>
+
+  <!-- ══ router ══ -->
+  <g class="card" style="animation-delay:.25s">
+    <circle class="halo" cx="236" cy="179" r="42" fill="__ACC__" opacity=".3"/>
+    <rect x="192" y="152" width="88" height="54" rx="9" fill="url(#face)" stroke="__ACC__" stroke-opacity=".7"/>
+    <text x="236" y="176" class="t" text-anchor="middle">router</text>
+    <text x="236" y="194" class="s" text-anchor="middle">bash? goal?</text>
+  </g>
+  <path class="edge" d="M152 179 L 188 179"/>
+  <path class="flow" d="M152 179 L 188 179"/>
+
+  <!-- ══ bash branch ══ -->
+  <g class="card" style="animation-delay:.7s">
+    <rect x="352" y="120" width="128" height="50" rx="9" fill="url(#face)" stroke="__RULE2__"/>
+    <text x="368" y="142" class="t">bash, as-is</text>
+    <text x="368" y="159" class="s">zero latency</text>
+  </g>
+  <path class="edge" d="M280 170 C 316 170 316 145 348 145"/>
+  <path class="flow2" d="M280 170 C 316 170 316 145 348 145" style="animation-delay:.3s"/>
+
+  <!-- ══ agent branch ══ -->
+  <g class="card" style="animation-delay:.8s">
+    <rect x="352" y="196" width="128" height="50" rx="9" fill="url(#face)" stroke="__ACC__" stroke-opacity=".5"/>
+    <text x="368" y="218" class="t">orchestrator</text>
+    <text x="368" y="235" class="s">plan · skill</text>
+  </g>
+  <path class="edge" d="M280 190 C 316 190 316 221 348 221"/>
+  <path class="flow" d="M280 190 C 316 190 316 221 348 221" style="animation-delay:.3s"/>
+
+  <!-- ══ policy gate ══ -->
+  <g class="card" style="animation-delay:1.0s">
+    <rect x="530" y="158" width="130" height="66" rx="9" fill="url(#face)" stroke="__WARN__" stroke-opacity=".6"/>
+    <text x="546" y="180" class="t"><tspan fill="__WARN__">⚠</tspan> policy</text>
+    <text x="546" y="197" class="s">preview every cmd</text>
+    <text x="546" y="213" class="s">destructive → YES</text>
+  </g>
+  <path class="edge" d="M480 145 C 506 145 506 178 526 178"/>
+  <path class="flow2" d="M480 145 C 506 145 506 178 526 178" style="animation-delay:.6s"/>
+  <path class="edge" d="M480 221 C 506 221 506 200 526 200"/>
+  <path class="flow" d="M480 221 C 506 221 506 200 526 200" style="animation-delay:.6s"/>
+
+  <!-- ══ pty ══ -->
+  <g class="card" style="animation-delay:1.2s">
+    <rect x="712" y="158" width="118" height="66" rx="9" fill="url(#face)" stroke="__RULE2__"/>
+    <text x="728" y="180" class="t">pty</text>
+    <text x="728" y="197" class="s">ptyprocess</text>
+    <text x="728" y="213" class="s">vim, htop, ssh</text>
+  </g>
+  <path class="edge" d="M660 191 L 708 191"/>
+  <path class="flow" d="M660 191 L 708 191" style="animation-delay:.9s"/>
+
+  <!-- ══ sub-agent ══ -->
+  <g class="card" style="animation-delay:1.35s">
+    <rect x="352" y="272" width="180" height="56" rx="9" fill="url(#face)" stroke="__ACC__" stroke-opacity=".45"/>
+    <text x="368" y="294" class="t"><tspan fill="__ACC__">◈</tspan> sub-agent</text>
+    <text x="368" y="312" class="s">own tmux window · bwrap</text>
+  </g>
+  <path class="edge" d="M416 250 L 416 268"/>
+  <path class="flow" d="M416 250 L 416 268" style="animation-delay:1.1s"/>
+
+  <!-- ══ persistence ══ -->
+  <g class="card" style="animation-delay:1.5s">
+    <rect x="576" y="272" width="120" height="56" rx="9" fill="url(#face)" stroke="__RULE2__"/>
+    <text x="592" y="294" class="t">audit log</text>
+    <text x="592" y="312" class="s">append-only</text>
+  </g>
+  <g class="card" style="animation-delay:1.6s">
+    <rect x="712" y="272" width="118" height="56" rx="9" fill="url(#face)" stroke="__RULE2__"/>
+    <text x="728" y="294" class="t">skills</text>
+    <text x="728" y="312" class="s">seen 3× → kept</text>
+  </g>
+  <path class="edge" d="M532 300 L 572 300"/>
+  <path class="edge" d="M696 300 L 708 300"/>
+  <path class="edge" d="M771 228 L 771 268"/>
+  <path class="flow" d="M771 228 L 771 268" style="animation-delay:1.4s"/>
+</svg>
