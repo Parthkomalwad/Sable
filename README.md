@@ -1,10 +1,14 @@
 <div align="center">
 
-<img src="docs/assets/sable-mark.svg" alt="sable" width="360">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sable-mark-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/sable-mark-light.svg">
+  <img src="docs/assets/sable-mark-dark.svg" alt="sable — the shell that asks first" width="380">
+</picture>
 
 <br>
 
-### A Linux login shell that understands plain English, runs sandboxed agents, and learns your server.
+### The Linux login shell that speaks plain English, shows you every command before it runs, and remembers how your server works.
 
 [![CI](https://github.com/Parthkomalwad/sable/actions/workflows/ci.yml/badge.svg)](https://github.com/Parthkomalwad/sable/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-8B7CF6.svg)](LICENSE)
@@ -13,26 +17,45 @@
 [![Status](https://img.shields.io/badge/status-v0.3%20alpha-E7B24B)](ROADMAP.md)
 [![Backends](https://img.shields.io/badge/LLM-Ollama%20%C2%B7%20OpenAI%20%C2%B7%20Anthropic-8B7CF6)](#configuration)
 
+[What it solves](#what-it-solves) ·
 [Quick start](#quick-start) ·
 [See it work](#see-it-work) ·
+[How it works](#how-it-works) ·
 [Why Sable](#why-sable) ·
-[Architecture](#architecture) ·
 [Roadmap](#roadmap) ·
 [Docs](docs/README.md)
 
 <br>
 
-<img src="docs/assets/sable-hero.svg" alt="Sable session: a goal typed in English, a skill picked, commands previewed, a sub-agent spawned, cost shown in the sidebar" width="880">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sable-hero-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/sable-hero-light.svg">
+  <img src="docs/assets/sable-hero-dark.svg" alt="A Sable session: a goal typed in plain English is routed to an agent, a skill is matched, each command is previewed before it runs, a destructive command is gated behind the word YES, and long work is handed to a sandboxed sub-agent while a sidebar shows live cost and running agents." width="900">
+</picture>
 
 </div>
 
 <br>
 
-SSH into a box running Sable and every line you type is either **bash** (runs as-is) or **a goal**. A goal goes to an orchestrator agent that plans it, shows you every command before running it, hands long work to sandboxed sub-agents in their own tmux windows, and keeps the procedure as a skill it will reuse next time. A sidebar shows agents, cost, git and system load, live.
+## What it solves
 
-Sable is the shell that asks first. Nothing runs that you did not see; anything destructive needs the word `YES`; `scp`, `rsync` and `git push` never touch the agent path.
+You know the machine. You do not know the exact `find` invocation, the `journalctl` flag, or which of the four `docker prune` variants is the one that does not eat your volumes. So you leave the terminal, search, and paste back a command you have not fully read — onto production.
 
-> **Alpha.** Sable runs as your *login shell*. The SSH bypass and `/exit` are bulletproof; the rest is evolving. Read [SECURITY.md](SECURITY.md) before installing on a machine you care about.
+Sable removes that round trip **without removing you from the loop.**
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sable-problem-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/sable-problem-light.svg">
+  <img src="docs/assets/sable-problem-dark.svg" alt="Without Sable: recall flags, search the web, paste a command you have not read, hope, babysit, and relearn it next month. With Sable: state the goal, read the command before it runs, destructive ones demand YES, long work goes to a sandboxed sub-agent, everything is audited, and the third repeat becomes a reusable skill." width="900">
+</picture>
+
+</div>
+
+It is a **login shell**, not a laptop app. It replaces `/bin/bash` on the server, so it sees the real filesystem, the real units, the real logs — and it accumulates knowledge about *that machine*. The tenth deploy is one sentence and zero babysitting.
+
+> **Sable is the shell that asks first.** Nothing runs that you did not see. Anything destructive needs the literal word `YES`. And `scp`, `rsync` and `git push` never touch the agent path at all.
 
 <br>
 
@@ -74,7 +97,7 @@ ollama pull llama3.1            # local model, the default backend
 SABLE_MOCK_LLM=1 sable          # canned responses, zero API calls
 ```
 
-`SABLE_MOCK_LLM=1` swaps in a scripted backend, so routing, the confirm block, sub-agent spawning and `/tour` all work end to end without a key or a local model. Goals it does not have a script for run one placeholder command and finish, so the loop always terminates. Use it for demos, for the playground, and for trying the shell before committing to a backend.
+`SABLE_MOCK_LLM=1` swaps in a scripted backend, so routing, the confirm block, sub-agent spawning and `/tour` all work end to end without a key or a local model. Goals it has no script for run one placeholder command and finish, so the loop always terminates. Use it for demos, for the playground, and for trying the shell before committing to a backend.
 
 <br>
 
@@ -91,7 +114,7 @@ SABLE_MOCK_LLM=1 sable          # canned responses, zero API calls
     ↵ run   e edit   q cancel  ›
 ```
 
-Ambiguous lines ask `[b]ash or [a]gentic?`. Force either way: `>> text` sends to the agent, `Ctrl+B` sends the next line straight to bash.
+No prefix, no mode switch, no latency tax on the commands you already know. Ambiguous lines ask `[b]ash or [a]gentic?`. Force either way: `>> text` sends to the agent, `Ctrl+B` sends the next line straight to bash, and `/route why "<line>"` explains any routing decision after the fact.
 </details>
 
 <details>
@@ -109,6 +132,8 @@ Ambiguous lines ask `[b]ash or [a]gentic?`. Force either way: `>> text` sends to
   ⚠ DESTRUCTIVE  rm -rf /tmp/*
   Type YES to run, anything else to cancel › YES
 ```
+
+Note the `e`: the model proposed `-af`, the human downgraded it to `-f` and ran that instead. The preview is an edit box, not a dialog.
 
 Eleven destructive patterns (`rm -rf`, `dd`, `mkfs`, `curl | bash`, …) always require the literal word `YES`. The model's own `safe: false` flag is honoured too. Every executed command lands in an append-only audit log.
 </details>
@@ -147,7 +172,7 @@ Sub-agents run in their own tmux window inside a `bwrap` sandbox: their workspac
   ✦ Using skill deploy-api            ← matched by keyword, injected into context
 ```
 
-Skills are plain markdown you can read and edit: `/skill list · new · edit`. Each carries a confidence score that starts at 0.5 when generated and 1.0 when written by hand, and moves +0.05 on success and −0.10 on failure.
+This is the part a laptop client cannot do: the knowledge is about *this server*, and it is written down where the server can reach it. Skills are plain markdown you can read and edit: `/skill list · new · edit`. Each carries a confidence score that starts at 0.5 when generated and 1.0 when written by hand, and moves +0.05 on success and −0.10 on failure.
 
 Today skills are matched to a goal by keyword. Confidence is recorded but not yet used to rank them, and nothing calls the success and failure nudges automatically; closing that loop is the first item of [Phase 2](docs/roadmap-phases.md).
 </details>
@@ -155,7 +180,9 @@ Today skills are matched to a goal by keyword. Confidence is recorded but not ye
 <details>
 <summary><b>5 · The sidebar and the clipboard.</b></summary>
 
-`Ctrl+T` toggles a live sidebar: session and cost, system, git, top processes, 7-day token history, saved snippets, shortcuts. Save any command with `/clip add "docker ps -a" --note containers --tags docker`, then run it from the sidebar with arrow keys and Enter, or from the full-screen picker (`/clip`, live filter with `/`).
+`Ctrl+T` toggles a live sidebar: session and cost, system, git, top processes, 7-day token history, saved snippets, shortcuts. You always know what an agent is doing and what it has cost you — no hidden spend.
+
+Save any command with `/clip add "docker ps -a" --note containers --tags docker`, then run it from the sidebar with arrow keys and Enter, or from the full-screen picker (`/clip`, live filter with `/`).
 </details>
 
 <details>
@@ -178,9 +205,38 @@ Today skills are matched to a goal by keyword. Confidence is recorded but not ye
 
 <br>
 
+## How it works
+
+Every line you type meets exactly one decision, and the riskiest path is the one that never reaches a model at all.
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sable-flow-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/sable-flow-light.svg">
+  <img src="docs/assets/sable-flow-dark.svg" alt="How a line of input flows through Sable: non-interactive SSH commands bypass straight to bash; an interactive line is routed either to bash or to the orchestrator, which plans it, checks it against the policy gate, and runs it in a pty, spawning sandboxed sub-agents for long work while writing to the audit log and learning skills." width="900">
+</picture>
+
+</div>
+
+The **SSH bypass is the first executable line of `main.py`**, before any import that could fail. `scp`, `rsync` and `git push` set `SSH_ORIGINAL_COMMAND`, hit that line, and `execvp` straight into bash. They cannot hang on a model, and they cannot be re-interpreted by one.
+
+| Layer | Modules | Notes |
+|---|---|---|
+| Entry & loop | `app/main.py` `app/repl.py` `agents/router.py` | SSH bypass first; REPL, builtins, routing |
+| Execution | `core/executor.py` `policy/engine.py` `agents/planner.py` | everything through a pty; `cd` intercepted in-process; 11-pattern blocklist |
+| Agents | `agents/orchestrator.py` `worker.py` `manager.py` `sandbox.py` | multi-turn loop, sub-agents, bwrap with bash-wrapper fallback |
+| Skills | `skills/watcher.py` `crystalliser.py` `index.py` | audit-log clustering, LLM-written skills, confidence index |
+| Models | `llm/base.py` `ollama.py` `openai.py` `anthropic.py` | one `LLMBackend` ABC, streaming, JSON fallback chain |
+| State & UI | `core/db.py` `memory/` `ui/sidebar/` `ui/tmux/` | SQLite WAL, token-reducer compression, sidebar, tmux layout |
+
+Deeper: [docs/architecture-v4.md](docs/architecture-v4.md) (request lifecycle, agent turn, spawn, skills, memory, daemon, processes) · [docs/architecture.md](docs/architecture.md) (v0.3 diagrams) · [docs/specs/prd-v3.md](docs/specs/prd-v3.md) (task engine & skills) · [docs/structure.md](docs/structure.md) (where v4 is going).
+
+<br>
+
 ## Why Sable
 
-Most 2026 terminal AI tools are **clients you run on your laptop**. Sable is the **server side**: it lives where the work happens, owns the safety layer, and accumulates knowledge about *that machine*, so the tenth deploy takes one line and zero babysitting.
+Most 2026 terminal AI tools are **clients you run on your laptop**. Sable is the **server side**: it lives where the work happens, owns the safety layer, and accumulates knowledge about *that machine*.
 
 | | Sable | Warp / Claude Code / Codex CLI | Aider / Goose |
 |---|:-:|:-:|:-:|
@@ -193,40 +249,7 @@ Most 2026 terminal AI tools are **clients you run on your laptop**. Sable is the
 | Works fully offline with Ollama | ✅ | ❌ | ✅ |
 | Zero LLM gateways, direct `httpx` | ✅ | n/a | n/a |
 
-<br>
-
-## Architecture
-
-```mermaid
-flowchart LR
-    SSH([SSH login]) --> M[main.py<br/>SSH bypass first]
-    M -->|SSH_ORIGINAL_COMMAND| B0["/bin/bash"]
-    M --> R[REPL<br/>prompt_toolkit]
-    R --> RT{router}
-    RT -->|bash| S[safety<br/>blocklist · YES]
-    RT -->|goal| O[orchestrator<br/>run · spawn · done]
-    O --> S
-    S --> P[pty<br/>ptyprocess]
-    O -->|spawn| T[TaskAgent<br/>tmux window · bwrap]
-    O -->|done| K[skills<br/>watch · crystallise · score]
-    P --> A[(audit.log)]
-    P --> DB[(SQLite WAL)]
-    T --> DB
-    K --> DB
-    DB --> SB[sidebar<br/>separate process]
-    O <-->|httpx / SSE| LLM[[Ollama · OpenAI · Anthropic]]
-```
-
-| Layer | Modules | Notes |
-|---|---|---|
-| Entry & loop | `main.py` `loop.py` `router.py` | SSH bypass is the first executable line; REPL, builtins, routing |
-| Execution | `executor.py` `safety.py` `planner.py` | everything through a pty; `cd` intercepted in-process; 11-pattern blocklist |
-| Agents | `tasks/orchestrator.py` `agent.py` `manager.py` `sandbox.py` | multi-turn loop, sub-agents, bwrap with bash-wrapper fallback |
-| Skills | `skills/pattern_watcher.py` `crystalliser.py` `index.py` | audit-log clustering, LLM-written skills, confidence index |
-| Models | `llm/base.py` `ollama.py` `openai.py` `anthropic.py` | one `LLMBackend` ABC, streaming, JSON fallback chain |
-| State & UI | `telemetry/` `memory/` `clipboard/` `tui/` | SQLite WAL, token-reducer compression, sidebar, tmux layout |
-
-Deeper: [docs/architecture-v4.md](docs/architecture-v4.md) (request lifecycle, agent turn, spawn, skills, memory, daemon, processes) · [docs/architecture.md](docs/architecture.md) (v0.3 diagrams) · [docs/specs/prd-v3.md](docs/specs/prd-v3.md) (task engine & skills) · [docs/structure.md](docs/structure.md) (where v4 is going).
+> **Alpha.** Sable runs as your *login shell*, which is a serious thing to replace. The SSH bypass and `/exit` are bulletproof; the rest is evolving. Read [SECURITY.md](SECURITY.md) before installing on a machine you care about, and keep a second root session open the first time.
 
 <br>
 
@@ -240,7 +263,7 @@ v4 turns Sable into a full agent runtime. Milestones (full plan with test gates 
 | 🔧 | **v0.4 Foundations** | CI, playground, router accuracy, `/tour`, `/bash` to drop to plain Linux and back, clean package layout |
 | ⏳ | v0.5 Agent runtime | one `Agent` with roles, event bus, steer with `Ctrl+G`, `/task replay`, repo-aware context |
 | ⏳ | v0.6 Skills that learn | confidence-ranked retrieval, skills right after a task, folder skills, learn from your edits |
-| ⏳ | v0.7 Policy, trust and tools | `policy.yaml` tiers, hooks, output-injection defence, web search, structured file edits, verify-after-act |
+| ⏳ | v0.7 Policy, trust and tools | `policy.toml` tiers, hooks, output-injection defence, web search, structured file edits, verify-after-act |
 | ⏳ | v0.8 Command center | Warp-style blocks, Textual dashboard, approval inbox, ghost-text, explain-last-error |
 | ⏳ | v0.9 Autonomy | `sabled` daemon, natural-language cron, approve from your phone |
 | ⏳ | v1.0 Ecosystem | MCP client and server, Memory Palace, rehearsal mode, evals, plugins |
@@ -270,6 +293,8 @@ Linux (Ubuntu 22.04+ tested), Python 3.11+, tmux. Optional: `bubblewrap` for ker
 ## Contributing
 
 Issues and PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/branching.md](docs/branching.md); implementation rules are in [CLAUDE.md](CLAUDE.md) and apply to humans and AI sessions alike. Each roadmap feature has an ID (`A1`, `B2` …) you can reference in branches and PRs.
+
+The README artwork is generated: edit the templates in [scripts/assets/](scripts/assets/) and run `python scripts/build-assets.py` to re-render both themes. Never hand-edit `docs/assets/sable-*-{dark,light}.svg` — they are build output, and `--check` fails CI when they drift.
 
 ## Documentation
 
