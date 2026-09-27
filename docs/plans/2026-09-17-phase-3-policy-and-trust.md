@@ -329,15 +329,15 @@ position, to be written down rather than papered over:
 
 **Files:** Create `sable/policy/secrets.py`, `sable/app/builtins/secret.py`
 
-- [ ] **Step 1: failing tests.** `$SECRET:name` resolves from the keyring **at
+- [x] **Step 1: failing tests.** `$SECRET:name` resolves from the keyring **at
       exec time**. The value never appears in the audit row, the bus payload,
       `agent_turns`, or any LLM message: one test asserts the placeholder is what
       the model saw and another greps every written surface for the value. An
       unavailable keyring **refuses**, and does not fall back to an environment
       variable or plaintext. An unknown name is an error before the command runs,
       not a literal `$SECRET:name` passed to the shell.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** **Build on `core/config/keyring.py`, do not
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** **Build on `core/config/keyring.py`, do not
       duplicate it.** It already wraps `secretstorage` with an attribute-keyed
       collection, and a second keyring path would mean two places a secret can
       live and one of them being wrong. Two changes are needed there: its
@@ -346,7 +346,7 @@ position, to be written down rather than papered over:
       and wrong for a broker, where "keyring unavailable" and "no such secret"
       must be distinguishable. The broker needs the raising variant; the existing
       callers keep the forgiving one.
-- [ ] **Step 4:** green. Commit: `feat(policy): a secret broker that resolves at exec time and never at prompt time`
+- [x] **Step 4:** green. Commit: `feat(policy): a secret broker that resolves at exec time and never at prompt time`
 
 ## Task 10: Threat model, contracts, and the real run
 
