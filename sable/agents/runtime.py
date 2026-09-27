@@ -125,6 +125,16 @@ def run_command(
 
     from ptyprocess import PtyProcessUnicode
 
+    from sable.policy import secrets
+
+    # F6: resolve `$SECRET:name` here, after gate/preview/audit saw only the
+    # placeholder. The value goes in the child's env, never the script.
+    try:
+        command, secret_env, reveal = secrets.resolve(command)
+    except secrets.SecretError as exc:
+        return f"[blocked: {exc}]"
+    env = {**os.environ, **secret_env} if secret_env else None
+
     body = wrap(command) if wrap is not None else command
 
     try:
@@ -133,7 +143,7 @@ def run_command(
             with os.fdopen(handle, "w") as script:
                 script.write(body)
 
-            proc = PtyProcessUnicode.spawn(["/bin/bash", script_path], cwd=cwd)
+            proc = PtyProcessUnicode.spawn(["/bin/bash", script_path], cwd=cwd, env=env)
             chunks: list[str] = []
             deadline = time.monotonic() + timeout
 
@@ -161,7 +171,7 @@ def run_command(
                     break
 
             status = _reap(proc)
-            output = "".join(chunks)
+            output = secrets.redact("".join(chunks), reveal)
 
             # Two separate problems, both solved by reporting the status the
             # pty already collected and this function used to discard.
