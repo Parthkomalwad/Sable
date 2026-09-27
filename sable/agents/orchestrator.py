@@ -21,6 +21,7 @@ from sable import data
 from sable.agents import context, runtime
 from sable.core.events.types import EventKind
 from sable.llm import prompts
+from sable.policy import hooks
 
 #: The actions this role may emit. `wait` and `ask` are specified in
 #: docs/contracts.md and not yet implemented; `mcp` is reserved for Phase 6.
@@ -263,6 +264,15 @@ class OrchestratorAgent:
         if output.strip():
             sys.stdout.write(f'\n{output.rstrip()}\n\n')
             sys.stdout.flush()
+        # A post_command hook's `context` is appended to what the model reads
+        # of the output; its `message` is for the user only.
+        after = hooks.run("post_command", {
+            "command": confirmed_cmd, "role": "orchestrator",
+            "cwd": self._cwd, "output": output[-4000:],
+        })
+        hooks.show("post_command", after)
+        if after.context:
+            output = f"{output.rstrip()}\n[post_command hook] {after.context}"
         self._commands_run += 1
         self._record_step(confirmed_cmd, output)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
@@ -311,6 +321,16 @@ class OrchestratorAgent:
         # Prepend CWD so sub-agent knows where to operate
         if not goal.startswith("Working directory:"):
             goal = f"Working directory: {self._cwd}\n{goal}"
+
+        gate = hooks.run("pre_spawn", {"name": name, "goal": goal, "cwd": self._cwd})
+        if gate.blocked:
+            _out(f"[orchestrator] spawn of {name} blocked by pre_spawn hook: {gate.message}")
+            self._history.append({
+                "role": "user",
+                "content": f"[spawn blocked by pre_spawn hook: {gate.message}]",
+            })
+            return
+        hooks.show("pre_spawn", gate)
 
         _out(f"  \u25c8 spawning agent: {name}")
         _out(f"    goal: {goal}")
@@ -556,6 +576,12 @@ class OrchestratorAgent:
         if not line:
             return
         _out(f"  ◈ {line}")
+        # Notification only: the skills are already in the model's context,
+        # so there is nothing left for exit 2 to block.
+        hooks.show("on_skill_use", hooks.run("on_skill_use", {
+            "skills": [{"name": s["name"], "confidence": s.get("confidence")} for s in self._skills],
+            "cwd": self._cwd,
+        }))
         self._bus.publish(
             "orchestrator",
             EventKind.SKILL_USED,
