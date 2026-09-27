@@ -181,7 +181,7 @@ position, to be written down rather than papered over:
 `sable/agents/{orchestrator,worker,planner}.py`; create
 `tests/unit/test_no_legacy_policy_callers.py`
 
-- [ ] **Step 1: failing tests.** `decide()` returns `allow` for `ls`, `confirm`
+- [x] **Step 1: failing tests.** `decide()` returns `allow` for `ls`, `confirm`
       for a matched destructive pattern, and the matching `Rule` in both cases.
       An **unmatched** command returns the configured `policy.default_tier`.
       That key does not exist yet: structure.md §3.3 drafts it but
@@ -192,14 +192,22 @@ position, to be written down rather than papered over:
       receiving `confirm` gets a queued decision and **never** a prompt. The
       guard test: no module outside `sable/policy/` imports `is_destructive` or
       `confirm_destructive`.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** Convert all six sites. `is_destructive` stays for
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** Convert all six sites. `is_destructive` stays for
       one commit as a shim delegating to `decide()`, so the diff is reviewable,
       and is deleted in step 4 once the guard test passes. The confirm prompt
       moves behind `decide()` rather than being called alongside it: a caller
       that can choose whether to consult policy is a caller that can forget.
-- [ ] **Step 4:** delete the shim. Guard test green.
-- [ ] **Step 5:** green. Commit: `feat(policy)!: every command is tiered by decide(), not classified by a boolean`
+- [x] **Step 4:** delete the shim. Guard test green.
+- [x] **Step 5:** green. Commit: `feat(policy)!: every command is tiered by decide(), not classified by a boolean`
+
+> **Done differently, agreed 2026-09-27:** an unmatched command is `allow`, not
+> `confirm`. A model's command is already previewed before it runs, and a
+> worker's runs in its sandbox, so `confirm` on every unmatched command would
+> have meant a `YES` on top of every preview and a worker that could run
+> nothing. `policy.default_tier` is not added. A worker refuses `confirm`
+> with the rule's reason; the `policy_queue` table and `/approve` move to
+> Task 3 with the user file.
 
 ## Task 3: The user file and the admin floor (F1, I4)
 

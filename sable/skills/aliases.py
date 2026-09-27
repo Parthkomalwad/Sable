@@ -12,7 +12,7 @@ approved dependency list and this does not need more than the stdlib offers.
 
 **An alias is not a safety bypass.** Resolving one produces a command string
 and nothing else; the caller runs it down the ordinary bash path, where
-`policy/engine.py:is_destructive` gates it exactly as it would a typed
+`policy/engine.py:gate` gates it exactly as it would a typed
 command. `rm -rf` hidden behind a friendly phrase still asks.
 
 **Promotion is offered, never taken.** An alias that has earned its keep (3

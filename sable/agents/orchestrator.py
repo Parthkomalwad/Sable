@@ -850,11 +850,13 @@ class OrchestratorAgent:
         orchestrator's own policy check. Unlike the worker, it runs unwrapped:
         the orchestrator works in the user's real cwd, not a sandbox.
         """
-        from sable.policy.engine import is_destructive
+        from sable.policy.engine import gate
 
-        if is_destructive(command):
-            _out(f"[orchestrator] blocked destructive command: {command}")
-            return "[blocked: destructive command]"
+        # A matched `confirm` rule asks for YES here, as the docs always said;
+        # it used to refuse outright, which no rule could express.
+        if not gate(command, role="orchestrator"):
+            _out(f"[orchestrator] not run: {command}")
+            return "[blocked: refused by policy or not confirmed by the user]"
 
         return runtime.run_command(
             command, cwd=self._cwd, timeout=timeout, prefix="orch_"
