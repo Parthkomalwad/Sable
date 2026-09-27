@@ -38,6 +38,11 @@ class ShellConfig:
     # Per-role model overrides (A5). Empty means "use `model` for everything",
     # which is what every config written before Phase 1 says.
     models: dict[str, str] = field(default_factory=dict)
+    # Per-job circuit breaker (I2, sable/policy/breaker.py). Keys are
+    # tokens, usd, turns, wall_s; a missing key is unlimited, so an empty
+    # dict is today's behaviour. breaker_consecutive_failures: None = off.
+    per_job_budget: dict[str, float] = field(default_factory=dict)
+    breaker_consecutive_failures: int | None = None
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -105,6 +110,18 @@ class ShellConfig:
             if role_model:
                 models[role] = role_model
 
+        per_job = data.get("per_job_budget") or {}
+        if not isinstance(per_job, dict):
+            raise ValueError(f"per_job_budget must be an object, got {per_job!r}")
+        for key, limit in per_job.items():
+            if key not in ("tokens", "usd", "turns", "wall_s"):
+                raise ValueError(f"Unknown per_job_budget key: {key!r}")
+            if limit is not None and (isinstance(limit, bool) or not isinstance(limit, (int, float)) or limit <= 0):
+                raise ValueError(f"per_job_budget.{key} must be a positive number or null, got {limit!r}")
+        failures = data.get("breaker_consecutive_failures")
+        if failures is not None and (isinstance(failures, bool) or not isinstance(failures, int) or failures <= 0):
+            raise ValueError(f"breaker_consecutive_failures must be a positive int or null, got {failures!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -116,6 +133,8 @@ class ShellConfig:
             setup_complete=bool(data.get("setup_complete", False)),
             tasks_base_dir=data.get("tasks_base_dir", "~/tasks"),
             models=models,
+            per_job_budget={k: v for k, v in per_job.items() if v is not None},
+            breaker_consecutive_failures=failures,
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -134,5 +153,7 @@ class ShellConfig:
             "setup_complete": self.setup_complete,
             "tasks_base_dir": self.tasks_base_dir,
             "models": dict(self.models),
+            "per_job_budget": dict(self.per_job_budget),
+            "breaker_consecutive_failures": self.breaker_consecutive_failures,
             "api_key": getattr(self, "api_key", ""),
         }

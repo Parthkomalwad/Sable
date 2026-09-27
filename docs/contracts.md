@@ -441,6 +441,24 @@ starts with `tainted context`. A bumped `allow` carries a stand-in rule named
 acting on what was read cost a human's YES. `tests/evals/injection/` pins it:
 30+ hostile outputs, a model that obeys them, zero commands executed.
 
+### 7.5 Circuit breaker (Phase 3)
+
+Config: `per_job_budget` = `{tokens, usd, turns, wall_s}` (any key absent or
+null is unlimited; `{}` is the default) and `breaker_consecutive_failures`
+(null = off). Checked by the orchestrator and every worker **before** each
+turn, never during one: a running command is not killed. A trip writes a row
+to `breaker_trips` (`sable/policy/breaker.py`): `id`, `created_at`, `job`,
+`reason`, `status` = `tripped | reset`, and publishes a `breaker` event on the
+bus. The job that tripped stops (`lost`, `FAILED`). While any row is
+`tripped`, every other sub-agent **pauses** before its next turn: it prints
+`[breaker] paused: ...`, sets its task `paused`, publishes a `status` event
+with `paused: true`, and polls the table every 5 s with no model call and no
+spend; paused time does not count toward `wall_s`. It resumes, back to
+`running`, when no trip is open. The interactive orchestrator never pauses on
+another job's trip and stops only on its own goal's limits. `/breaker`
+lists open trips; `/breaker reset` sets them `reset`. Phase 5's `/inbox` reads
+this table.
+
 ### 7.6 Blast radius (Phase 3, F3)
 
 `sable/policy/blast.py`: `classify(command) -> Level`, one of `read-only`

@@ -184,6 +184,14 @@ class OrchestratorAgent:
         self._bus = EventBus(db_path=db_path)
         self._bus_cursor = self._bus.latest_id()
 
+        # I2: checked before every turn, so a trip never interrupts a command.
+        from sable.policy.breaker import Breaker, Limits
+
+        # held_by_trips=False: a goal the user typed is not paused by a
+        # sub-agent's open trip, only by its own limits.
+        self._breaker = Breaker(self._slug, Limits.from_config(config), db_path,
+                                held_by_trips=False)
+
     # ------------------------------------------------------------------
     # Public
     # ------------------------------------------------------------------
@@ -193,6 +201,12 @@ class OrchestratorAgent:
         _MAX_TURNS = 20
         self._announce_skills()
         for _turn in range(1, _MAX_TURNS + 1):
+            from sable.policy.breaker import block
+
+            reason = self._breaker.check()
+            if reason:
+                _out(block(self._slug, reason))
+                break
             messages = self._build_messages()
             spinner = _Spinner()
             spinner.start()
@@ -227,6 +241,7 @@ class OrchestratorAgent:
             action = self._parse_action(raw)
 
             action_type = action.get("action", "")
+            steps_before = len(self._steps)
             try:
                 if action_type == "run":
                     self._handle_run(action)
@@ -240,6 +255,13 @@ class OrchestratorAgent:
                     break
             except _TimeoutDelegated:
                 break
+            new_steps = self._steps[steps_before:]
+            self._breaker.record(
+                tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
+                usd=getattr(response, "cost_usd", 0.0),
+                # Non-zero, or None (error, timeout, unknown status), is a failure.
+                failed=any(runtime.exit_code_of(s.get("output", "")) != 0 for s in new_steps),
+            )
         else:
             _out(f"[orchestrator] reached {_MAX_TURNS} turn limit stopping")
 
