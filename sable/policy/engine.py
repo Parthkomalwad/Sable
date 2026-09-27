@@ -11,11 +11,12 @@ Key responsibilities:
 """
 from __future__ import annotations
 import math
+import os
 import re
 import sys
 from collections import Counter
 
-from sable.policy import privilege, rules
+from sable.policy import hooks, privilege, rules
 from sable.policy.tiers import Decision, Tier
 
 # The rules themselves live in defaults/policy.toml (Phase 0.5 step 4), so a
@@ -79,17 +80,32 @@ def gate(command: str, *, role: str) -> bool:
     user's session) or "worker" (a sub-agent nobody is watching). A worker is
     never prompted: its tmux window has no reader, so a prompt there blocks
     forever. It runs `allow` and refuses everything else.
+
+    The `pre_command` hook runs last, only for a command policy would run,
+    so a hook can block and never unblock.
     """
     d = decide(command)
-    if d.tier is Tier.ALLOW:
-        return True
     if d.tier is Tier.DENY:
         if role != "worker":
             _warn(f"refused by policy: {d.rule.name}", command, d.why)
         return False
-    if role == "worker":
+    if d.tier is Tier.CONFIRM and (role == "worker" or not _confirm(command, d)):
         return False
-    return _confirm(command, d)
+
+    result = hooks.run("pre_command", {
+        "command": command,
+        "role": role,
+        "tier": d.tier.value,
+        "rule": d.rule.name if d.rule else None,
+        "cwd": os.getcwd(),
+    })
+    if result.blocked:
+        if role != "worker":
+            _warn("blocked by pre_command hook", command, result.message)
+        return False
+    if role != "worker":
+        hooks.show("pre_command", result)
+    return True
 
 
 def _warn(label: str, command: str, why: str) -> None:

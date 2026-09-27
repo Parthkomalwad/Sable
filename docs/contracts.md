@@ -393,6 +393,24 @@ A user rule wins only when its tier is strictly more severe
 `policy/privilege.py`, whatever any file says. `Decision.source` names the file
 whose rule won, or `built-in` for `sudo`.
 
+### 7.2 Hooks (Phase 3)
+
+Executables in `~/.sable/hooks/`, named after the event. Same contract as
+Claude Code's hooks.
+
+| Hook | When | Payload (besides `hook`) | Exit 2 |
+|---|---|---|---|
+| `pre_command` | after policy allows or you confirm, before running | `command`, `role`, `tier`, `rule`, `cwd` | blocks the command |
+| `post_command` | after a command runs | `command`, `role`, `cwd`, and `exit_code` (typed) or `output` (orchestrator) | nothing to block |
+| `pre_spawn` | before a sub-agent starts | `name`, `goal`, `cwd` | blocks the spawn |
+| `on_skill_use` | when skills are injected | `skills`, `cwd` | nothing to block |
+
+Stdout that parses as a JSON object may carry `message` (shown to the user)
+and `context` (for `post_command` in the orchestrator, appended to the output
+the model reads). Other stdout is shown as text. Exit 0 allows; any other
+non-zero exit, or running past 10 s, is reported on stderr and does **not**
+block. A hook never sees a command policy refused, so it cannot loosen one.
+
 ---
 
 ## 8. Skills, corrections and aliases
