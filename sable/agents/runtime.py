@@ -255,6 +255,144 @@ def call_llm(backend, messages: list[dict], system: str, timeout: float = LLM_TI
         loop.close()
 
 
+# ---------------------------------------------------------------------------
+# J4, J5: verify-after-act, the repeat guard and the retry ladder
+# ---------------------------------------------------------------------------
+
+#: How many times the same command or tool call may run in one goal. The
+#: next one is refused by the runtime, not left to the prompt.
+MAX_IDENTICAL = 2
+
+#: Rungs of the retry ladder, indexed by consecutive failures (1-based).
+#: Past the last rung the step is marked failed and the counter resets.
+LADDER = ("retry", "alternative", "ask")
+
+
+def action_key(action: dict) -> str:
+    """What makes two actions "the same": whitespace-normalised command text,
+    or the tool call rendered as `tool:<name> <sorted args>`."""
+    if action.get("tool") or action.get("action") == "tool":
+        call = action.get("tool") or action
+        return "tool:" + str(call.get("name", "")) + " " + json.dumps(
+            call.get("args", {}), sort_keys=True, default=str)
+    return " ".join(str(action.get("command", "")).split())
+
+
+class RepeatGuard:
+    """Counts actions that ran in a goal; refuses the third identical one.
+
+    `refuse` only checks; `ran` counts. A proposal that was blocked or
+    cancelled never ran, so it does not use up a try.
+    """
+
+    def __init__(self) -> None:
+        self._seen: dict[str, int] = {}
+
+    def refuse(self, key: str) -> str | None:
+        """None to go ahead, or the message for the model."""
+        if key.strip() and self._seen.get(key, 0) >= MAX_IDENTICAL:
+            return (f"[refused: `{key}` already ran {MAX_IDENTICAL} times in this goal. "
+                    "Running it again will not change the result. Try a different "
+                    "command, or finish with what you have.]")
+        return None
+
+    def ran(self, key: str) -> None:
+        self._seen[key] = self._seen.get(key, 0) + 1
+
+
+def failed_output(output: str) -> bool:
+    """Did this action's output report a failure? Non-zero or unknown status."""
+    return exit_code_of(output or "") != 0
+
+
+def _local_url(url: str) -> bool:
+    # Localhost only, deliberately: verify exists to check the user's own
+    # local services, and this keeps a model-chosen URL off the network and
+    # off metadata addresses. web.py's URL policy refuses localhost, so it is
+    # the wrong check to reuse here.
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    return parts.scheme in ("http", "https") and parts.hostname in ("localhost", "127.0.0.1")
+
+
+def run_verify(verify, *, output: str, cwd: str, run: Callable[[str], str]) -> dict | None:
+    """Check an action with its `verify`. None when it passed.
+
+    `output` is the action's own output. `run` executes a verify command and
+    must gate it like any other command (the caller's runner already does).
+    A failure is the structured record fed back to the model.
+    """
+    def fail(check, got) -> dict:
+        return {"verify": "failed", "check": check, "got": got}
+
+    if isinstance(verify, str):
+        if not verify.strip():
+            return None
+        got = run(verify)
+        return None if exit_code_of(got) == 0 else fail(verify, got[-500:])
+    if not isinstance(verify, dict) or len(verify) != 1:
+        return fail(verify, "unknown verify form")
+    (kind, want), = verify.items()
+    if kind == "exit":
+        code = exit_code_of(output or "")
+        return None if code == want else fail(verify, code)
+    if kind == "stdout_contains":
+        return None if str(want) in (output or "") else fail(verify, (output or "")[-500:])
+    if kind == "file_exists":
+        path = os.path.join(cwd, os.path.expanduser(str(want)))
+        return None if os.path.exists(path) else fail(verify, "missing")
+    if kind == "http_status" and isinstance(want, dict):
+        url, status = str(want.get("url", "")), want.get("status", 200)
+        if not _local_url(url):
+            return fail(verify, "http_status is limited to localhost/127.0.0.1 URLs for now")
+        import httpx
+
+        try:
+            got = httpx.get(url, timeout=httpx.Timeout(30.0), follow_redirects=False).status_code
+        except httpx.HTTPError as exc:
+            return fail(verify, str(exc))
+        return None if got == status else fail(verify, got)
+    return fail(verify, "unknown verify form")
+
+
+def failure_of(output: str) -> tuple[str, str]:
+    """(check, got) for a failed step, short enough for one terminal line."""
+    for line in reversed((output or "").splitlines()):
+        if line.startswith('{"verify": "failed"'):
+            try:
+                v = json.loads(line)
+            except json.JSONDecodeError:
+                break
+            check = v.get("check")
+            return (check if isinstance(check, str) else json.dumps(check)), str(v.get("got"))[-80:]
+    code = exit_code_of(output or "")
+    lines = [l for l in (output or "").splitlines() if l.strip() and not _EXIT_MARKER.search(l)]
+    return (f"exit {code}" if code is not None else "no exit status"), (lines[-1] if lines else "")[-80:]
+
+
+def rung_label(failures: int, ask: str = "asking you") -> str:
+    """What happens next, for the visible block. 0 means marked failed."""
+    return {1: "retry 1 of 2", 2: "try an alternative", 3: ask}.get(failures, "marked failed, moving on")
+
+
+def failure_block(check: str, got: str, next_: str) -> str:
+    return f"  ↻ step failed: {check} (got: {got})\n    next: {next_}"
+
+
+def reflection(failures: int, what: str) -> str:
+    """The reflection turn injected after a failed step, by ladder rung."""
+    rung = LADDER[min(failures, len(LADDER)) - 1]
+    then = {
+        "retry": "Then retry, fixing the cause.",
+        "alternative": "The same approach failed twice: try a different one.",
+        "ask": "This step has failed three times; guidance has been requested.",
+    }[rung]
+    return (f"[reflect] The last step failed: {what[:300]}\n"
+            "Before your next action, say briefly in its explanation: what failed, "
+            f"why, and what to try instead. {then}")
+
+
 def strip_fences(raw: str) -> str:
     """Remove markdown code fences from a model response.
 

@@ -96,6 +96,35 @@ publishes one `tool` event (`name`, `args`, `ok`, `duration_ms`,
 cancel`); a worker is never prompted, so a `confirm`-tier tool is refused for
 it. `/tools` lists what each role may call.
 
+**`verify`** (Phase 3.5, J4): an optional field on `run` and `tool` (and on the
+worker's command JSON), required by the prompts on any state-changing action.
+It is a shell command that must exit 0, or one of:
+
+```json
+{"exit": 0}
+{"stdout_contains": "ready"}
+{"file_exists": "docker-compose.yml"}
+{"http_status": {"url": "http://localhost:8080/health", "status": 200}}
+```
+
+The runtime checks it after the action succeeds (`agents/runtime.run_verify`).
+A verify command goes through `gate()` with the agent's role, like any command.
+`http_status` accepts only `localhost` / `127.0.0.1` URLs. A failed check is appended to the output the model reads as
+`{"verify": "failed", "check": ..., "got": ...}` followed by `[exit 1]`, so
+`exit_code_of`, skill grading and the breaker count it as a failure.
+
+**Recovery** (J5). After a failed step the result carries one `[reflect]` note
+asking what failed, why and what to try instead. Consecutive failures climb a
+ladder: retry, try an alternative, ask (the orchestrator prompts the user; a
+worker queues the request in `policy_queue`), then `[step failed]` and the
+counter resets. Each failure prints `↻ step failed: <check> (got: ...)` and
+`next: <rung>`; the model's next action is shown as `↻ reflection: <explanation>`
+and published as a `reflection` event with `{step, rung, check, got, reflection}`.
+Verify's `http_status` is localhost only by design, not pending J2: it checks
+the user's own services and keeps a model-chosen URL off the network. The same command (whitespace-normalised) or tool call (name
+plus sorted args) runs at most twice per goal; the third is refused by the
+runtime with a message to the model.
+
 **`run`** — execute one shell command.
 
 ```json

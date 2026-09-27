@@ -201,6 +201,13 @@ class OrchestratorAgent:
         self._breaker = Breaker(self._slug, Limits.from_config(config), db_path,
                                 held_by_trips=False)
 
+        # J5: the third identical command is refused in code, and consecutive
+        # failures climb the retry ladder (runtime.LADDER).
+        self._guard = runtime.RepeatGuard()
+        self._failures = 0
+        self._turn = 0
+        self._pending_reflection: dict | None = None
+
     # ------------------------------------------------------------------
     # Public
     # ------------------------------------------------------------------
@@ -250,6 +257,8 @@ class OrchestratorAgent:
             action = self._parse_action(raw)
 
             action_type = action.get("action", "")
+            self._turn = _turn
+            self._show_reflection(action.get("explanation", ""))
             steps_before = len(self._steps)
             try:
                 if action_type == "run":
@@ -283,7 +292,7 @@ class OrchestratorAgent:
     def _handle_run(self, action: dict) -> None:
         command = action.get("command", "").strip()
         explanation = action.get("explanation", "")
-        if not command:
+        if not command or self._refused(action):
             return
 
         confirmed_cmd = self._confirm_command(command, explanation)
@@ -295,9 +304,11 @@ class OrchestratorAgent:
             return
 
         output = self._run_command(confirmed_cmd)
+        self._guard.ran(runtime.action_key({"command": confirmed_cmd}))
         if output.strip():
             sys.stdout.write(f'\n{output.rstrip()}\n\n')
             sys.stdout.flush()
+        output = self._verify(action, output)
         # A post_command hook's `context` is appended to what the model reads
         # of the output; its `message` is for the user only.
         after = hooks.run("post_command", {
@@ -323,6 +334,7 @@ class OrchestratorAgent:
         # belt-and-braces, because a second source of that exact string is
         # how the behaviour would come back.
         self._history.append({"role": "user", "content": for_model})
+        self._climb_ladder(output)
 
         try:
             from sable.core.audit import write_command
@@ -359,6 +371,8 @@ class OrchestratorAgent:
         args = action.get("args", {})
         explanation = action.get("explanation", "")
         call_text = registry.as_command(name, args)
+        if self._refused(action):
+            return
         ctx = ToolContext(
             role="orchestrator", cwd=self._cwd, agent="orchestrator", goal=self._goal,
             model=self._config.model_for("orchestrator"), tainted=self._tainted,
@@ -368,6 +382,7 @@ class OrchestratorAgent:
             return
 
         result = registry.call(name, args, ctx, publish=lambda kind, payload: self._bus.publish("orchestrator", kind, payload))
+        self._guard.ran(runtime.action_key(action))
         if result.output.strip():
             sys.stdout.write(f'\n{result.output.rstrip()}\n\n')
             sys.stdout.flush()
@@ -380,9 +395,79 @@ class OrchestratorAgent:
         self._commands_run += 1
         # The step record carries an exit marker so grading and the breaker
         # read a failed tool call as a failure, like a failed command.
-        self._record_step(call_text, result.output if result.ok else f"{result.output}\n[exit 1]")
+        output = self._verify(action, result.output) if result.ok else f"{result.output}\n[exit 1]"
+        self._record_step(call_text, output)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
-        self._history.append({"role": "user", "content": taint.wrap_untrusted(result.output)})
+        self._history.append({"role": "user", "content": taint.wrap_untrusted(output)})
+        self._climb_ladder(output)
+
+    def _refused(self, action: dict) -> bool:
+        """J5: refuse the third identical command or tool call in this goal."""
+        refusal = self._guard.refuse(runtime.action_key(action))
+        if refusal is None:
+            return False
+        _out(f"  [orchestrator] {refusal}")
+        self._history.append({"role": "assistant", "content": json.dumps(action)})
+        self._history.append({"role": "user", "content": refusal})
+        return True
+
+    def _verify(self, action: dict, output: str) -> str:
+        """J4: run the action's `verify`. A failure is appended as JSON plus
+        `[exit 1]`, so grading and the breaker count it like a failed command.
+        A verify command goes through `_run_command`, which gates it."""
+        verify = action.get("verify")
+        if not verify or runtime.failed_output(output):
+            return output
+        failure = runtime.run_verify(verify, output=output, cwd=self._cwd, run=self._run_command)
+        if failure is None:
+            _out("  [verify] passed")
+            return output
+        _out(f"  [verify] failed: {json.dumps(failure)[:300]}")
+        return f"{output.rstrip()}\n{json.dumps(failure)}\n[exit 1]"
+
+    def _climb_ladder(self, output: str) -> None:
+        """J5: after a failed step, one reflection turn. The ladder is retry,
+        alternative, ask the user, then the step is marked failed."""
+        if not runtime.failed_output(output):
+            self._failures = 0
+            return
+        self._failures += 1
+        if self._failures > len(runtime.LADDER):
+            self._failures = 0
+        check, got = runtime.failure_of(output)
+        rung = runtime.rung_label(self._failures)
+        _out(runtime.failure_block(check, got, rung))
+        # Published with the model's reflection once its next action arrives.
+        self._pending_reflection = {"step": self._turn, "rung": rung, "check": check, "got": got}
+        if self._failures == 0:
+            note = ("[step failed] This step failed after every retry and is marked "
+                    "failed. Move on to the next step, or finish and say what did not work.")
+        else:
+            note = runtime.reflection(self._failures, output[-300:])
+            if runtime.LADDER[self._failures - 1] == "ask":
+                guidance = self._ask_user()
+                if guidance:
+                    note += f"\n[user guidance] {guidance}"
+        # Appended to the result message, so roles still alternate.
+        self._history[-1]["content"] += "\n\n" + note
+
+    def _show_reflection(self, explanation: str) -> None:
+        """J5: the first action after a failure carries the model's reflection.
+        Label it before the usual preview, and publish it on the bus."""
+        if self._pending_reflection is None:
+            return
+        payload, self._pending_reflection = self._pending_reflection, None
+        _out(f"  ↻ reflection: {explanation}")
+        self._bus.publish("orchestrator", EventKind.REFLECTION, {**payload, "reflection": explanation})
+
+    def _ask_user(self) -> str:
+        """The ladder's third rung: ask the human what to try. Empty means skip."""
+        sys.stdout.write("\n  this step failed 3 times. guidance for the agent (↵ skip) › ")
+        sys.stdout.flush()
+        try:
+            return input('').strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
 
     def _confirm_tool(self, name: str, args, explanation: str, ctx=None) -> bool:
         """Show a tool call and ask ↵ run / q cancel. No edit: args are JSON.
@@ -893,7 +978,12 @@ class OrchestratorAgent:
         # If the backend captured the action field directly, use it
         if action in ("run", "spawn", "done"):
             if action == "run":
-                return json.dumps({"action": "run", "command": command, "explanation": explanation})
+                run = {"action": "run", "command": command, "explanation": explanation}
+                # J4: `verify` is not a typed field; take it from `raw`.
+                verify = runtime.parse_json_action(getattr(response, "raw", "") or "", {}).get("verify")
+                if verify:
+                    run["verify"] = verify
+                return json.dumps(run)
             if action == "spawn" and isinstance(spawn, dict):
                 return json.dumps({
                     "action": "spawn",
