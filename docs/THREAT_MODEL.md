@@ -118,6 +118,9 @@ mitigations than they deliver.
    running as the user can edit. It records what happened; it does not prove it.
 9. **Lines the user types are not secret-resolved.** `$SECRET:` works in model
    and plan commands only.
+   The broker also needs a Secret Service on D-Bus. A headless server reached
+   over SSH usually has none, and there `/secret` refuses: the broker is
+   unavailable rather than falling back to plaintext.
 10. **Blast radius is a heuristic.** Unknown commands show as "unknown", never
     green, but a green can still be wrong for a program with a side effect the
     table does not know.

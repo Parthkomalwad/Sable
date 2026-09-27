@@ -131,3 +131,23 @@ def test_output_is_redacted_before_untrusted_wrapping(fake_keyring):
     _, _, reveal = secrets.resolve("echo $SECRET:db_pass")
     wrapped = wrap_untrusted(secrets.redact(f"pw={VALUE}", reveal))
     assert VALUE not in wrapped and "$SECRET:db_pass" in wrapped
+
+
+def test_no_dbus_session_is_a_refusal_not_a_crash(monkeypatch):
+    """Found by the Phase 3 gate run: with no D-Bus session, secretstorage
+    raises its own exception type, `/secret add` let it escape, and the
+    whole login shell exited. Every keyring call must turn it into a
+    refusal. This is the normal state of an SSH login on a headless server."""
+    import types
+    from sable.core.config import keyring
+
+    def no_bus():
+        raise keyring._SecretStorageError("Environment variable DBUS_SESSION_BUS_ADDRESS is unset")
+
+    monkeypatch.setitem(__import__("sys").modules, "secretstorage",
+                        types.SimpleNamespace(dbus_init=no_bus))
+    with pytest.raises(RuntimeError):
+        keyring.store_api_key("secret:x", "v")
+    with pytest.raises(keyring.KeyringUnavailable):
+        keyring.lookup("secret:x")
+    assert keyring.get_api_key("openai") is None

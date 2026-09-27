@@ -13,6 +13,19 @@ from __future__ import annotations
 
 KEYRING_APP = "agentic-shell"
 
+# secretstorage raises its own SecretStorageException family, which is not an
+# OSError or RuntimeError. With no D-Bus session (a normal SSH login on a
+# headless server) it raises SecretServiceNotAvailableException, and before
+# this was caught `/secret add` took the whole login shell down. Found by the
+# Phase 3 gate run, not by any unit test.
+try:
+    from secretstorage.exceptions import SecretStorageException as _SecretStorageError  # type: ignore
+except ImportError:
+    class _SecretStorageError(Exception):  # type: ignore[no-redef]
+        """Stand-in so the tuple below is valid without secretstorage."""
+
+_ERRORS = (ImportError, OSError, RuntimeError, AttributeError, _SecretStorageError)
+
 
 def store_api_key(service: str, key: str) -> None:
     """Store an API key in the Linux keyring.
@@ -34,7 +47,7 @@ def store_api_key(service: str, key: str) -> None:
             secret=key.encode(),
             replace=True,
         )
-    except (ImportError, OSError, RuntimeError, AttributeError) as exc:
+    except _ERRORS as exc:
         # No secretstorage, no D-Bus session, or a locked collection that will
         # not unlock. The caller falls back to config.json.
         raise RuntimeError(
@@ -45,8 +58,6 @@ def store_api_key(service: str, key: str) -> None:
 class KeyringUnavailable(RuntimeError):
     """secretstorage or the D-Bus session it needs is not there."""
 
-
-_ERRORS = (ImportError, OSError, RuntimeError, AttributeError)
 
 
 def _collection():
@@ -123,5 +134,5 @@ def get_api_key(service: str) -> str | None:
         if not items:
             return None
         return items[0].get_secret().decode()
-    except (ImportError, OSError, RuntimeError, AttributeError, UnicodeDecodeError):
+    except (*_ERRORS, UnicodeDecodeError):
         return None
