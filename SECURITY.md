@@ -22,7 +22,7 @@ Email **parthkomalwad99@gmail.com** with the subject `Sable security`. Include r
 
 ## Threat model
 
-`docs/THREAT_MODEL.md` (Phase 3 deliverable) documents assets, trust boundaries, and mitigations. Until it lands, the operative rules are: model output is never executed without the policy engine; command output returned to the model is untrusted data; agents never run as root.
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) documents what Sable protects, from whom, the trust boundaries, which mitigation covers which threat, and, in its section 5, where the protection stops. Read that section before relying on any single mitigation.
 
 ## Supported versions
 
