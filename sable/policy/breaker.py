@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 _CREATE = """
 CREATE TABLE IF NOT EXISTS breaker_trips (
@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS breaker_trips (
 #: Keys `per_job_budget` accepts. None or absent means unlimited.
 BUDGET_KEYS = ("tokens", "usd", "turns", "wall_s")
 
+#: Keys one `tool_budgets` entry accepts (J12). Absent means unlimited.
+TOOL_BUDGET_KEYS = ("max_calls_per_goal", "max_bytes", "max_cost")
+
 
 @dataclass(frozen=True)
 class Limits:
@@ -40,6 +43,9 @@ class Limits:
     turns: int | None = None
     wall_s: float | None = None
     consecutive_failures: int | None = None
+    #: J12: `{"web": {"max_calls_per_goal": 2}}`. A key budgets that tool and
+    #: every tool under it (`web` covers `web.search` and `web.fetch`).
+    tools: dict = field(default_factory=dict, hash=False)
 
     @staticmethod
     def from_config(config) -> "Limits":
@@ -47,6 +53,7 @@ class Limits:
         return Limits(
             **{k: per_job.get(k) for k in BUDGET_KEYS},
             consecutive_failures=getattr(config, "breaker_consecutive_failures", None),
+            tools=dict(getattr(config, "tool_budgets", None) or {}),
         )
 
 
@@ -85,6 +92,59 @@ class Breaker:
         self.usd = 0.0
         self.turns = 0
         self.failures = 0
+        # J12 per-tool spend, keyed by budget key, and the tool trip if any.
+        self._tool_used: dict[str, dict[str, float]] = {}
+        self._tool_trip: str | None = None
+        self._recorded: str | None = None
+
+    def _tool_keys(self, name: str) -> list[str]:
+        return [k for k in self._limits.tools if name == k or name.startswith(k + ".")]
+
+    def _trip_tool(self, reason: str) -> str:
+        """Stop this job: recorded now, and `check()` refuses the next turn."""
+        self._tool_trip = reason
+        self.check()
+        return f"[breaker: {reason}; the job stops before its next turn]"
+
+    def before_tool(self, name: str) -> str | None:
+        """None if tool `name` may run now, else the refusal the model reads.
+
+        A call that would go past `max_calls_per_goal` never runs; bytes and
+        cost are only known afterwards, so a budget already spent refuses too.
+        """
+        for key in self._tool_keys(name):
+            lim, used = self._limits.tools[key], self._tool_used.setdefault(
+                key, {"max_calls_per_goal": 0, "max_bytes": 0, "max_cost": 0.0})
+            for k in TOOL_BUDGET_KEYS:
+                limit = lim.get(k)
+                if limit is not None and used[k] >= limit:
+                    return self._trip_tool(f"tool {name}: {key}.{k} limit reached ({used[k]:g} of {limit:g})")
+        for key in self._tool_keys(name):
+            self._tool_used[key]["max_calls_per_goal"] += 1
+        return None
+
+    def after_tool(self, name: str, nbytes: int, cost: float = 0.0) -> tuple[int | None, str | None]:
+        """Count a finished call. Returns (bytes to keep, trip notice).
+
+        The call that crosses `max_bytes` trips, and its output is cut to
+        what the budget had left, so the model never reads past the limit.
+        Cost is only reported, so the call that crosses `max_cost` is kept.
+        """
+        keep, notice = None, None
+        for key in self._tool_keys(name):
+            lim, used = self._limits.tools[key], self._tool_used[key]
+            before = used["max_bytes"]
+            used["max_bytes"] += nbytes
+            used["max_cost"] += cost or 0.0
+            if lim.get("max_bytes") is not None and used["max_bytes"] > lim["max_bytes"]:
+                left = max(0, int(lim["max_bytes"] - before))
+                keep = left if keep is None else min(keep, left)
+                notice = self._trip_tool(f"tool {name}: {key}.max_bytes limit reached "
+                                         f"({used['max_bytes']:g} of {lim['max_bytes']:g})")
+            elif lim.get("max_cost") is not None and used["max_cost"] >= lim["max_cost"]:
+                notice = self._trip_tool(f"tool {name}: {key}.max_cost limit reached "
+                                         f"({used['max_cost']:g} of {lim['max_cost']:g})")
+        return keep, notice
 
     def record(self, tokens: int = 0, usd: float = 0.0, failed: bool = False) -> None:
         """One finished turn. A success ends a run of failures."""
@@ -123,6 +183,8 @@ class Breaker:
         return paused_at is not None
 
     def _over(self) -> str | None:
+        if self._tool_trip:
+            return self._tool_trip
         lim = self._limits
         checks = (
             ("turns", self.turns, lim.turns),
@@ -155,6 +217,9 @@ class Breaker:
                         t = open_trips[0]
                         return f"breaker tripped by {t['job']}: {t['reason']}. /breaker reset to resume"
                     return None
+                if reason == self._recorded:
+                    return f"{reason}. /breaker reset to resume"
+                self._recorded = reason
                 conn.execute(
                     "INSERT INTO breaker_trips (created_at, job, reason) VALUES (?, ?, ?)",
                     (time.time(), self._job, reason),

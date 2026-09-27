@@ -425,7 +425,7 @@ class TaskAgent:
         print(f"[agent] tool: {registry.as_command(name, args)}", flush=True)
         result = registry.call(name, args, ToolContext(
             role="worker", cwd=self._workspace, agent=self._name, goal=self._goal,
-            model=self._config.model_for("worker"), tainted=self._tainted,
+            model=self._config.model_for("worker"), tainted=self._tainted, budget=self._breaker,
         ), publish=lambda kind, payload: self._publish(kind, **payload))
         if result.taints:
             self._tainted = True

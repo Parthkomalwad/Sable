@@ -375,7 +375,7 @@ class OrchestratorAgent:
             return
         ctx = ToolContext(
             role="orchestrator", cwd=self._cwd, agent="orchestrator", goal=self._goal,
-            model=self._config.model_for("orchestrator"), tainted=self._tainted,
+            model=self._config.model_for("orchestrator"), tainted=self._tainted, budget=self._breaker,
         )
         if not self._confirm_tool(name, args, explanation, ctx):
             self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})
