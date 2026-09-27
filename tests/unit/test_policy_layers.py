@@ -100,3 +100,8 @@ class TestRoot:
     def test_user_is_not(self, monkeypatch):
         monkeypatch.setattr(privilege, "_euid", lambda: 1000)
         assert privilege.root_refusal() is None
+
+    def test_containers_can_opt_out(self, monkeypatch):
+        monkeypatch.setattr(privilege, "_euid", lambda: 0)
+        monkeypatch.setenv("SABLE_ALLOW_ROOT", "1")
+        assert privilege.root_refusal() is None
