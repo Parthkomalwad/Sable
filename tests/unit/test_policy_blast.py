@@ -26,6 +26,39 @@ from sable.policy.blast import Level
     ("echo hi > out.txt", Level.WRITES),
     ("git push", Level.WRITES),
     ("ls > listing.txt", Level.WRITES),
+    # false greens: wrappers, substitution, writing modes of read-only tools
+    ("env mv a b", Level.WRITES),
+    ("env -i PATH=/bin mv a b", Level.WRITES),
+    ("env VAR=x cp a b", Level.WRITES),
+    ("nice rm x", Level.WRITES),
+    ("nice -n 10 rm x", Level.WRITES),
+    ("timeout 5 cp a b", Level.WRITES),
+    ("timeout -s KILL 5 cp a b", Level.WRITES),
+    ("nohup mv a b", Level.WRITES),
+    ("time mv a b", Level.WRITES),
+    ("stdbuf -oL mv a b", Level.WRITES),
+    ("ls | xargs rm", Level.WRITES),
+    ("find . | xargs -0 -n1 rm", Level.WRITES),
+    ("nice ls", Level.READ_ONLY),
+    ("env", Level.UNKNOWN),
+    ("ls | xargs", Level.UNKNOWN),
+    ("ls $(rm x)", Level.UNKNOWN),
+    ("cat `touch y`", Level.UNKNOWN),
+    ("echo $(date)", Level.UNKNOWN),
+    ("awk '{system(\"rm \" $1)}' f", Level.UNKNOWN),
+    ("awk '{print > \"out\"}' f", Level.WRITES),  # the redirect check sees it first
+    ("gawk '{print | \"sh\"}' f", Level.UNKNOWN),
+    ("awk '{print $1}' f", Level.READ_ONLY),
+    ("sed -n 'w out.txt' f", Level.WRITES),
+    ("sed 's/a/b/e' f", Level.WRITES),
+    ("sed 's/a/b/w out' f", Level.WRITES),
+    ("sed -n 1,5p f", Level.READ_ONLY),
+    ("sort -o out.txt f", Level.WRITES),
+    ("sort --output=out f", Level.WRITES),
+    ("find . -fprint out", Level.WRITES),
+    ("find . -fls out", Level.WRITES),
+    ("find . -fprintf out %p", Level.WRITES),
+    ("find . -ok rm {} ;", Level.WRITES),
     ("frobnicate --all", Level.UNKNOWN),
     ("", Level.UNKNOWN),
 ])
@@ -84,3 +117,4 @@ def test_tainted_bumped_ls_is_still_read_only(monkeypatch, capsys):
     assert engine._confirm("ls -la", d) is False
     out = capsys.readouterr().out
     assert blast.COLOURS[Level.READ_ONLY] in out and "read-only" in out
+    assert "CONFIRM  tainted-context" in out and "DESTRUCTIVE" not in out
