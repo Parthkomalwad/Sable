@@ -84,7 +84,7 @@ def main() -> int:
         for theme_name, theme in THEMES.items():
             target = OUT / f"sable-{name}-{theme_name}.svg"
             rendered = render(source, theme)
-            current = target.read_text(encoding="utf-8", newline="") if target.exists() else None
+            current = target.read_bytes().decode("utf-8") if target.exists() else None
             if current == rendered:
                 continue
             if args.check:
