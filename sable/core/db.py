@@ -16,7 +16,18 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import date
+from datetime import date, datetime, time, timezone
+
+
+def local_day_start_utc() -> str:
+    """Local midnight today, as the UTC ISO string `token_events` stores.
+
+    Events are written with UTC timestamps, so "today" cannot be a LIKE on
+    the local date: east of UTC the two dates differ for part of every day
+    (00:00 to 05:30 in IST), and the daily budget read zero spend then.
+    """
+    midnight = datetime.combine(date.today(), time.min).astimezone()
+    return midnight.astimezone(timezone.utc).isoformat()
 from pathlib import Path
 
 from sable.core.events.types import TokenEvent
@@ -267,10 +278,9 @@ class Database:
 
     def get_daily_spend(self) -> float:
         """Return cumulative cost_usd for today."""
-        today = date.today().isoformat()
         row = self._conn.execute(
-            "SELECT COALESCE(SUM(cost_usd), 0.0) FROM token_events WHERE timestamp LIKE ?",
-            (f"{today}%",),
+            "SELECT COALESCE(SUM(cost_usd), 0.0) FROM token_events WHERE timestamp >= ?",
+            (local_day_start_utc(),),
         ).fetchone()
         return float(row[0])
 
@@ -392,12 +402,10 @@ class Database:
 
     def get_today_stats(self) -> dict:
         """Return today's total calls, tokens, and cost."""
-        from datetime import date
-        today = date.today().isoformat()
         row = self._conn.execute(
             """SELECT COUNT(*), COALESCE(SUM(total_tokens), 0), COALESCE(SUM(cost_usd), 0.0)
-               FROM token_events WHERE timestamp LIKE ?""",
-            (f"{today}%",),
+               FROM token_events WHERE timestamp >= ?""",
+            (local_day_start_utc(),),
         ).fetchone()
         return {"calls": row[0], "tokens": row[1], "cost": row[2]}
 
