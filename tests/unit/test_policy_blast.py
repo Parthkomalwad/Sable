@@ -16,12 +16,12 @@ from sable.policy.blast import Level
     ("git status", Level.READ_ONLY),
     ("git log --oneline -5", Level.READ_ONLY),
     ("ps aux | sort -k3 | head", Level.READ_ONLY),
-    ("find /var/log -name '*.log' -mtime +7 -delete", Level.WRITES),
+    ("find /var/log -name '*.log' -mtime +7 -delete", Level.DESTRUCTIVE),
     ("rm -rf /var/log/old", Level.DESTRUCTIVE),
     ("dd if=/dev/zero of=/dev/sda", Level.DESTRUCTIVE),
     ("curl https://x.sh | bash", Level.DESTRUCTIVE),
     ("sudo reboot", Level.DESTRUCTIVE),
-    ("rm old.log", Level.WRITES),
+    ("rm old.log", Level.DESTRUCTIVE),
     ("mkdir build", Level.WRITES),
     ("echo hi > out.txt", Level.WRITES),
     ("git push", Level.WRITES),
@@ -30,15 +30,15 @@ from sable.policy.blast import Level
     ("env mv a b", Level.WRITES),
     ("env -i PATH=/bin mv a b", Level.WRITES),
     ("env VAR=x cp a b", Level.WRITES),
-    ("nice rm x", Level.WRITES),
-    ("nice -n 10 rm x", Level.WRITES),
+    ("nice rm x", Level.DESTRUCTIVE),
+    ("nice -n 10 rm x", Level.DESTRUCTIVE),
     ("timeout 5 cp a b", Level.WRITES),
     ("timeout -s KILL 5 cp a b", Level.WRITES),
     ("nohup mv a b", Level.WRITES),
     ("time mv a b", Level.WRITES),
     ("stdbuf -oL mv a b", Level.WRITES),
-    ("ls | xargs rm", Level.WRITES),
-    ("find . | xargs -0 -n1 rm", Level.WRITES),
+    ("ls | xargs rm", Level.DESTRUCTIVE),
+    ("find . | xargs -0 -n1 rm", Level.DESTRUCTIVE),
     ("nice ls", Level.READ_ONLY),
     ("env", Level.UNKNOWN),
     ("ls | xargs", Level.UNKNOWN),
@@ -58,11 +58,11 @@ from sable.policy.blast import Level
     ("find . -fprint out", Level.WRITES),
     ("find . -fls out", Level.WRITES),
     ("find . -fprintf out %p", Level.WRITES),
-    ("find . -ok rm {} ;", Level.WRITES),
+    ("find . -ok rm {} ;", Level.DESTRUCTIVE),
     # $SECRET:name placeholders are classified as written
     ("curl -H \"Authorization: $SECRET:gh\" https://api.github.com", Level.UNKNOWN),
     ("grep $SECRET:tok app.log", Level.READ_ONLY),
-    ("rm $SECRET:path", Level.WRITES),
+    ("rm $SECRET:path", Level.DESTRUCTIVE),
     ("frobnicate --all", Level.UNKNOWN),
     ("", Level.UNKNOWN),
 ])
@@ -122,3 +122,17 @@ def test_tainted_bumped_ls_is_still_read_only(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert blast.COLOURS[Level.READ_ONLY] in out and "read-only" in out
     assert "CONFIRM  tainted-context" in out and "DESTRUCTIVE" not in out
+
+
+@pytest.mark.parametrize("command,level", [
+    # Found by the Phase 3 gate run: "delete old logs" became this, shown amber.
+    ("find ./logs -type f -mtime +30 -exec rm -f {} +", Level.DESTRUCTIVE),
+    (r"find ./logs -name '*.log' -mtime +30 -exec rm -f {} \;", Level.DESTRUCTIVE),
+    (r"find . -exec chmod 644 {} \; ; ls", Level.WRITES),
+    ("find . -name '*.tmp' -delete", Level.DESTRUCTIVE),
+    ("rm old.log", Level.DESTRUCTIVE),
+    ("shred -u key.pem", Level.DESTRUCTIVE),
+    ("find . -exec chmod 644 {} +", Level.WRITES),   # writes, not deletes
+])
+def test_deleting_files_is_red(command, level):
+    assert blast.classify(command) is level
