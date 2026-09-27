@@ -237,20 +237,26 @@ position, to be written down rather than papered over:
 **Files:** Create `sable/policy/hooks.py`; modify `sable/app/repl.py`,
 `sable/agents/orchestrator.py`
 
-- [ ] **Step 1: failing tests.** A `pre_command` hook receives the command as
+- [x] **Step 1: failing tests.** A `pre_command` hook receives the command as
       JSON on stdin. Exit 0 allows, **exit 2 blocks** and the hook's stdout is
       shown to the user. Any other non-zero exit is a hook *error*: it is
       reported and does not block, because a broken hook must not wedge the
       shell. Stdout that parses as JSON may inject context; stdout that does not
       is shown as text rather than discarded. A hook that hangs is killed at a
       timeout and treated as an error.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** Four names: `pre_command`, `post_command`,
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** Four names: `pre_command`, `post_command`,
       `pre_spawn`, `on_skill_use`. Same model as Claude Code, deliberately, so a
       user who has written one already knows this one. Hooks run **after** the
       policy decision and can only make it stricter, for the same reason the
       admin floor exists.
-- [ ] **Step 4:** green. Commit: `feat(policy): lifecycle hooks that can block a command but never loosen one`
+- [x] **Step 4:** green. Commit: `feat(policy): lifecycle hooks that can block a command but never loosen one`
+
+> **Done, plus a fix Task 2 owed:** `Ctrl+B`, offline mode and the
+> budget-exhausted fallback in `repl.py` ran bash with no `gate()`. They are
+> gated now, with a guard test that reads the code. The hook timeout is a
+> constant, not a `schema.py` key, until something needs it changed.
+> `policy_queue` and `/approve` get their own PR next.
 
 ## Task 5: Untrusted output and taint (I1)
 
