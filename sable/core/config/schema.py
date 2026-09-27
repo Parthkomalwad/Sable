@@ -43,6 +43,9 @@ class ShellConfig:
     # dict is today's behaviour. breaker_consecutive_failures: None = off.
     per_job_budget: dict[str, float] = field(default_factory=dict)
     breaker_consecutive_failures: int | None = None
+    # Per-tool settings (Phase 3.5), e.g. {"web": {"search_provider": "brave"}}.
+    # Empty means every tool's defaults, so DuckDuckGo search.
+    tools: dict = field(default_factory=dict)
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -122,6 +125,13 @@ class ShellConfig:
         if failures is not None and (isinstance(failures, bool) or not isinstance(failures, int) or failures <= 0):
             raise ValueError(f"breaker_consecutive_failures must be a positive int or null, got {failures!r}")
 
+        tools = data.get("tools") or {}
+        if not isinstance(tools, dict) or not isinstance(tools.get("web", {}), dict):
+            raise ValueError(f"tools must be an object of objects, got {tools!r}")
+        provider = tools.get("web", {}).get("search_provider")
+        if provider is not None and provider not in ("duckduckgo", "searxng", "brave", "tavily"):
+            raise ValueError(f"Unknown tools.web.search_provider: {provider!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -135,6 +145,7 @@ class ShellConfig:
             models=models,
             per_job_budget={k: v for k, v in per_job.items() if v is not None},
             breaker_consecutive_failures=failures,
+            tools=tools,
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -155,5 +166,6 @@ class ShellConfig:
             "models": dict(self.models),
             "per_job_budget": dict(self.per_job_budget),
             "breaker_consecutive_failures": self.breaker_consecutive_failures,
+            "tools": dict(self.tools),
             "api_key": getattr(self, "api_key", ""),
         }

@@ -730,3 +730,59 @@ a model drafted unattended reaches another model's context without that step.
 **B6, semantic skill search.** Retrieval is keyword `match` against `triggers`
 and `keywords` only. Embedding-based retrieval is scheduled for a later phase
 and nothing depends on it today.
+
+---
+
+## 9. Tools
+
+### 9.2 web.search and web.fetch
+
+Module: `sable/tools/web.py` (HTML to text in `sable/tools/html_text.py`).
+Both are tier `allow` and both return `taints=True`, so the caller wraps the
+output as untrusted and the agent is tainted for the rest of the goal.
+
+**`web.search(query: string, k?: integer)`** returns up to `k` results
+(default 5, at most 20) as numbered text:
+
+```
+1. <title>
+   <url>
+   <snippet>
+```
+
+The provider is config `tools.web.search_provider`:
+
+| Provider | Needs | Notes |
+|---|---|---|
+| `duckduckgo` (default) | nothing | `https://html.duckduckgo.com/html/?q=`, parsed with `html.parser` |
+| `searxng` | `tools.web.searxng_url` | `GET <url>/search?format=json`; the URL is trusted config, not SSRF checked |
+| `brave` | keyring service `brave` | refused with a message if the key is absent |
+| `tavily` | keyring service `tavily` | refused with a message if the key is absent |
+
+An unknown provider in the config file fails config validation.
+
+**`web.fetch(url: string, max_bytes?: integer)`** returns
+`url: <final url>`, optional `[note]` lines (size cap hit, truncated, plain
+http), a blank line, then the page text. At most `max_bytes` (default
+200 000) are read and the text is cut to 16 000 characters. `text/html` and
+XHTML are converted to text; other `text/*` and `application/json` pass
+through; anything else is refused. Results are cached by URL for 15 minutes
+in the process.
+
+URL safety, checked before any request and again on every redirect hop
+(at most 5, followed by hand):
+
+- scheme must be `http` or `https` (`file://`, `ftp://` refused);
+- the host is resolved and **every** address must be public
+  (`ipaddress.is_global`) and not a metadata address (`169.254.169.254`,
+  `fd00:ec2::254`, `100.100.100.200`), so private, loopback, link-local,
+  shared and unique-local ranges are denied, including a DNS name that
+  points at one;
+- the connection goes to the checked IP with the original `Host` header and
+  TLS SNI, so a DNS answer that changes after the check is not used.
+
+This is stricter than vision J2's `confirm` for localhost and raw IPs: a
+tool's tier is per tool, so a private target is denied, not confirmed.
+
+The orchestrator lists every page `web.fetch` read in the goal when it
+finishes: `read N page(s): <url>, ...`.

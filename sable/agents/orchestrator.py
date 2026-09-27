@@ -135,6 +135,8 @@ class OrchestratorAgent:
         # (policy/taint.py). Sticky for this goal; a new goal is a new
         # OrchestratorAgent, so the next thing the user types starts clean.
         self._tainted = False
+        #: Pages `web.fetch` read this goal, listed when it finishes (J2).
+        self._pages_read: list[str] = []
 
         # Skills, injected rather than imported, for the same layering reason
         # as `corrections_db` above: `agents` sits below `skills`, and
@@ -370,6 +372,8 @@ class OrchestratorAgent:
             sys.stdout.flush()
         if result.taints:
             self._tainted = True
+        if name == "web.fetch" and result.ok and args["url"] not in self._pages_read:
+            self._pages_read.append(args["url"])
         # A tool call is work done: without this, a goal finished by a tool
         # was reported as "the model declined this goal" (live J1 smoke run).
         self._commands_run += 1
@@ -548,6 +552,8 @@ class OrchestratorAgent:
             return
 
         _out(f"\n  \u2726 {explanation}\n")
+        if self._pages_read:
+            _out(f"  read {len(self._pages_read)} page(s): {', '.join(self._pages_read)}\n")
         self._grade_skills()
         self._maybe_draft_skill()
         if self._task_dir:
