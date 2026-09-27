@@ -49,6 +49,7 @@ _HELP_TEXT = (
     "  /alias \"phrase\" = <command>   Name a command in your own words\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
+    "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
     "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
@@ -125,6 +126,44 @@ def _handle_alias_builtin(argument: str, db) -> bool:
         _out(f"alias {phrase!r} -> {command}")
     else:
         _out("could not store that alias")
+    return True
+
+
+def _handle_approve_builtin(argument: str, db) -> bool:
+    """`/approve`, `/approve <id>`, `/approve reject <id>`. Always True.
+
+    What sub-agents asked to run and could not, because nobody can type YES
+    in their window. An approved command runs the next time that agent
+    proposes it, once.
+    """
+    from sable.policy import queue
+
+    if db is None:
+        _out("approvals need the session database, which is unavailable")
+        return True
+
+    parts = argument.split()
+    approve = True
+    if parts and parts[0] == "reject":
+        approve, parts = False, parts[1:]
+    if parts:
+        if len(parts) != 1 or not parts[0].isdigit():
+            _out("usage: /approve [reject] <id>")
+        elif queue.decide_request(db._conn, int(parts[0]), approve=approve):
+            _out(f"{'approved' if approve else 'rejected'} #{parts[0]}"
+                 + (": it runs when the agent proposes it again" if approve else ""))
+        else:
+            _out(f"no pending request #{parts[0]}")
+        return True
+
+    waiting = queue.pending(db._conn)
+    if not waiting:
+        _out("nothing waiting for approval")
+        return True
+    for r in waiting:
+        _out(f"  #{r['id']}  {r['agent']}  $ {r['command']}")
+        _out(f"       {r['rule']}: {r['why']}")
+    _out("/approve <id> to allow once, /approve reject <id> to refuse")
     return True
 
 
@@ -282,6 +321,9 @@ def handle_builtin(
 
     if cmd == "/alias" or cmd.startswith("/alias "):
         return _handle_alias_builtin(cmd[len("/alias"):].strip(), db)
+
+    if cmd == "/approve" or cmd.startswith("/approve "):
+        return _handle_approve_builtin(cmd[len("/approve"):].strip(), db)
 
     if cmd == "/corrections" or cmd.startswith("/corrections "):
         return _handle_corrections_builtin(cmd[len("/corrections"):].strip(), db)
