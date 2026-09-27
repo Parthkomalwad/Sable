@@ -21,70 +21,83 @@ description = "Default destructive-command blocklist and secret formats"
 
 # ── Commands that require an explicit typed confirmation ────────────────────
 # Matching one of these does not block the command outright; it forces the
-# literal-YES confirm flow in policy/engine.py.
+# literal-YES confirm flow in policy/engine.py. `tier` is allow, confirm or
+# deny; a rule without one is confirm. None is deny yet, because the callers
+# cannot act on deny until Phase 3 Task 2 replaces is_destructive.
 
 [[destructive]]
 name = "dd-to-device"
+tier = "confirm"
 category = "disk"
 pattern = '\bdd\s+if=.*of=/dev/'
 why = "dd writing straight to a device overwrites a disk or partition table with no undo"
 
 [[destructive]]
 name = "mkfs"
+tier = "confirm"
 category = "disk"
 pattern = '\bmkfs\b'
 why = "formatting a filesystem discards everything on it"
 
 [[destructive]]
 name = "fdisk-device"
+tier = "confirm"
 category = "disk"
 pattern = '\bfdisk\b.*(/dev/)'
 why = "repartitioning a device can make every filesystem on it unreachable"
 
 [[destructive]]
 name = "redirect-to-sd-device"
+tier = "confirm"
 category = "disk"
 pattern = '>\s*/dev/sd[a-z]\b'
 why = "redirecting into a raw disk corrupts it from the first byte"
 
 [[destructive]]
 name = "redirect-to-nvme-device"
+tier = "confirm"
 category = "disk"
 pattern = '>\s*/dev/nvme\d'
 why = "redirecting into a raw nvme disk corrupts it from the first byte"
 
 [[destructive]]
 name = "recursive-delete"
+tier = "confirm"
 category = "delete"
 pattern = '\brm\s+-[^\s]*r[^\s]*\s+\S'
 why = "recursive delete, and the path may expand to more than intended"
 
 [[destructive]]
 name = "curl-pipe-shell"
+tier = "confirm"
 category = "remote-code"
 pattern = '\bcurl\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b'
 why = "runs whatever the server returns, unreviewed, with your privileges"
 
 [[destructive]]
 name = "wget-pipe-shell"
+tier = "confirm"
 category = "remote-code"
 pattern = '\bwget\b[^|]*\|\s*(sudo\s+)?(bash|sh)\b'
 why = "runs whatever the server returns, unreviewed, with your privileges"
 
 [[destructive]]
 name = "shutdown"
+tier = "confirm"
 category = "system-state"
 pattern = '\bshutdown\b'
 why = "takes the machine down, and over SSH that ends your own session"
 
 [[destructive]]
 name = "reboot"
+tier = "confirm"
 category = "system-state"
 pattern = '\breboot\b'
 why = "restarts the machine, and over SSH that ends your own session"
 
 [[destructive]]
 name = "iptables-flush"
+tier = "confirm"
 category = "system-state"
 pattern = '\biptables\s+-F\b'
 why = "flushes every firewall rule, which can expose the host or lock you out"

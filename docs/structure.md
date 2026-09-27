@@ -59,11 +59,11 @@ sable/
 
   policy/                ── what is allowed ─────────────────────────────────
     engine.py            evaluate(command|tool, context) → allow|confirm|deny + reason
-    rules.py             rule model, loader for policy.yaml
+    rules.py             rule model, loader for policy.toml
     hooks.py             pre_command / post_command / pre_spawn / on_skill_use runners
     blast_radius.py      scope tagging (cheap model, cached)
     secrets.py           entropy check, redaction, $SECRET: broker
-    defaults/policy.yaml the shipped 11 destructive patterns, as data
+    defaults/policy.toml the shipped 11 destructive patterns, as data
 
   agents/                ── the runtime ─────────────────────────────────────
     runtime.py           Agent(role=…): one turn loop, one _run_command, one _call_llm
@@ -158,7 +158,7 @@ Lower layers never import higher ones. `agents` never imports `ui`; it **publish
 ```
 ~/.sable/
   config.toml            user config (was config.json; TOML for comments + sections)
-  policy.yaml            allow / confirm / deny rules, tiers
+  policy.toml            allow / confirm / deny rules, tiers (TOML: tomllib is stdlib, no YAML parser on the path that gates every command)
   hooks/                 executable scripts by lifecycle name
   prompts/               overrides for sable/llm/prompts/*.md (same filename wins)
   themes/                user palettes
@@ -239,7 +239,7 @@ spinner_verbs = "fun"               # fun | plain | off
 Every key has a default in `schema.py`; `docs/config-reference.md` is generated from the dataclass docstrings so the reference can never drift.
 
 ### 3.4 Prompts and rules are files
-System prompts (`llm/prompts/orchestrator.md`, `worker.md`, `skill_writer.md`, `router.md`) and the destructive-pattern list (`policy/defaults/policy.yaml`) ship as data. A user overrides by dropping a same-named file in `~/.sable/prompts/` or editing `policy.yaml`. `/prompt show orchestrator` prints the effective prompt with its source path.
+System prompts (`llm/prompts/orchestrator.md`, `worker.md`, `skill_writer.md`, `router.md`) and the destructive-pattern list (`policy/defaults/policy.toml`) ship as data. A user overrides by dropping a same-named file in `~/.sable/prompts/` or editing `policy.toml`. `/prompt show orchestrator` prints the effective prompt with its source path.
 
 ---
 
@@ -270,7 +270,7 @@ Mechanical move first, behaviour change later. Every step ends with `pytest test
 1. **Baseline**: Phase 0 tests merged; add `tests/unit/test_layering.py` (import-graph rule from §2) it will fail initially and becomes the migration's finish line.
 2. **`git mv` packages** into the `sable/` tree per §2 table below; leave `shell/__init__.py` as a **compat shim** that re-exports the old paths with a `DeprecationWarning` for one release so `install.sh`, the Dockerfiles, and tmux `send_keys` commands keep working.
 3. **Split `loop.py`** into `app/repl.py`, `app/builtins/*.py`, `core/audit.py`, `llm/registry.py`, `ui/prompt/*`. No logic changes pure extraction with tests pinned.
-4. **Extract data**: destructive patterns → `policy/defaults/policy.yaml`; prompts → `llm/prompts/*.md`; verbs/stopwords → `data/`; numeric constants → `config/schema.py` defaults.
+4. **Extract data**: destructive patterns → `policy/defaults/policy.toml`; prompts → `llm/prompts/*.md`; verbs/stopwords → `data/`; numeric constants → `config/schema.py` defaults.
 5. **Paths**: `core/paths.py` + symlink migration on first run; update `install.sh`, Dockerfiles, `uninstall.sh`.
 6. **Config format**: `config.json` → `config.toml` with automatic one-time conversion; `/config show` with layer provenance.
 7. **Delete shim** in the release after next.
@@ -281,7 +281,7 @@ Mechanical move first, behaviour change later. Every step ends with `pytest test
 | `shell/loop.py` | `sable/app/repl.py` + `app/builtins/*` + `core/audit.py` + `llm/registry.py` + `ui/prompt/*` |
 | `shell/router.py` | `sable/agents/router.py` |
 | `shell/executor.py` | `sable/core/executor.py` + `ui/renderers/{ls,cat}.py` |
-| `shell/safety.py` | `sable/policy/{engine,secrets}.py` + `policy/defaults/policy.yaml` |
+| `shell/safety.py` | `sable/policy/{engine,secrets}.py` + `policy/defaults/policy.toml` |
 | `shell/planner.py` | `sable/agents/planner.py` |
 | `shell/llm/*` | `sable/llm/*` |
 | `shell/config/*` | `sable/core/config/*` |

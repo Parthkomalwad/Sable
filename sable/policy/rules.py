@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from sable.policy.tiers import Tier
+
 POLICY_PATH = Path(__file__).parent / "defaults" / "policy.toml"
 
 
@@ -39,6 +41,7 @@ class Rule:
     pattern: str
     category: str = ""
     why: str = ""
+    tier: Tier = Tier.CONFIRM
 
     @property
     def compiled(self) -> re.Pattern[str]:
@@ -83,11 +86,22 @@ def _parse_rules(raw: dict, key: str, *, need_metadata: bool) -> tuple[Rule, ...
             # blank one is a real gap rather than a style nit.
             _require(bool(entry.get("why")), f"{where} ({name}) has no 'why'")
 
+        # A missing tier is `confirm`, never `allow`: a forgotten field must
+        # fail safe rather than quietly wave the command through.
+        try:
+            tier = Tier(entry.get("tier", Tier.CONFIRM))
+        except ValueError as exc:
+            raise PolicyError(
+                f"{POLICY_PATH}: {where} ({name}) has an unknown tier "
+                f"{entry['tier']!r}; expected one of {[t.value for t in Tier]}"
+            ) from exc
+
         rules.append(Rule(
             name=name,
             pattern=pattern,
             category=entry.get("category", ""),
             why=entry.get("why", ""),
+            tier=tier,
         ))
     return tuple(rules)
 
