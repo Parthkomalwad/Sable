@@ -5,6 +5,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Changed
+- **CI's integration job runs in about half the time.** Five test files ran twice: once in their own named step, so a failure names what broke, and again in "Full integration suite". The full run now skips them, which was most of its 82 seconds. Both Docker images build through buildx with the GitHub Actions layer cache, so an unchanged Dockerfile reuses its apt and pip layers.
+
+### Changed
 - **Phase 3 (F1): every command is tiered by `decide()`, and `gate()` is the only thing that prompts.** `is_destructive` and `confirm_destructive` are gone. The six places that checked a command each chose what a match meant, and they disagreed: a typed line asked for `YES`, the orchestrator refused outright, a sub-agent refused. Now `decide()` returns a `Decision` and `gate(command, role=...)` acts on it in one place. A test fails if any module outside `sable/policy/` imports the old functions.
 - **Behaviour change: the orchestrator now asks for `YES` on a destructive command instead of refusing it.** The README and docs always showed the agent asking; the code refused. It now matches the docs, and a `deny` rule is how you get the old refusal. The refusal marker keeps its `[blocked:` prefix, so a refused command still grades the run as failed.
 - A command that matches no rule is `allow`. Typed lines run as before; a model's command is still previewed with `↵ run / e edit / q cancel`; a sub-agent's runs inside its sandbox. A sub-agent is never prompted, since nobody reads its window: it runs `allow` and refuses `confirm` and `deny`, and the model is told which rule refused it and why. The plan's `policy.default_tier` key is not added, because nothing needs a different default yet.
