@@ -10,6 +10,7 @@ Tables:
 - agent_turns: the redacted prompt replay log (see core/events/replay.py)
 - skill_corrections: what the user corrected (see skills/corrections.py)
 - skill_aliases: natural-language aliases (see skills/aliases.py)
+- audit_ledger: who/why/what/outcome per command decision (see core/audit.py)
 """
 from __future__ import annotations
 
@@ -122,6 +123,28 @@ CREATE INDEX IF NOT EXISTS idx_agent_events_agent_id
     ON agent_events (agent, id)
 """
 
+# F4. One row per gate() decision. A new table rather than a wider audit.log
+# line, so the watcher's tab format and this schema can evolve apart.
+_CREATE_AUDIT_LEDGER = """
+CREATE TABLE IF NOT EXISTS audit_ledger (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    uid         INTEGER,
+    agent       TEXT NOT NULL,
+    role        TEXT,
+    model       TEXT,
+    goal        TEXT,
+    tier        TEXT,
+    rule        TEXT,
+    why         TEXT,
+    command     TEXT NOT NULL,
+    cwd         TEXT,
+    outcome     TEXT NOT NULL,
+    exit_code   INTEGER,
+    duration_ms INTEGER
+)
+"""
+
 _CREATE_AGENT_TURNS = """
 CREATE TABLE IF NOT EXISTS agent_turns (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -211,6 +234,7 @@ class Database:
         self._conn.execute(_CREATE_AGENT_EVENTS_INDEX)
         self._conn.execute(_CREATE_AGENT_TURNS)
         self._conn.execute(_CREATE_AGENT_TURNS_INDEX)
+        self._conn.execute(_CREATE_AUDIT_LEDGER)
         self._conn.execute(_CREATE_SKILL_CORRECTIONS)
         self._conn.execute(_CREATE_SKILL_CORRECTIONS_INDEX)
         self._conn.execute(_CREATE_SKILL_ALIASES)

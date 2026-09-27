@@ -25,3 +25,11 @@ def _no_local_hooks(monkeypatch, tmp_path_factory):
     from sable.policy import hooks
 
     monkeypatch.setattr(hooks, "HOOKS_DIR", tmp_path_factory.mktemp("hooks"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_audit_ledger(monkeypatch, tmp_path_factory):
+    """`gate()` writes an audit_ledger row; keep it out of the real sessions.db."""
+    import sable.core.db as db
+
+    monkeypatch.setattr(db, "DB_PATH", tmp_path_factory.mktemp("db") / "sessions.db")

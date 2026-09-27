@@ -16,6 +16,7 @@ import re
 import sys
 from collections import Counter
 
+from sable.core import audit
 from sable.policy import hooks, privilege, rules, taint
 from sable.policy.tiers import Decision, Tier
 
@@ -85,7 +86,16 @@ def decide(command: str, *, tainted: bool = False) -> Decision:
                     why=f"{why} ({d.why})" if d.why else why, source=d.source)
 
 
-def gate(command: str, *, role: str, approved: bool = False, tainted: bool = False) -> bool:
+def gate(
+    command: str,
+    *,
+    role: str,
+    approved: bool = False,
+    tainted: bool = False,
+    agent: str | None = None,
+    model: str | None = None,
+    goal: str | None = None,
+) -> bool:
     """Decide, then act on it. True means the command may run.
 
     `role` is "user" (a typed line), "orchestrator" (a model's command in the
@@ -100,13 +110,27 @@ def gate(command: str, *, role: str, approved: bool = False, tainted: bool = Fal
     so a hook can block and never unblock.
 
     `tainted` is passed to `decide()`: one tier stricter.
+
+    Every decision writes one `audit_ledger` row (F4); `agent`, `model` and
+    `goal` are provenance for it, and `agent` defaults to `role`. The caller
+    that runs the command then calls `core.audit.finish(exit_code)`.
     """
     d = decide(command, tainted=tainted)
+
+    def _record(outcome: str) -> None:
+        audit.record(
+            command, agent=agent or role, role=role, model=model, goal=goal,
+            tier=d.tier.value, rule=d.rule.name if d.rule else None,
+            why=d.why if d.rule else None, outcome=outcome, redact=redact_text,
+        )
+
     if d.tier is Tier.DENY:
         if role != "worker":
             _warn(f"refused by policy: {d.rule.name}", command, d.why)
+        _record("refused")
         return False
     if d.tier is Tier.CONFIRM and not approved and (role == "worker" or not _confirm(command, d)):
+        _record("unconfirmed")
         return False
 
     result = hooks.run("pre_command", {
@@ -119,9 +143,14 @@ def gate(command: str, *, role: str, approved: bool = False, tainted: bool = Fal
     if result.blocked:
         if role != "worker":
             _warn("blocked by pre_command hook", command, result.message)
+        _record("hook_blocked")
         return False
     if role != "worker":
         hooks.show("pre_command", result)
+    if d.tier is Tier.CONFIRM:
+        _record("approved" if approved else "confirmed")
+    else:
+        _record("allowed")
     return True
 
 
