@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+- **Phase 3.5 plan** (`docs/plans/2026-09-27-phase-3.5-agent-tools.md`): a tool registry reached through a new JSON `tool` action on every backend, DuckDuckGo search with no key, stdlib-only HTML parsing, and every tool call going through `gate()`, taint and the audit ledger. Task 1 (the registry) goes first; Tasks 2 to 6 then run in parallel; Task 7 runs the gate against a live model.
+
 ### Changed
 - `ROADMAP.md` ticks the four v0.7 lines Phase 3 shipped: tiers and hooks (F1), the threat model and injection evals (I1), the circuit breaker (I2), and blast radius, the audit ledger, the secret broker and the privilege model (F3 F4 F6 I4). Agent tools (Phase 3.5) keep v0.7 current.
 
