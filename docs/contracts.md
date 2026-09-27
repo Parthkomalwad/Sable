@@ -464,7 +464,8 @@ prints that path. A ledger write never raises.
 `[A-Za-z_][A-Za-z0-9_]*`). The model, preview, `gate()`, audit, event bus and
 `agent_turns` see only the placeholder; resolution happens in the runner
 (`agents/runtime.run_command`, `agents/planner`). Each placeholder is rewritten
-to `"${SABLE_SECRET_<NAME>}"` (bare `${...}` inside double quotes) and the value
+to `"${SABLE_SECRET_<name>}"` (name case kept, so `db_pass` and `DB_PASS` never
+share a variable; bare `${...}` inside double quotes) and the value
 is passed in the child's environment, never in the command string or script
 file. Inside single quotes, an unknown name, or an unavailable keyring: the
 command does not run and the model reads `[blocked: <reason>]`. No plaintext or
