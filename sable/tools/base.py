@@ -55,6 +55,9 @@ class Tool:
     tier: Tier                 # the floor: policy files can raise it, never lower it
     run: Callable[[dict, ToolContext], ToolResult]
     roles: frozenset[str] = field(default=ROLES)
+    #: Optional human preview for the confirm block (fs.write shows a diff).
+    #: May raise ToolError; the caller then shows the error instead.
+    preview: Callable[[dict, ToolContext], str] | None = None
 
     def validate(self, args) -> str | None:
         """None if `args` fits the schema, else what is wrong, for the model."""

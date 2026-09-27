@@ -735,6 +735,12 @@ and nothing depends on it today.
 
 ## 9. Tools
 
+The tool interface is `sable/tools/base.py` (`Tool`, `ToolContext`,
+`ToolResult`); every call goes through `registry.call()`, which gates it with
+the tool's tier as a floor. A tool may set `preview(args, ctx) -> str`: the
+orchestrator's confirm block shows it under the call instead of the raw JSON
+args. A preview that raises `ToolError` shows the error instead.
+
 ### 9.2 web.search and web.fetch
 
 Module: `sable/tools/web.py` (HTML to text in `sable/tools/html_text.py`).
@@ -786,3 +792,38 @@ tool's tier is per tool, so a private target is denied, not confirmed.
 
 The orchestrator lists every page `web.fetch` read in the goal when it
 finishes: `read N page(s): <url>, ...`.
+
+### 9.3 fs tools
+
+`sable/tools/fs.py` (J3). Both roles see all five; a worker is never
+prompted, so the two `confirm` tools are refused for it by `gate()`.
+
+| tool | args | tier | taints | blast |
+|---|---|---|---|---|
+| `fs.read` | `path`, `start?`, `end?` (1-based, inclusive) | allow | only for an outside path (orchestrator) | read-only |
+| `fs.write` | `path`, `content` | confirm | no | writes |
+| `fs.patch` | `path`, `diff` (unified) | confirm | no | writes; destructive if the diff removes lines |
+| `fs.search` | `glob`, `regex?` | allow | no | read-only |
+| `fs.tree` | `path?`, `depth?` (default 2) | allow | no | read-only |
+
+- **Confinement.** Paths are joined to `ctx.cwd` (orchestrator cwd, worker
+  workspace) and resolved with `os.path.realpath`. A result outside that root,
+  by `..`, an absolute path or a symlink, is a `ToolError`. The one exception:
+  the orchestrator may `fs.read` an outside file, and the result has
+  `taints=True`, matching `cat` of an outside file in `policy/taint.py`. A
+  worker's outside read is refused. `fs.search` drops any match that resolves
+  outside the root.
+- **Writes are atomic.** New content goes to a temp file in the target's
+  directory, then `os.replace`. The parent directory must exist. An existing
+  file keeps its mode.
+- **Patches.** Every hunk's context and removed lines must match the file
+  exactly; a hunk may sit at another line than its header says (models
+  miscount) but never before the previous hunk. Any mismatch, or a diff with
+  no `@@` hunk, is a `ToolError` and the file is untouched. One file per call;
+  `---`/`+++` headers are ignored.
+- **Previews.** `fs.write` and `fs.patch` preview a coloured unified diff
+  against the current file.
+- **Caps.** Files over 2 MB are refused by `fs.read` and `fs.patch`; output is
+  cut at 100 KB; `fs.search` stops at 200 results, `fs.tree` at 500 entries.
+  `.git`, `node_modules`, `__pycache__` and `.venv` are skipped by search and
+  not descended by tree.

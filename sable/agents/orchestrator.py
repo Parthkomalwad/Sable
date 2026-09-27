@@ -359,14 +359,15 @@ class OrchestratorAgent:
         args = action.get("args", {})
         explanation = action.get("explanation", "")
         call_text = registry.as_command(name, args)
-        if not self._confirm_tool(name, args, explanation):
+        ctx = ToolContext(
+            role="orchestrator", cwd=self._cwd, agent="orchestrator", goal=self._goal,
+            model=self._config.model_for("orchestrator"), tainted=self._tainted,
+        )
+        if not self._confirm_tool(name, args, explanation, ctx):
             self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})
             return
 
-        result = registry.call(name, args, ToolContext(
-            role="orchestrator", cwd=self._cwd, agent="orchestrator", goal=self._goal,
-            model=self._config.model_for("orchestrator"), tainted=self._tainted,
-        ), publish=lambda kind, payload: self._bus.publish("orchestrator", kind, payload))
+        result = registry.call(name, args, ctx, publish=lambda kind, payload: self._bus.publish("orchestrator", kind, payload))
         if result.output.strip():
             sys.stdout.write(f'\n{result.output.rstrip()}\n\n')
             sys.stdout.flush()
@@ -383,11 +384,29 @@ class OrchestratorAgent:
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": taint.wrap_untrusted(result.output)})
 
-    def _confirm_tool(self, name: str, args, explanation: str) -> bool:
-        """Show a tool call and ask ↵ run / q cancel. No edit: args are JSON."""
+    def _confirm_tool(self, name: str, args, explanation: str, ctx=None) -> bool:
+        """Show a tool call and ask ↵ run / q cancel. No edit: args are JSON.
+
+        A tool with a `preview` (fs.write, fs.patch: a diff) shows it under
+        the call, so a write is never confirmed unseen.
+        """
+        from sable.tools import registry
+        from sable.tools.base import ToolError
+
         DIM, BRIGHT, RESET = '\033[2;37m', '\033[1;37m', '\033[0m'
         sys.stdout.write(f'\n  ⚙ {explanation}\n\n')
-        sys.stdout.write(f'  {BRIGHT}{name}{RESET} {DIM}{json.dumps(args)}{RESET}\n\n')
+        tool = registry.get(name)
+        preview = None
+        if tool is not None and tool.preview is not None and ctx is not None and tool.validate(args) is None:
+            try:
+                preview = tool.preview(args, ctx)
+            except ToolError as exc:
+                preview = f'(no preview: {exc})'
+        if preview is None:
+            sys.stdout.write(f'  {BRIGHT}{name}{RESET} {DIM}{json.dumps(args)}{RESET}\n\n')
+        else:
+            sys.stdout.write(f'  {BRIGHT}{name}{RESET} {DIM}{args.get("path", "")}{RESET}\n\n')
+            sys.stdout.write('\n'.join(f'    {ln}' for ln in preview.splitlines()) + '\n\n')
         sys.stdout.write(f'  {DIM}↵ run   q cancel  ›{RESET}\n')
         sys.stdout.flush()
         try:

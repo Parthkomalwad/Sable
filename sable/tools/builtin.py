@@ -19,3 +19,4 @@ register(Tool(
 ))
 
 from sable.tools import web  # noqa: E402,F401  registers web.search and web.fetch
+from sable.tools import fs  # noqa: E402,F401  registers fs.* on import
