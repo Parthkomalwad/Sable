@@ -5,6 +5,13 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 3 (F1): lifecycle hooks.** Executables in `~/.sable/hooks/` named `pre_command`, `post_command`, `pre_spawn` and `on_skill_use` get one JSON object on stdin, the same contract as Claude Code's hooks. Exit 2 blocks and stdout says why; exit 0 allows, and JSON stdout can carry a `message` for you and a `context` for the model. Any other failure, including a hang past 10 seconds, is reported and does not block, because a broken hook must not wedge the shell.
+- `pre_command` runs inside `gate()`, after policy, so every path that runs a command gets it and a hook can block but never unblock: a command policy refused never reaches it. `docs/contracts.md` §7.2 lists every hook and its payload. `tests/unit/conftest.py` keeps a developer's own hooks out of the test suite. 12 tests.
+
+### Fixed
+- **Three REPL paths ran a typed line as bash with no policy check.** `Ctrl+B`, offline mode, and the fallback when the token budget runs out all called `execute_bash` without `gate()`, so `rm -rf` there was never asked about. The last one ran whatever was typed, plain English included. Phase 3 Task 2 counted six call sites and missed these, and its guard only looked for imports of the old functions. All three are gated now, and `test_every_repl_bash_path_is_gated` reads the REPL's code and fails on any `execute_bash` without a `gate()` before it. Against the old code it names exactly these three lines.
+
+### Added
 - **Phase 3 (F1, I4): your own policy file, under an admin floor it cannot loosen.** `~/.sable/policy.toml` and `/etc/sable/policy.toml` take `[[rule]]` entries with `name`, `pattern`, `tier` and an optional `why`. A user rule wins only when it is stricter than the admin or shipped rule for the same command, so a user `allow` never loosens a shipped `confirm` and a user `deny` beats anything. `Tier` gains a `severity` ordering for that comparison, and the confirm prompt names the file whose rule fired.
 - A broken user file prints a warning and Sable carries on with the other rules. A broken admin file stops Sable from starting, because a typo must not silently remove the floor.
 - **`sudo` is always at least `confirm`**, from the new `sable/policy/privilege.py`, whatever any file says. Only `sudo` as a command word counts, so `man sudo` and `grep sudoers` are unaffected.

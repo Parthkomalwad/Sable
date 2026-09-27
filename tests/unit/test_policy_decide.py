@@ -77,3 +77,28 @@ def test_no_legacy_policy_callers():
 
 def test_legacy_boolean_is_gone():
     assert not hasattr(engine, "is_destructive")
+
+
+def test_every_repl_bash_path_is_gated():
+    """Each `execute_bash` in the REPL sits in a block that called `gate` first.
+
+    Task 2 counted six call sites and missed three: Ctrl+B, offline mode, and
+    the exhausted-budget fallback all ran a typed line as bash with no policy
+    check. The import guard above could not see them, because they never
+    imported anything. This one reads the code.
+    """
+    src = (SABLE / "app" / "repl.py").read_text(encoding="utf-8")
+    ungated = []
+    for node in ast.walk(ast.parse(src)):
+        body = getattr(node, "body", None)
+        if not isinstance(body, list):
+            continue
+        seen_gate = False
+        for stmt in body:
+            text = ast.unparse(stmt)
+            if "gate(" in text and "execute_bash(" not in text:
+                seen_gate = True
+            elif "execute_bash(" in text and not isinstance(stmt, (ast.If, ast.For, ast.While, ast.Try, ast.With, ast.FunctionDef)):
+                if not seen_gate:
+                    ungated.append(stmt.lineno)
+    assert not ungated, f"execute_bash with no gate() before it at repl.py lines {ungated}"

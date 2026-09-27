@@ -17,3 +17,11 @@ def _no_local_policy_files(monkeypatch, tmp_path_factory):
     rules.load.cache_clear()
     yield
     rules.load.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _no_local_hooks(monkeypatch, tmp_path_factory):
+    """A developer's own ~/.sable/hooks must not run inside the test suite."""
+    from sable.policy import hooks
+
+    monkeypatch.setattr(hooks, "HOOKS_DIR", tmp_path_factory.mktemp("hooks"))

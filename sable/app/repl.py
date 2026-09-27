@@ -146,6 +146,15 @@ def _after_alias_use(db, alias_hit: dict) -> None:
         mark_promotion_offered(db, phrase)
 
 
+def _post_command(command: str, exit_code: int, cwd: str) -> None:
+    """Run the user's post_command hook after a typed line. Never blocks."""
+    from sable.policy import hooks
+
+    hooks.show("post_command", hooks.run("post_command", {
+        "command": command, "exit_code": exit_code, "role": "user", "cwd": cwd,
+    }))
+
+
 def pending_skills_banner() -> str:
     """One line naming how many drafted skills are waiting for approval.
 
@@ -261,15 +270,27 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
             if _handle_builtin(line, db, session_id, config, turns=_active_turns):
                 continue
 
+            # Ctrl+B skips the router, not policy. Offline mode and an
+            # exhausted budget below are the same: each runs the line as
+            # bash, so each is gated like the bash route. All three used to
+            # run ungated, which Phase 3 Task 2's call-site count missed.
             if _bypass_next:
                 _bypass_next = False
+                if not gate(line, role="user"):
+                    _audit_log("destructive_blocked", line)
+                    continue
                 exit_code, _ = execute_bash(line, cwd)
+                _post_command(line, exit_code, cwd)
                 if exit_code != 0:
                     _out(f"exit {exit_code}")
                 continue
 
             if _offline_mode:
+                if not gate(line, role="user"):
+                    _audit_log("destructive_blocked", line)
+                    continue
                 exit_code, _ = execute_bash(line, cwd)
+                _post_command(line, exit_code, cwd)
                 if exit_code != 0:
                     _out(f"exit {exit_code}")
                 continue
@@ -287,6 +308,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     _audit_log("destructive_blocked", resolved)
                     continue
                 exit_code, _ = execute_bash(resolved, cwd)
+                _post_command(resolved, exit_code, cwd)
                 _last_exit = exit_code
                 _audit_log("alias", resolved, exit_code)
                 _write_audit_log(session_id, cwd, resolved)
@@ -313,6 +335,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     _audit_log("destructive_blocked", line)
                     continue
                 exit_code, _ = execute_bash(line, cwd)
+                _post_command(line, exit_code, cwd)
                 _last_exit = exit_code
                 _audit_log("bash", line, exit_code)
                 _write_audit_log(session_id, cwd, line)
@@ -321,7 +344,11 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 continue
 
             if not budget.check_and_enforce(db, config, session_id):
+                if not gate(line, role="user"):
+                    _audit_log("destructive_blocked", line)
+                    continue
                 exit_code, _ = execute_bash(line, cwd)
+                _post_command(line, exit_code, cwd)
                 if exit_code != 0:
                     _out(f"exit {exit_code}")
                 continue
