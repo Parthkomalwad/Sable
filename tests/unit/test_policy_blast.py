@@ -59,6 +59,10 @@ from sable.policy.blast import Level
     ("find . -fls out", Level.WRITES),
     ("find . -fprintf out %p", Level.WRITES),
     ("find . -ok rm {} ;", Level.WRITES),
+    # $SECRET:name placeholders are classified as written
+    ("curl -H \"Authorization: $SECRET:gh\" https://api.github.com", Level.UNKNOWN),
+    ("grep $SECRET:tok app.log", Level.READ_ONLY),
+    ("rm $SECRET:path", Level.WRITES),
     ("frobnicate --all", Level.UNKNOWN),
     ("", Level.UNKNOWN),
 ])
