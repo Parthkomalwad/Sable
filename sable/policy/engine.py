@@ -138,6 +138,7 @@ def gate(
         "role": role,
         "tier": d.tier.value,
         "rule": d.rule.name if d.rule else None,
+        "tainted": tainted,
         "cwd": os.getcwd(),
     })
     if result.blocked:

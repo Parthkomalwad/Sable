@@ -526,7 +526,7 @@ class TaskAgent:
                     command, timeout=runtime.escalated_timeout(command)
                 )
                 from sable.core import audit
-                audit.finish()  # duration only: the output carries no status
+                audit.finish(runtime.exit_code_of(output))
                 print(f"[agent] output: {output[:200]}", flush=True)
                 from sable.policy import taint
                 if taint.is_tainting(command, self._workspace):

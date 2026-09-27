@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import sys
 
+from sable.core import audit
 from sable.core.executor import execute_bash
 from sable.policy.engine import gate
 
@@ -107,6 +108,7 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
             continue
 
         exit_code, _ = execute_bash(cmd, current_cwd)
+        audit.finish(exit_code)
         current_cwd = os.getcwd()
         last_exit = exit_code
 
