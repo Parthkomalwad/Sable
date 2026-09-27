@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+- **Phase 3 (I1): `docs/THREAT_MODEL.md`.** What Sable protects, the four kinds of attacker it defends against, the five trust boundaries, a mitigations table pointing at each Phase 3 module, and ten stated limits: the orchestrator is not sandboxed, an unmatched command is `allow`, the `strip_secrets` hole, exact-value secret redaction, word-level taint detection, advisory framing, the eval proving only its corpus, a ledger that is not tamper-evident, typed lines not resolving `$SECRET:`, and blast radius being a heuristic. `SECURITY.md` points to it. `docs/contracts.md` §7 now describes `decide()` and `gate()` as the single decision path, and §7.9 marks F2, F5 and `/policy explain` as not implemented.
+
 ### Fixed
 - **Reading a log now taints an agent.** A code review of the merged taint work (#35) found that only `curl`, `wget`, `mcp` and `cat`/`head`/`tail` of outside files counted as untrusted. A server shell's most common question is "why is this service failing", answered from logs that carry text any visitor chose, such as an nginx User-Agent. `grep`, `awk`, `sed`, `jq`, `zcat`, `rg` and similar on files outside the working directory now taint, and so do `journalctl`, `dmesg`, `docker|podman|kubectl logs`, `ssh`, `nc`, `socat` and `telnet` from anywhere.
 - The untrusted-output frame now escapes any spelling of a closing tag (`</OUTPUT>`, `</output >`, `< /output>`), not only the exact one.
