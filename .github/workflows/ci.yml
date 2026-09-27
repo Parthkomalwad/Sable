@@ -134,17 +134,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Both images build through buildx with the GitHub Actions layer cache,
+      # so a run whose Dockerfiles and dependencies are unchanged reuses the
+      # apt and pip layers instead of rebuilding them. `load: true` puts the
+      # result in the local daemon, where the `docker run` steps expect it.
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build playground image
-        run: docker build -t sable-playground -f docker/Dockerfile.playground .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.playground
+          tags: sable-playground
+          load: true
+          cache-from: type=gha,scope=playground
+          cache-to: type=gha,mode=max,scope=playground
 
       # The production image had rotted unnoticed: ubuntu:22.04 (Python 3.10,
       # below the >=3.11 this project requires) and a login-shell wrapper
       # invoking `shell.main`, the compat shim scheduled for deletion. Nothing
       # built it, so nothing noticed. Building it here is cheap and catches the
       # next drift; the run asserts it can actually start.
-      - name: Build production image and check it boots
+      - name: Build production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: sable-prod
+          load: true
+          cache-from: type=gha,scope=prod
+          cache-to: type=gha,mode=max,scope=prod
+
+      - name: Check the production image boots
         run: |
-          docker build -t sable-prod -f docker/Dockerfile .
           # Through the login-shell wrapper, which is how a real user reaches
           # it: that is what pins the interpreter and PYTHONPATH.
           docker run --rm sable-prod /usr/local/bin/sable --version
@@ -195,8 +217,10 @@ jobs:
             sable-playground \
             bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/test_repl_pty.py -q"
 
-      # The whole suite, including the named steps above again. Cheap, and
-      # it is what catches a collection error in a file no named step covers.
+      # Everything the named steps above did not already run. It is what
+      # catches a collection error in a file no named step covers. The named
+      # files are skipped rather than run twice: they were most of this
+      # step's time, and each already fails under its own name.
       #
       # The Phase 2 placeholders in test_full_loop, test_llm_backends and
       # test_session_resume are marked xfail(strict), so they report as
@@ -208,7 +232,12 @@ jobs:
           docker run --rm -v "$PWD:/app" \
             --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
             sable-playground \
-            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q"
+            bash -c "cd /app && PYTHONPATH=/app pytest tests/integration/ -q \
+              --ignore=tests/integration/test_ssh_bypass_live.py \
+              --ignore=tests/integration/test_playground_layout.py \
+              --ignore=tests/integration/test_pane_resize.py \
+              --ignore=tests/integration/test_inplace_upgrade.py \
+              --ignore=tests/integration/test_repl_pty.py"
 
       # The playground is how a contributor on Windows or macOS runs anything
       # at all, and `playground.ps1 tests` is the first line of the Phase 0
