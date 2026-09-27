@@ -107,7 +107,7 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
             _step_line(step_num, total, cmd, "skip")
             continue
 
-        exit_code, _ = execute_bash(cmd, current_cwd)
+        exit_code, _ = _run_step(cmd, current_cwd)
         audit.finish(exit_code)
         current_cwd = os.getcwd()
         last_exit = exit_code
@@ -129,7 +129,7 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
                 _console.print(f"\n[{RED}]  plan aborted[/{RED}]")
                 return exit_code
             elif choice == "r":
-                exit_code2, _ = execute_bash(cmd, current_cwd)
+                exit_code2, _ = _run_step(cmd, current_cwd)
                 current_cwd = os.getcwd()
                 last_exit = exit_code2
                 state2 = "ok" if exit_code2 == 0 else "fail"
@@ -138,3 +138,15 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
 
     _console.print(Rule(style="color(55)"))
     return last_exit
+
+
+def _run_step(cmd: str, cwd: str) -> tuple[int, str]:
+    """execute_bash with `$SECRET:name` resolved (F6). A refusal is exit 1."""
+    from sable.policy import secrets
+
+    try:
+        resolved, env, _ = secrets.resolve(cmd)
+    except secrets.SecretError as exc:
+        _console.print(f"[{RED}]  not run: {exc}[/{RED}]")
+        return 1, ""
+    return execute_bash(resolved, cwd, {**os.environ, **env} if env else None)

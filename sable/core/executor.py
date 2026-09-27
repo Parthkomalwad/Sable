@@ -158,13 +158,13 @@ def _rich_ls(path: str, flags: str) -> tuple[int, str]:
     return 0, ""
 
 
-def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
+def _pty_exec(command: str, cwd: str, env: dict[str, str] | None = None) -> tuple[int, str]:
     """Run command in a pty, streaming output and forwarding stdin (Ctrl+C works)."""
     import select
     import termios
     import tty
 
-    proc = PtyProcessUnicode.spawn(["/bin/bash", "-c", command], cwd=cwd)
+    proc = PtyProcessUnicode.spawn(["/bin/bash", "-c", command], cwd=cwd, env=env)
 
     # Put stdin in raw mode so Ctrl+C, Ctrl+Z, arrow keys pass through to the pty
     fd = sys.stdin.fileno()
@@ -218,7 +218,9 @@ def _pty_exec(command: str, cwd: str) -> tuple[int, str]:
     return proc.exitstatus or 0, "".join(output)
 
 
-def execute_bash(command: str, cwd: str) -> tuple[int, str]:
+def execute_bash(
+    command: str, cwd: str, env: dict[str, str] | None = None,
+) -> tuple[int, str]:
     """Execute a shell command, returning (exit_code, combined_output).
 
     Special cases:
@@ -229,6 +231,8 @@ def execute_bash(command: str, cwd: str) -> tuple[int, str]:
     Args:
         command: Shell command string to execute.
         cwd: Current working directory for the subprocess.
+        env: Full environment for the child; None inherits. The secret broker
+            passes resolved values this way (policy/secrets.py).
 
     Returns:
         Tuple of (exit_code, output_string).
@@ -274,4 +278,4 @@ def execute_bash(command: str, cwd: str) -> tuple[int, str]:
         return _rich_cat(filepath, stripped)
 
     # All other commands run in a pty so interactive programs work correctly
-    return _pty_exec(stripped, cwd)
+    return _pty_exec(stripped, cwd, env)
