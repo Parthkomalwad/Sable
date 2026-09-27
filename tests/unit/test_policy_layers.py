@@ -95,6 +95,7 @@ def test_tier_severity_orders_allow_confirm_deny():
 class TestRoot:
     def test_root_is_refused(self, monkeypatch):
         monkeypatch.setattr(privilege, "_euid", lambda: 0)
+        monkeypatch.delenv("SABLE_ALLOW_ROOT", raising=False)   # set in the playground
         assert privilege.root_refusal() is not None
 
     def test_user_is_not(self, monkeypatch):
