@@ -833,13 +833,15 @@ class OrchestratorAgent:
 
     def _confirm_command(self, command: str, explanation: str) -> str | None:
         """Show ↵ run  e edit  q cancel prompt. Returns confirmed command or None."""
-        PURPLE = '\033[38;5;141m'
+        from sable.policy import blast
         BRIGHT_WHITE = '\033[1;37m'
         DIM = '\033[2;37m'
         RESET = '\033[0m'
+        level = blast.classify(command)
+        colour = blast.COLOURS[level]
 
         sys.stdout.write('\n')
-        sys.stdout.write(f'{PURPLE}  \u2726{RESET} {explanation}\n\n')
+        sys.stdout.write(f'{colour}  \u2726{RESET} {explanation}  {colour}{level.value}{RESET}\n\n')
         sys.stdout.write(f'  {BRIGHT_WHITE}$ {command}{RESET}\n\n')
         sys.stdout.write(f'  {DIM}\u21b5 run   e edit   q cancel  \u203a{RESET}\n')
         sys.stdout.flush()

@@ -166,7 +166,9 @@ def _warn(label: str, command: str, why: str) -> None:
 
 def _confirm(command: str, d: Decision) -> bool:
     """Show which rule fired and why, and require the literal word YES."""
-    _warn(f"DESTRUCTIVE  {d.rule.name}", command, d.why)
+    _warn(f"{d.tier.value.upper()}  {d.rule.name}", command, d.why)
+    from sable.policy import blast
+    sys.stdout.write(f"  {blast.tag(command)}  \033[2;37mtier {d.tier.value}\033[0m\n")
     try:
         answer = input("  type YES to confirm: ").strip()
     except (EOFError, KeyboardInterrupt):
