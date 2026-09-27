@@ -9,7 +9,7 @@ import os
 import sys
 
 from sable.core.executor import execute_bash
-from sable.policy.engine import is_destructive, confirm_destructive
+from sable.policy.engine import gate
 
 # Rich imports for styled plan output
 from rich.console import Console
@@ -102,10 +102,9 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
         step_num = i + 1
 
         # Safety check per step
-        if is_destructive(cmd):
-            if not confirm_destructive(cmd):
-                _step_line(step_num, total, cmd, "skip")
-                continue
+        if not gate(cmd, role="orchestrator"):
+            _step_line(step_num, total, cmd, "skip")
+            continue
 
         exit_code, _ = execute_bash(cmd, current_cwd)
         current_cwd = os.getcwd()

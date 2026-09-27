@@ -5,6 +5,12 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Changed
+- **Phase 3 (F1): every command is tiered by `decide()`, and `gate()` is the only thing that prompts.** `is_destructive` and `confirm_destructive` are gone. The six places that checked a command each chose what a match meant, and they disagreed: a typed line asked for `YES`, the orchestrator refused outright, a sub-agent refused. Now `decide()` returns a `Decision` and `gate(command, role=...)` acts on it in one place. A test fails if any module outside `sable/policy/` imports the old functions.
+- **Behaviour change: the orchestrator now asks for `YES` on a destructive command instead of refusing it.** The README and docs always showed the agent asking; the code refused. It now matches the docs, and a `deny` rule is how you get the old refusal. The refusal marker keeps its `[blocked:` prefix, so a refused command still grades the run as failed.
+- A command that matches no rule is `allow`. Typed lines run as before; a model's command is still previewed with `↵ run / e edit / q cancel`; a sub-agent's runs inside its sandbox. A sub-agent is never prompted, since nobody reads its window: it runs `allow` and refuses `confirm` and `deny`, and the model is told which rule refused it and why. The plan's `policy.default_tier` key is not added, because nothing needs a different default yet.
+- The confirm prompt names the rule that fired and its reason, not a generic "pattern matched as destructive". 9 tests.
+
+### Changed
 - **The README is short again, and the long-form docs moved to a site.** It keeps the tagline, the hero, what Sable solves, the quick start and how to contribute, and links to the [documentation site](https://claude.ai/artifact/Vr4twSX8dcLQpcusj3RoyS) for routing, safety, sub-agents, skills, commands, configuration and architecture. Its old skills and roadmap sections still described v0.3; the site describes v0.6. The status badge now says v0.6. The problem and flow SVGs are no longer embedded but are still generated, so they can return without a template change.
 
 ### Fixed

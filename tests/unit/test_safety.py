@@ -4,17 +4,23 @@ Tests:
 - All DESTRUCTIVE_PATTERNS match correctly
 - shannon_entropy() returns expected values
 - looks_like_secret() for known secrets and non-secrets
-- is_destructive() detection
+- decide() detection
 
 No LLM calls, no subprocess, no file I/O.
 """
 import pytest
 from sable.policy.engine import (
     DESTRUCTIVE_PATTERNS,
-    is_destructive,
+    decide,
     looks_like_secret,
     shannon_entropy,
 )
+from sable.policy.tiers import Tier
+
+
+def is_destructive(command: str) -> bool:
+    return decide(command).tier is not Tier.ALLOW
+
 
 
 class TestDestructivePatterns:

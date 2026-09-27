@@ -200,7 +200,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
 
     from sable.core.executor import execute_bash
     from sable.agents.router import classify, Route
-    from sable.policy.engine import is_destructive, confirm_destructive
+    from sable.policy.engine import gate
 
     db = None
     try:
@@ -283,10 +283,9 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 _out(f"[alias] {alias_hit['phrase']} -> {resolved}")
                 # An alias is not a safety bypass: the resolved command goes
                 # down the ordinary bash path and is gated the same way.
-                if is_destructive(resolved):
-                    if not confirm_destructive(resolved):
-                        _audit_log("destructive_blocked", resolved)
-                        continue
+                if not gate(resolved, role="user"):
+                    _audit_log("destructive_blocked", resolved)
+                    continue
                 exit_code, _ = execute_bash(resolved, cwd)
                 _last_exit = exit_code
                 _audit_log("alias", resolved, exit_code)
@@ -310,10 +309,9 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 _record_router_correction(line, route.value, db=db)
 
             if route == Route.BASH:
-                if is_destructive(line):
-                    if not confirm_destructive(line):
-                        _audit_log("destructive_blocked", line)
-                        continue
+                if not gate(line, role="user"):
+                    _audit_log("destructive_blocked", line)
+                    continue
                 exit_code, _ = execute_bash(line, cwd)
                 _last_exit = exit_code
                 _audit_log("bash", line, exit_code)
