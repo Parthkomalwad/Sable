@@ -169,6 +169,30 @@ def _handle_approve_builtin(argument: str, db) -> bool:
     return True
 
 
+def _handle_breaker_builtin(argument: str, db) -> bool:
+    """`/breaker` shows open trips; `/breaker reset` clears them. Always True."""
+    from sable.policy import breaker
+
+    if db is None:
+        _out("the breaker needs the session database, which is unavailable")
+        return True
+    if argument == "reset":
+        n = breaker.reset(db._conn)
+        _out(f"breaker reset ({n} trip{'s' if n != 1 else ''} cleared)")
+        return True
+    if argument:
+        _out("usage: /breaker [reset]")
+        return True
+    trips = breaker.tripped(db._conn)
+    if not trips:
+        _out("breaker: not tripped")
+        return True
+    for t in trips:
+        _out(f"  #{t['id']}  {t['job']}: {t['reason']}")
+    _out("/breaker reset to resume autonomous jobs")
+    return True
+
+
 def _handle_corrections_builtin(argument: str, db) -> bool:
     """Handle `/corrections [delete <id>]`. Always returns True.
 
@@ -334,6 +358,9 @@ def handle_builtin(
     if cmd == "/secret" or cmd.startswith("/secret "):
         from sable.app.builtins.secret import _handle_secret_builtin
         return _handle_secret_builtin(cmd[len("/secret"):].strip())
+
+    if cmd == "/breaker" or cmd.startswith("/breaker "):
+        return _handle_breaker_builtin(cmd[len("/breaker"):].strip(), db)
 
     if cmd == "/corrections" or cmd.startswith("/corrections "):
         return _handle_corrections_builtin(cmd[len("/corrections"):].strip(), db)
