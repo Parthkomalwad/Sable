@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Fixed
+- **The daily budget undercounted every day east of UTC.** Token events are stored with UTC timestamps, but "today" was matched with the local date, so in IST the daily spend read zero from local midnight until 05:30 and spend in that window was counted on the wrong day. Spend is now counted from local midnight, converted to UTC. Found when a cost test started failing just after midnight.
+
 ### Added
 - **Phase 3.5 (J1): agents can call tools.** A new JSON action, `{"action": "tool", "name": ..., "args": {...}}`, works on every backend: the contract grows by one action and its shape is unchanged. Tools live in a new `sable/tools/` package, one layer between `policy` and `agents`, and `test_layering.py` enforces the new line. `registry.call()` checks the tool exists, the role may use it and the args fit its schema, then runs it through `gate()` with the tool's own tier as a floor policy can raise and never lower, so every call is tiered, hooked and audited like a command. Failures come back to the model as text, never a crash. The orchestrator previews every call; a worker is never prompted. Each call publishes a `tool` bus event. `/tools` lists what each role may call and at which tier. Only `echo` ships in this PR, so the whole path is testable before the real tools in Tasks 2 to 5. A live smoke run with `gpt-4o-mini` called `echo` end to end, and found that a goal finished by a tool was reported as "declined", now fixed. 20 tests.
 
