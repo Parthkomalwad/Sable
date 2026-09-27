@@ -13,6 +13,7 @@ round trip to every command.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shlex
@@ -86,6 +87,8 @@ def classify(command: str) -> Level:
 def _static(command: str) -> Level:
     if not command.strip():
         return Level.UNKNOWN
+    if command.startswith("tool:"):
+        return _tool_level(command)
     if _REDIRECT.search(command):
         return Level.WRITES
     levels = [_segment(s) for s in _SEGMENTS.split(command) if s.strip()]
@@ -97,6 +100,25 @@ def _static(command: str) -> Level:
     if levels and all(lv is Level.READ_ONLY for lv in levels) and not (
             "$(" in command or "`" in command):
         return Level.READ_ONLY
+    return Level.UNKNOWN
+
+
+def _tool_level(command: str) -> Level:
+    """A `tool:<name> {json}` call (J3). fs reads are green, fs writes amber,
+    and a patch that removes lines red, like deleting content."""
+    name, _, raw = command[len("tool:"):].partition(" ")
+    if name in ("fs.read", "fs.search", "fs.tree"):
+        return Level.READ_ONLY
+    if name == "fs.write":
+        return Level.WRITES
+    if name == "fs.patch":
+        try:
+            args = json.loads(raw)
+        except ValueError:
+            return Level.WRITES
+        diff = str(args.get("diff", "")) if isinstance(args, dict) else ""
+        removes = any(ln.startswith("-") and not ln.startswith("---") for ln in diff.splitlines())
+        return Level.DESTRUCTIVE if removes else Level.WRITES
     return Level.UNKNOWN
 
 
