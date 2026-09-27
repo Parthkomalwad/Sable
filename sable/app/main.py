@@ -120,6 +120,15 @@ def main(argv: list[str] | None = None) -> None:
         sys.stdout.flush()
         return
 
+    # I4: never run the agent layer as root, and never lock root out either.
+    from sable.policy.privilege import root_refusal
+
+    refusal = root_refusal()
+    if refusal:
+        sys.stderr.write(refusal + "\n")
+        sys.stderr.flush()
+        os.execvp("/bin/bash", ["/bin/bash", "-l"])
+
     # With no arguments, re-attach a running session rather than starting a
     # second one. Replaces this process when it succeeds.
     if not argv and not wrap_mode:

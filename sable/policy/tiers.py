@@ -22,6 +22,14 @@ class Tier(str, Enum):
     CONFIRM = "confirm"
     DENY = "deny"
 
+    @property
+    def severity(self) -> int:
+        """Ordering for the floor rule: a user file may raise, never lower."""
+        return _SEVERITY[self]
+
+
+_SEVERITY = {Tier.ALLOW: 0, Tier.CONFIRM: 1, Tier.DENY: 2}
+
 
 @dataclass(frozen=True)
 class Decision:
