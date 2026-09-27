@@ -440,6 +440,18 @@ starts with `tainted context`. A bumped `allow` carries a stand-in rule named
 `tainted-context` (source `taint`). Taint never blocks a turn; it only makes
 acting on what was read cost a human's YES. `tests/evals/injection/` pins it:
 30+ hostile outputs, a model that obeys them, zero commands executed.
+
+### 7.6 Blast radius (Phase 3, F3)
+
+`sable/policy/blast.py`: `classify(command) -> Level`, one of `read-only`
+(green), `writes` (amber), `destructive` (red), `unknown` (dim). Order: a
+matched non-`allow` rule's `category` (every shipped category is
+`destructive`; an unrecognised one is too); else a static per-segment
+heuristic (known read-only programs, known writers, output redirects); else
+`_model_level`, cached by SHA-256 of the command. That seam returns `unknown`
+without a model call today, and must never return `read-only` on failure.
+Shown on the orchestrator's preview header and on the `YES` confirm block.
+
 ### 7.7 Audit ledger (Phase 3, F4)
 
 Every `gate()` decision writes one row to `audit_ledger` in `sessions.db`;
