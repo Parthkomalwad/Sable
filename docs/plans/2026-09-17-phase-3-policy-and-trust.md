@@ -263,7 +263,7 @@ position, to be written down rather than papered over:
 **Files:** Create `sable/policy/taint.py`, `tests/evals/injection/`; modify
 `sable/agents/{orchestrator,worker}.py`
 
-- [ ] **Step 1: failing tests.** Command output returned to the model is wrapped
+- [x] **Step 1: failing tests.** Command output returned to the model is wrapped
       `<output untrusted="true">…</output>` with a fixed framing line. Output
       from `curl`, `wget`, `cat` outside the workspace, or a future `mcp` result
       sets a taint flag. While tainted, the next proposed command is bumped one
@@ -271,12 +271,12 @@ position, to be written down rather than papered over:
       "tainted context". The eval corpus: >= 30 hostile outputs, asserting **zero
       executed commands**, not "the model refused" (which is a property of the
       model, not of us).
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** The wrapper is the cheap half and the tier bump is
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** The wrapper is the cheap half and the tier bump is
       the half that actually holds: a model that ignores the framing still cannot
       execute at a tier the runtime will not run. That asymmetry is the design and
       is commented as such.
-- [ ] **Step 4:** green, including `pytest tests/evals/injection -q`. Commit: `feat(policy): command output is untrusted, and acting on it costs a tier`
+- [x] **Step 4:** green, including `pytest tests/evals/injection -q`. Commit: `feat(policy): command output is untrusted, and acting on it costs a tier`
 
 ## Task 6: The circuit breaker (I2)
 

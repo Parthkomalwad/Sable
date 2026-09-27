@@ -420,6 +420,27 @@ agent and command. `/approve <id>` sets `approved`; the worker's next proposal
 of exactly that command by that agent consumes it (`used`), so an approval
 runs once. `deny` is never enqueued, and `gate(approved=True)` never lifts it.
 
+### 7.4 Taint (Phase 3)
+
+`sable/policy/taint.py`. Every command output the orchestrator or a worker
+sends back to the model is `wrap_untrusted(output)`: the fixed line in
+`taint.FRAMING`, then `<output untrusted="true">`, the output, `</output>`. A
+literal `</output>` inside the output is escaped to `&lt;/output&gt;`, so the
+frame has exactly one close.
+
+`is_tainting(command, cwd)` is true for `curl`, `wget` or `mcp` in command
+position anywhere in a pipeline, for `cat`/`less`/`more`/`head`/`tail` of a
+path resolving outside `cwd`, and for a command that does not tokenise. Once a
+tainting command has run, the agent is tainted for the rest of its goal
+(orchestrator) or task (worker); a new typed goal starts clean.
+
+`decide(command, tainted=True)` and `gate(..., tainted=True)` move the tier one
+step: `allow` -> `confirm`, `confirm` -> `deny`, `deny` stays. `Decision.why`
+starts with `tainted context`. A bumped `allow` carries a stand-in rule named
+`tainted-context` (source `taint`). Taint never blocks a turn; it only makes
+acting on what was read cost a human's YES. `tests/evals/injection/` pins it:
+30+ hostile outputs, a model that obeys them, zero commands executed.
+
 ---
 
 ## 8. Skills, corrections and aliases
