@@ -10,32 +10,32 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/
 - [x] **v0.2**: Rich shell UX, sidebar, snippet clipboard, settings overlay
 - [x] **v0.3**: Orchestrator agent, sandboxed sub-agents, task manager, adaptive skills (pattern → crystallise → confidence)
 
-## v0.4: Foundations *(current)*
+## v0.4: Foundations
 
-- [ ] Project hygiene: CI, devcontainer, playground for Windows/macOS, licence, security policy (`I5 I11 I12`)
-- [ ] Docs & tests parity for the task engine and skills; mock-LLM mode (`H1`)
-- [ ] Router accuracy corpus (≥99 % bash recall) and `/route why` (`I3`)
-- [ ] Onboarding `/tour` (`I10`)
-- [ ] Mode switch: `/bash` to drop to plain Linux and back, `sable on|off`, `--wrap` non-login mode (`I13`)
-- [ ] Restructure into the `sable/` package with an enforced layering rule [structure.md](docs/structure.md)
+- [x] Project hygiene: CI, devcontainer, playground for Windows/macOS, licence, security policy (`I5 I11 I12`)
+- [x] Docs & tests parity for the task engine and skills; mock-LLM mode (`H1`)
+- [x] Router accuracy corpus (≥99 % bash recall) and `/route why` (`I3`)
+- [x] Onboarding `/tour` (`I10`)
+- [x] Mode switch: `/bash` to drop to plain Linux and back, `sable on|off`, `--wrap` non-login mode (`I13`)
+- [x] Restructure into the `sable/` package with an enforced layering rule [structure.md](docs/structure.md)
 
 ## v0.5: Agent runtime
 
-- [ ] One `Agent` runtime with roles (orchestrator / worker / reviewer) (`A2`)
-- [ ] SQLite event bus; sidebar and agents share one stream (`A1`)
-- [ ] Per-role model routing (cheap for routing/summaries, strong for reasoning) (`A5`)
-- [ ] Steer a running agent (`Ctrl+G`), prompt replay, visible degraded modes (`A7 I9 I7`)
-- [ ] Repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.sable.toml` loaded from the repo root (`K11`)
+- [x] One `Agent` runtime with roles (orchestrator / worker / reviewer) (`A2`)
+- [x] SQLite event bus; sidebar and agents share one stream (`A1`)
+- [x] Per-role model routing (cheap for routing/summaries, strong for reasoning) (`A5`)
+- [x] Steer a running agent (`Ctrl+G`), prompt replay, visible degraded modes (`A7 I9 I7`)
+- [x] Repo-aware context: `CLAUDE.md` / `AGENTS.md` / `.sable.toml` loaded from the repo root (`K11`)
 ## v0.6: Skills that learn
 
-- [ ] Confidence-ranked skill retrieval and success/failure feedback (`B1`)
-- [ ] Folder skills (`SKILL.md` + scripts, agentskills.io compatible) (`B2`)
-- [ ] Crystallise a skill right after a multi-step task, approve from the inbox (`B3`)
-- [ ] Validators that auto-grade a skill run (`B5`)
-- [ ] Learn from your edits and routing answers; natural-language aliases (`K3 K4`)
-## v0.7: Policy & trust
+- [x] Confidence-ranked skill retrieval and success/failure feedback (`B1`)
+- [x] Folder skills (`SKILL.md` + scripts, agentskills.io compatible) (`B2`)
+- [x] Crystallise a skill right after a multi-step task, approve from the inbox (`B3`)
+- [x] Validators that auto-grade a skill run (`B5`)
+- [x] Learn from your edits and routing answers; natural-language aliases (`K3 K4`)
+## v0.7: Policy & trust *(current)*
 
-- [ ] Policy engine (`policy.yaml`: allow / confirm / deny) and lifecycle hooks (`F1`)
+- [ ] Policy engine (`policy.toml`: allow / confirm / deny) and lifecycle hooks (`F1`)
 - [ ] Threat model and output-injection defence with a red-team eval corpus (`I1`)
 - [ ] Cost circuit breaker for autonomous work (`I2`)
 - [ ] Blast-radius tagging, provenance ledger, secret broker, multi-user model (`F3 F4 F6 I4`)

@@ -136,7 +136,7 @@ docker volume rm sable-playground-home
 .\scripts\playground.ps1 tests                     # green, includes test_layering
 .\scripts\playground.ps1                           # identical behaviour to Phase 0
 wc -l sable/app/repl.py                          # < 250 lines
-ls sable/llm/prompts/ sable/policy/defaults/   # prompts + policy.yaml exist as files
+ls sable/llm/prompts/ sable/policy/defaults/   # prompts + policy.toml exist as files
 python -W error -c "import shell"                  # DeprecationWarning raised (shim works)
 ```
 
@@ -198,8 +198,8 @@ cat ~/skills/deploy-api/SKILL.md   → readable, frontmatter valid
 **Deliverables:** F1, F3, F4, F6, **I1, I2, I4** (F2, F5 second wave).
 - **I1 Threat model**: `docs/THREAT_MODEL.md` (assets, actors, trust boundaries, mitigations table). Command output returned to the model is wrapped `<output untrusted="true">…</output>` with a fixed framing line; a *taint* flag set by `curl|wget|cat <outside repo>|mcp` results bumps the next proposed command one tier stricter; `tests/evals/injection/` holds ≥30 hostile outputs that must never yield an executed command.
 - **I2 Circuit breaker**: `[budget] per_job = {tokens, usd, turns, wall_s}`, `daemon_daily_usd`, `breaker.consecutive_failures`; trip = pause all autonomous jobs + INBOX item + notification; `/breaker reset`.
-- **I4 Privilege model**: per-user `~/.sable/`, admin floor `/etc/sable/policy.yaml` that user policy cannot loosen, agents refuse to start as uid 0, `sudo` forced to confirm tier, uid in every audit row.
-- `~/.sable/policy.yaml`: rules `{match: regex|path|tool|role, tier: allow|confirm|deny, when: …}`; the 11-pattern blocklist becomes the shipped default policy.
+- **I4 Privilege model**: per-user `~/.sable/`, admin floor `/etc/sable/policy.toml` that user policy cannot loosen, agents refuse to start as uid 0, `sudo` forced to confirm tier, uid in every audit row.
+- `~/.sable/policy.toml`: rules `{match: regex|path|tool|role, tier: allow|confirm|deny, when: …}`; the 11-pattern blocklist becomes the shipped default policy.
 - Hooks: `~/.sable/hooks/{pre_command,post_command,pre_spawn,on_skill_use}` scripts; stdin JSON, exit 2 = block, stdout JSON may inject context. Same model as Claude Code.
 - Blast-radius tag on every proposed command (cheap model, cached by hash) → colour in the confirm block.
 - `/audit [--since] [--agent] [--export jsonl]` over an extended audit table (who/why/what/outcome).
@@ -334,7 +334,7 @@ These are things I'd change or lock down early; Opus should treat them as inputs
 
 7. **Everything human-readable on disk.** Skills, knowledge, policy, hooks, schedules markdown/YAML/JSON under `~/.sable/`. SQLite holds events, telemetry, indexes. Embeddings are the only opaque blob. This is the trust story for a tool that runs as root-adjacent on a server.
 
-8. **Consolidate state dirs.** Today: `~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `~/tasks`, `~/skills`, `/var/log/agentic-shell`. Propose `~/.sable/{config.json,policy.yaml,hooks/,skills/,knowledge/,tasks/,sessions.db}` with the XDG paths kept as symlinks for one release. Fewer surprises for users and for agents.
+8. **Consolidate state dirs.** Today: `~/.config/agentic-shell`, `~/.local/share/agentic-shell`, `~/tasks`, `~/skills`, `/var/log/agentic-shell`. Propose `~/.sable/{config.json,policy.toml,hooks/,skills/,knowledge/,tasks/,sessions.db}` with the XDG paths kept as symlinks for one release. Fewer surprises for users and for agents.
 
 9. **Sidebar/dashboard must never touch the REPL process.** Keep the separate-process rule. Textual runs in pane 1 / a full-screen window; communication is SQLite + the bus. This is what keeps the shell responsive when an agent floods events.
 
