@@ -358,11 +358,24 @@ name = "rm-rf"
 pattern = "rm\\s+(-[a-zA-Z]*[rf][a-zA-Z]*\\s+)+"
 category = "filesystem"
 why = "recursive force delete removes data with no undo"
+tier = "confirm"       # allow | confirm | deny; missing means confirm
 ```
 
-`name`, `pattern`, `category` and `why` are all required. `why` exists so Phase
-3's `/policy explain` can say what a rule protects against instead of echoing a
-regex.
+`name`, `pattern`, `category` and `why` are all required in the shipped file.
+`why` is what the confirm block shows, so the user sees what a rule protects
+against instead of a regex.
+
+**One path decides.** `engine.decide(command, *, tainted=False) -> Decision`
+returns the tier, the rule, its reason and the file it came from.
+`engine.gate(command, *, role, approved=False, tainted=False, agent=None,
+model=None, goal=None) -> bool` is the only thing that acts on it: run, ask for
+`YES`, queue, or refuse, then the `pre_command` hook, then one audit row. Every
+path that runs a command calls `gate()` first; `test_every_repl_bash_path_is_gated`
+and `test_no_legacy_policy_callers` enforce that. `role` is `user`,
+`orchestrator` or `worker`; a worker is never prompted.
+
+The order inside `decide()`: floor and user rule (§7.1), then the `sudo` floor
+from `policy/privilege.py`, then the taint bump (§7.4). Unmatched is `allow`.
 
 A missing or malformed policy file **raises at import**. It does not degrade to
 an empty list, because an empty blocklist is a shell that runs `rm -rf /`
@@ -505,6 +518,18 @@ before the model or memory sees it. Storage: keyring item attributes
 (`core/config/keyring.py`). `/secret add <name>` (no echo), `/secret list`
 (names only), `/secret rm <name>`. Raw bash lines typed by the user are not
 resolved.
+
+### 7.9 Not implemented
+
+| Item | Status |
+|---|---|
+| F2: dry-run filesystem diff before a plan runs | Not implemented. Phase 8 (K5 rehearsal). |
+| F5: network and cgroup limits on sub-agents | Not implemented. Phase 8. |
+| `/policy explain "<cmd>"` | Not implemented. The confirm block shows the rule, reason and tier; `/audit` shows past decisions. |
+| Model-assisted blast radius | A seam in `policy/blast.py` that returns `unknown`. |
+
+What Phase 3 does not protect against is listed in
+[THREAT_MODEL.md](THREAT_MODEL.md) §5.
 
 ---
 
