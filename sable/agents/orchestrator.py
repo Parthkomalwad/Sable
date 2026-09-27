@@ -21,7 +21,7 @@ from sable import data
 from sable.agents import context, runtime
 from sable.core.events.types import EventKind
 from sable.llm import prompts
-from sable.policy import hooks
+from sable.policy import hooks, taint
 
 #: The actions this role may emit. `wait` and `ask` are specified in
 #: docs/contracts.md and not yet implemented; `mcp` is reserved for Phase 6.
@@ -124,6 +124,10 @@ class OrchestratorAgent:
         self._task_dir: Path | None = None  # lazy created only on first spawn
         self._history: list[dict] = []      # orchestrator's own turn history
         self._spawned: list[str] = []       # names of spawned sub-agents
+        # I1: set once a command read output from outside the workspace
+        # (policy/taint.py). Sticky for this goal; a new goal is a new
+        # OrchestratorAgent, so the next thing the user types starts clean.
+        self._tainted = False
 
         # Skills, injected rather than imported, for the same layering reason
         # as `corrections_db` above: `agents` sits below `skills`, and
@@ -271,8 +275,14 @@ class OrchestratorAgent:
             "cwd": self._cwd, "output": output[-4000:],
         })
         hooks.show("post_command", after)
+        # The output is framed as untrusted data; the hook's context is the
+        # user's own and stays outside the frame.
+        for_model = taint.wrap_untrusted(output)
         if after.context:
+            for_model = f"{for_model}\n[post_command hook] {after.context}"
             output = f"{output.rstrip()}\n[post_command hook] {after.context}"
+        if taint.is_tainting(confirmed_cmd, self._cwd):
+            self._tainted = True
         self._commands_run += 1
         self._record_step(confirmed_cmd, output)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
@@ -282,7 +292,7 @@ class OrchestratorAgent:
         # `or` is kept off deliberately rather than left as a harmless
         # belt-and-braces, because a second source of that exact string is
         # how the behaviour would come back.
-        self._history.append({"role": "user", "content": output})
+        self._history.append({"role": "user", "content": for_model})
 
         try:
             from sable.core.audit import write_command
@@ -880,7 +890,7 @@ class OrchestratorAgent:
 
         # A matched `confirm` rule asks for YES here, as the docs always said;
         # it used to refuse outright, which no rule could express.
-        if not gate(command, role="orchestrator"):
+        if not gate(command, role="orchestrator", tainted=self._tainted):
             _out(f"[orchestrator] not run: {command}")
             return "[blocked: refused by policy or not confirmed by the user]"
 

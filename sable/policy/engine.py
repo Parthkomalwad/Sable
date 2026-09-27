@@ -16,7 +16,7 @@ import re
 import sys
 from collections import Counter
 
-from sable.policy import hooks, privilege, rules
+from sable.policy import hooks, privilege, rules, taint
 from sable.policy.tiers import Decision, Tier
 
 # The rules themselves live in defaults/policy.toml (Phase 0.5 step 4), so a
@@ -56,24 +56,36 @@ def looks_like_secret(token: str) -> bool:
     return len(token) >= 20 and shannon_entropy(token) > 4.5
 
 
-def decide(command: str) -> Decision:
+def decide(command: str, *, tainted: bool = False) -> Decision:
     """The tier policy gives this command, and the rule that gave it.
 
     An unmatched command is `allow`. That is not the last line of defence it
     looks like: a model's command is still previewed before it runs, and a
     worker's runs inside its sandbox. The rules are for what a preview or a
     sandbox would not stop a tired human from approving.
+
+    `tainted` means the agent has read untrusted output (see `taint.py`):
+    the tier goes one step stricter. An `allow` gets a stand-in rule named
+    `tainted-context`, so every caller that prints `d.rule.name` still can.
     """
     rule = rules.match(command)
     sudo = privilege.sudo_rule(command)
     if sudo and (rule is None or sudo.tier.severity > rule.tier.severity):
         rule = sudo
     if rule is None:
-        return Decision(tier=Tier.ALLOW, rule=None, why="", source="default")
-    return Decision(tier=rule.tier, rule=rule, why=rule.why, source=rule.source)
+        d = Decision(tier=Tier.ALLOW, rule=None, why="", source="default")
+    else:
+        d = Decision(tier=rule.tier, rule=rule, why=rule.why, source=rule.source)
+    if not tainted:
+        return d
+    why = "tainted context: the agent has read untrusted output this goal"
+    rule = d.rule or rules.Rule(name="tainted-context", pattern="", why=why,
+                                tier=Tier.CONFIRM, source="taint")
+    return Decision(tier=taint.bump(d.tier), rule=rule,
+                    why=f"{why} ({d.why})" if d.why else why, source=d.source)
 
 
-def gate(command: str, *, role: str, approved: bool = False) -> bool:
+def gate(command: str, *, role: str, approved: bool = False, tainted: bool = False) -> bool:
     """Decide, then act on it. True means the command may run.
 
     `role` is "user" (a typed line), "orchestrator" (a model's command in the
@@ -86,8 +98,10 @@ def gate(command: str, *, role: str, approved: bool = False) -> bool:
 
     The `pre_command` hook runs last, only for a command policy would run,
     so a hook can block and never unblock.
+
+    `tainted` is passed to `decide()`: one tier stricter.
     """
-    d = decide(command)
+    d = decide(command, tainted=tainted)
     if d.tier is Tier.DENY:
         if role != "worker":
             _warn(f"refused by policy: {d.rule.name}", command, d.why)
