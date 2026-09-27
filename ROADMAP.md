@@ -35,10 +35,10 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/
 - [x] Learn from your edits and routing answers; natural-language aliases (`K3 K4`)
 ## v0.7: Policy & trust *(current)*
 
-- [ ] Policy engine (`policy.toml`: allow / confirm / deny) and lifecycle hooks (`F1`)
-- [ ] Threat model and output-injection defence with a red-team eval corpus (`I1`)
-- [ ] Cost circuit breaker for autonomous work (`I2`)
-- [ ] Blast-radius tagging, provenance ledger, secret broker, multi-user model (`F3 F4 F6 I4`)
+- [x] Policy engine (`policy.toml`: allow / confirm / deny) and lifecycle hooks (`F1`)
+- [x] Threat model and output-injection defence with a red-team eval corpus (`I1`)
+- [x] Cost circuit breaker for autonomous work (`I2`)
+- [x] Blast-radius tagging, provenance ledger, secret broker, multi-user model (`F3 F4 F6 I4`)
 - [ ] Agent tools: registry, web search and fetch, structured file edits, verify-after-act, reflect and retry, docs lookup, per-tool budgets (`J1 J2 J3 J4 J5 J7 J12`)
 ## v0.8: Command center
 
