@@ -298,17 +298,17 @@ position, to be written down rather than papered over:
 
 **Files:** Create `sable/policy/blast.py`; modify `sable/app/repl.py`
 
-- [ ] **Step 1: failing tests.** A matched rule's `category` maps to a colour
+- [x] **Step 1: failing tests.** A matched rule's `category` maps to a colour
       with no model call. An unmatched command consults the summariser model
       **once** and caches by command hash. A cache hit makes no call. The model
       being unreachable yields the neutral tag, never an exception and never a
       wrong-way-safe green.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** Colours from structure.md §4 item 10: green
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** Colours from structure.md §4 item 10: green
       read-only, amber writes, red destructive, blue policy. The confirm block
       gains the tier, the rule name and the blast colour, which is structure.md
       §4 item 2's "before" list.
-- [ ] **Step 4:** green. Commit: `feat(policy): blast-radius tagging on every confirm block, static first`
+- [x] **Step 4:** green. Commit: `feat(policy): blast-radius tagging on every confirm block, static first`
 
 ## Task 8: The provenance ledger and `/audit` (F4)
 
