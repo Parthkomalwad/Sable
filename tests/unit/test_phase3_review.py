@@ -76,3 +76,37 @@ def test_pre_command_hook_is_told_about_taint(monkeypatch, tmp_path):
 ])
 def test_exit_code_is_read_from_the_runner_markers(output, code):
     assert runtime.exit_code_of(output) == code
+
+
+class TestTaintCrossesDelegation:
+    """Found by the Phase 3 gate run: a tainted orchestrator delegated the
+    summary of a hostile file to a sub-agent. The handoff carries the recent
+    history, hostile text included, and every worker started clean, so
+    delegating laundered the taint away."""
+
+    def _cfg(self, tmp_path):
+        from unittest.mock import MagicMock
+        cfg = MagicMock()
+        cfg.tasks_base_dir = str(tmp_path / "tasks")
+        cfg.model = "test-model"
+        cfg.model_for.return_value = "test-model"
+        return cfg
+
+    def test_tainted_orchestrator_marks_the_handoff(self, tmp_path):
+        from unittest.mock import MagicMock
+        from sable.agents.orchestrator import OrchestratorAgent
+        agent = OrchestratorAgent(goal="summarise evil.txt", cwd=str(tmp_path),
+                                  config=self._cfg(tmp_path), db_path=str(tmp_path / "s.db"),
+                                  task_manager=MagicMock())
+        agent._tainted = True
+        agent._handle_spawn({"name": "summarise", "goal": "summarise the file"})
+        assert (agent._task_dir / "summarise" / ".agentic" / "tainted").exists()
+
+    def test_clean_orchestrator_does_not(self, tmp_path):
+        from unittest.mock import MagicMock
+        from sable.agents.orchestrator import OrchestratorAgent
+        agent = OrchestratorAgent(goal="list files", cwd=str(tmp_path),
+                                  config=self._cfg(tmp_path), db_path=str(tmp_path / "s.db"),
+                                  task_manager=MagicMock())
+        agent._handle_spawn({"name": "lister", "goal": "list the files"})
+        assert not (agent._task_dir / "lister" / ".agentic" / "tainted").exists()

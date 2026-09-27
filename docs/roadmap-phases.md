@@ -354,6 +354,7 @@ These are things I'd change or lock down early; Opus should treat them as inputs
 - **Web read-only dashboard** (G9) on localhost for the browser/phone.
 - **Team mode**: shared skills/knowledge over a git remote; per-user policy.
 - **Local-first embeddings** via Ollama `/api/embeddings` for skill and memory retrieval (B6) before considering any vector DB.
+- **Secret broker without a desktop keyring.** F6 needs a Secret Service on D-Bus, which most headless servers reached over SSH do not run, so `/secret` refuses there (Phase 3 gate, 2026-09-27; decided to document rather than work around). The follow-up is an encrypted-file fallback, keyed by a passphrase entered once per session, with no plaintext at rest and a clear answer to where that key lives while the session runs.
 
 ---
 

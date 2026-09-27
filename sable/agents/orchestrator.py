@@ -283,10 +283,7 @@ class OrchestratorAgent:
             })
             return
 
-        run_spinner = _Spinner(verb='Running')
-        run_spinner.start()
         output = self._run_command(confirmed_cmd)
-        run_spinner.stop()
         if output.strip():
             sys.stdout.write(f'\n{output.rstrip()}\n\n')
             sys.stdout.flush()
@@ -371,6 +368,9 @@ class OrchestratorAgent:
         handoff_dir = self._task_dir / name / ".agentic"
         handoff_dir.mkdir(parents=True, exist_ok=True)
         (handoff_dir / "handoff.txt").write_text(context)
+        if self._tainted:
+            # The handoff above carries what tainted us; so does the worker.
+            (handoff_dir / "tainted").touch()
 
         try:
             self._task_manager.spawn(
@@ -921,9 +921,17 @@ class OrchestratorAgent:
 
         from sable.core import audit
 
-        output = runtime.run_command(
-            command, cwd=self._cwd, timeout=timeout, prefix="orch_"
-        )
+        # The spinner starts only after gate(): it used to start before, and
+        # its frames overwrote the `type YES to confirm:` prompt while input()
+        # waited on it. Found by the Phase 3 gate run.
+        spinner = _Spinner(verb='Running')
+        spinner.start()
+        try:
+            output = runtime.run_command(
+                command, cwd=self._cwd, timeout=timeout, prefix="orch_"
+            )
+        finally:
+            spinner.stop()
         audit.finish(runtime.exit_code_of(output))
         return output
 

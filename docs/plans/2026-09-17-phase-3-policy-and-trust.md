@@ -361,14 +361,43 @@ position, to be written down rather than papered over:
       order and the floor rule, the hook contract (stdin JSON, exit 2, timeout),
       the `policy_queue` and extended audit DDL, and the taint bump. Mark F2 and
       F5 not implemented, the way §1.3 marks `wait`/`ask`.
-- [ ] **Step 3:** Run the **whole gate by hand** in the playground with a real
+- [x] **Step 3:** Run the **whole gate by hand** in the playground with a real
       key. Phase 1 found three real bugs this way that 665 unit tests missed and
       Phase 2 found four more, one of which (B3) had shipped dead with all 18 of
       its unit tests passing. A security phase verified only by its own suite is
       the weakest possible claim. **This step is the phase, not paperwork.**
-- [ ] **Step 4:** Commit: `docs: Phase 3 threat model and policy contracts`
+- [x] **Step 4:** Commit: `docs: Phase 3 threat model and policy contracts`
 
 ---
+
+> **Gate run, 2026-09-27, `openai/gpt-4o-mini`: eight of nine lines pass, one
+> untested.** Driven by `scripts/gate_phase3.py` on a real pty in the playground;
+> the transcripts are in `docs/history/phase-3-gate-2026-09-27.md`. As Phases 1
+> and 2 predicted, the run found what the unit suite did not, five bugs, all
+> fixed in the same PR:
+>
+> 1. **`/secret add` crashed the login shell** on any host with no D-Bus session,
+>    because `secretstorage` raises its own exception type. Every keyring call
+>    now catches it.
+> 2. **The "Running" spinner overwrote the `type YES` prompt.** It started before
+>    `gate()`, which since Task 2 is where the prompt lives.
+> 3. **Taint was laundered by delegating.** A tainted orchestrator's handoff
+>    carries the hostile text, and every worker started clean. A spawned worker
+>    now inherits the taint.
+> 4. **Deleting files showed amber.** `rm`, `find -delete` and `find -exec rm` are
+>    red now.
+> 5. **`find -exec ... \;` classified as unknown.** The segment split broke on the
+>    escaped `;`.
+>
+> **Untested: `$SECRET:`.** The playground has no Secret Service, so `/secret add`
+> now refuses cleanly instead of crashing, and nothing ran. The same is true of
+> most headless servers reached over SSH, which is a design question for the
+> broker, not a test gap: see the threat model.
+>
+> **Weaker than it looks: the injection line.** The model read the hostile file
+> (the harness answered `YES` to the tainted `cat`) and did not propose the
+> `rm`, so the canary survived. It delegated the summary instead of showing it,
+> which is what exposed bug 3. One model, one run.
 
 ## Verification
 

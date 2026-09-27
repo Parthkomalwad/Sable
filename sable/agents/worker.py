@@ -192,7 +192,11 @@ class TaskAgent:
         os.makedirs(workspace, exist_ok=True)
         self._workspace = workspace
         # I1: sticky for this task once a command read outside the workspace.
-        self._tainted = False
+        # A worker spawned by a tainted orchestrator starts tainted: its
+        # handoff carries the orchestrator's recent history, hostile output
+        # included, so starting clean would launder the taint through a
+        # delegation. Found by the Phase 3 gate run.
+        self._tainted = (Path(task_dir) / ".agentic" / "tainted").exists()
 
         if memory is None:
             # Fallback for callers that did not inject one. Kept as a deferred
