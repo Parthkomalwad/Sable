@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Changed
+- `ROADMAP.md` ticks the four v0.7 lines Phase 3 shipped: tiers and hooks (F1), the threat model and injection evals (I1), the circuit breaker (I2), and blast radius, the audit ledger, the secret broker and the privilege model (F3 F4 F6 I4). Agent tools (Phase 3.5) keep v0.7 current.
+
 ### Fixed
 - **Phase 3 gate run: eight of nine lines pass, one untested, and five bugs the unit suite missed.** `scripts/gate_phase3.py` drives the real REPL on a pty in the playground against a live model and writes the transcript for every gate line; this run is in `docs/history/phase-3-gate-2026-09-27.md`.
 - **`/secret add` crashed the login shell** on any host with no D-Bus session. `secretstorage` raises its own `SecretStorageException` family, which none of `keyring.py`'s handlers caught, so the exception escaped `main()`. Every keyring call now catches it, including `get_api_key`.
