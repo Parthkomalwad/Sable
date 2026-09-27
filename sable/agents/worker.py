@@ -294,6 +294,12 @@ class TaskAgent:
     def _db_conn(self):
         return sqlite3.connect(self._db_path, check_same_thread=False)
 
+    def _system_prompt(self) -> str:
+        """The worker prompt for this workspace, plus the tools it may call (J1)."""
+        from sable.tools import registry
+
+        return _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace) + "\n" + registry.describe("worker")
+
     def _publish(self, kind: str, **payload) -> None:
         """Announce something on the bus. Never raises, by the bus's contract."""
         self._bus.publish(self._name, kind, payload)
@@ -327,7 +333,7 @@ class TaskAgent:
 
         backend = build_backend(self._config, role="worker", mock_mode="worker")
         print("[agent] calling LLM...", flush=True)
-        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace)
+        system_prompt = self._system_prompt()
         return runtime.call_llm(backend, messages, system_prompt)
 
     def _record_turn(self, step: int, messages: list[dict], parsed: dict, response) -> None:
@@ -345,7 +351,7 @@ class TaskAgent:
             agent=self._name,
             role="worker",
             turn=step,
-            system_prompt=_SYSTEM_PROMPT_TEMPLATE.format(workspace=self._workspace),
+            system_prompt=self._system_prompt(),
             messages=messages,
             response=json.dumps(parsed),
             model=getattr(response, "model", None) or self._config.model_for("worker"),
@@ -355,6 +361,15 @@ class TaskAgent:
         )
 
     def _parse_response(self, response) -> dict:
+        # A tool call (J1) is not in the typed fields; `raw` carries it.
+        if getattr(response, "action", "") == "tool":
+            body = runtime.parse_json_action(getattr(response, "raw", "") or "", {})
+            return {
+                "command": "",
+                "tool": {"name": str(body.get("name", "")), "args": body.get("args", {})},
+                "explanation": body.get("explanation", "") or getattr(response, "explanation", ""),
+                "done": False,
+            }
         # LLMResponse now carries a done field populated by the backend from the parsed JSON.
         if hasattr(response, "command") and hasattr(response, "explanation"):
             return {
@@ -377,6 +392,26 @@ class TaskAgent:
             }
         except json.JSONDecodeError:
             return {"command": "", "explanation": raw, "done": False}
+
+    def _run_tool(self, call: dict) -> str:
+        """One tool call (J1). Returns the text the model reads next turn.
+
+        Policy, audit and the bus event happen inside `registry.call`. A
+        worker is never prompted, so a `confirm`-tier tool is refused there.
+        A failure carries `[exit 1]` so grading and the breaker count it.
+        """
+        from sable.tools import registry
+        from sable.tools.base import ToolContext
+
+        name, args = call.get("name", ""), call.get("args", {})
+        print(f"[agent] tool: {registry.as_command(name, args)}", flush=True)
+        result = registry.call(name, args, ToolContext(
+            role="worker", cwd=self._workspace, agent=self._name, goal=self._goal,
+            model=self._config.model_for("worker"), tainted=self._tainted,
+        ), publish=lambda kind, payload: self._publish(kind, **payload))
+        if result.taints:
+            self._tainted = True
+        return result.output if result.ok else result.output + "\n[exit 1]"
 
     def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
         """Run one command inside the sandbox and return its output.
@@ -553,6 +588,9 @@ class TaskAgent:
                     conn.close()
 
             output = ""
+            tool_call = parsed.get("tool")
+            if tool_call:
+                output = self._run_tool(tool_call)
             if command:
                 print(f"[agent] running: {command}", flush=True)
                 # Image and package pulls get the longer ceiling; see runtime.
@@ -597,7 +635,7 @@ class TaskAgent:
                 tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
                 usd=getattr(response, "cost_usd", 0.0),
                 # Non-zero, or None (error, timeout, unknown status), is a failure.
-                failed=bool(command) and runtime.exit_code_of(output or "") != 0,
+                failed=bool(command or tool_call) and runtime.exit_code_of(output or "") != 0,
             )
 
             if parsed.get("done"):

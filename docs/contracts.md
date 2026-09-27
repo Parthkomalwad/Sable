@@ -68,6 +68,7 @@ turn.
 | `done` | orchestrator, worker | **live** |
 | `wait` | — | **specified, not implemented** (Phase 1, PR4) |
 | `ask` | — | **specified, not implemented** (Phase 1, PR4) |
+| `tool` | orchestrator, worker | **live** (Phase 3.5, J1) |
 | `mcp` | — | **reserved** (Phase 6, D1) |
 
 `agents/orchestrator.py:ORCHESTRATOR_ACTIONS` is the live set. An action outside
@@ -75,6 +76,25 @@ it, including `wait` and `ask`, is rejected as unrecognised and stops the loop
 with a reason rather than being guessed at.
 
 #### Live actions
+
+**`tool`**: call a registered tool by name (Phase 3.5, J1).
+
+```json
+{"action": "tool", "name": "echo", "args": {"text": "hi"}, "explanation": "test the tool path"}
+```
+
+Backends put the whole answer in `LLMResponse.raw`; the orchestrator and the
+worker read `name` and `args` from there. The call is checked in order: the
+tool exists, the role may use it, `args` fit its schema, then
+`gate("tool:<name> <args as sorted JSON>", floor=<tool tier>)`, which applies
+policy and writes the audit row. A policy `[[rule]]` can match that text to
+raise a tool's tier; nothing lowers it below the tool's own. Every failure
+comes back to the model as text, and a failed call is recorded with
+`[exit 1]` so grading and the breaker count it. Each call that runs
+publishes one `tool` event (`name`, `args`, `ok`, `duration_ms`,
+`result_bytes`, `taints`). The orchestrator previews every call (`↵ run / q
+cancel`); a worker is never prompted, so a `confirm`-tier tool is refused for
+it. `/tools` lists what each role may call.
 
 **`run`** — execute one shell command.
 

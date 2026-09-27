@@ -57,7 +57,7 @@ def looks_like_secret(token: str) -> bool:
     return len(token) >= 20 and shannon_entropy(token) > 4.5
 
 
-def decide(command: str, *, tainted: bool = False) -> Decision:
+def decide(command: str, *, tainted: bool = False, floor: Tier | None = None) -> Decision:
     """The tier policy gives this command, and the rule that gave it.
 
     An unmatched command is `allow`. That is not the last line of defence it
@@ -77,6 +77,12 @@ def decide(command: str, *, tainted: bool = False) -> Decision:
         d = Decision(tier=Tier.ALLOW, rule=None, why="", source="default")
     else:
         d = Decision(tier=rule.tier, rule=rule, why=rule.why, source=rule.source)
+    # A tool's own tier (Phase 3.5, J1) is a floor: rules can raise it,
+    # nothing lowers it. It applies before taint, which bumps from there.
+    if floor is not None and floor.severity > d.tier.severity:
+        d = Decision(tier=floor, rule=rules.Rule(
+            name="tool-default", pattern="", why=f"this tool is {floor.value} by default",
+            tier=floor, source="tool"), why=f"this tool is {floor.value} by default", source="tool")
     if not tainted:
         return d
     why = "tainted context: the agent has read untrusted output this goal"
@@ -95,6 +101,7 @@ def gate(
     agent: str | None = None,
     model: str | None = None,
     goal: str | None = None,
+    floor: Tier | None = None,
 ) -> bool:
     """Decide, then act on it. True means the command may run.
 
@@ -109,13 +116,14 @@ def gate(
     The `pre_command` hook runs last, only for a command policy would run,
     so a hook can block and never unblock.
 
-    `tainted` is passed to `decide()`: one tier stricter.
+    `tainted` is passed to `decide()`: one tier stricter. `floor` is a tool's
+    own tier, which policy can raise and never lower.
 
     Every decision writes one `audit_ledger` row (F4); `agent`, `model` and
     `goal` are provenance for it, and `agent` defaults to `role`. The caller
     that runs the command then calls `core.audit.finish(exit_code)`.
     """
-    d = decide(command, tainted=tainted)
+    d = decide(command, tainted=tainted, floor=floor)
 
     def _record(outcome: str) -> None:
         audit.record(
