@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 import select
 import signal
@@ -75,6 +76,25 @@ def escalated_timeout(command: str, default: int = COMMAND_TIMEOUT) -> int:
     if any(marker in command for marker in LONG_RUNNING_MARKERS):
         return LONG_COMMAND_TIMEOUT
     return default
+
+
+_EXIT_MARKER = re.compile(r"(?:\(no output; exit (\d+)\)|\[exit (\d+)\])\s*\Z")
+
+
+def exit_code_of(output: str) -> int | None:
+    """The exit status `run_command` encoded in its return text, if known.
+
+    `run_command` returns text, not a status: a failure ends in `[exit N]`, a
+    silent command is `(no output; exit N)`, and output with neither marker
+    exited 0. Refusals, errors, timeouts and an unavailable status are None.
+    """
+    m = _EXIT_MARKER.search(output)
+    if m:
+        return int(m.group(1) or m.group(2))
+    if output.startswith(("[blocked:", "[error:")) or "[timeout after" in output \
+            or "exit status unavailable" in output[-60:]:
+        return None
+    return 0
 
 
 def run_command(

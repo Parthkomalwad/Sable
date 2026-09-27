@@ -900,8 +900,7 @@ class OrchestratorAgent:
         output = runtime.run_command(
             command, cwd=self._cwd, timeout=timeout, prefix="orch_"
         )
-        # run_command returns text, not a status, so only duration is known.
-        audit.finish()
+        audit.finish(runtime.exit_code_of(output))
         return output
 
 
