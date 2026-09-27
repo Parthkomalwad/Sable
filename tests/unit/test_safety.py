@@ -36,7 +36,12 @@ class TestDestructivePatterns:
     def test_chmod_777_not_in_blocklist(self):
         """chmod is not in DESTRUCTIVE_PATTERNS: it is recoverable and too
         common to be worth a confirm prompt. Policy tiers (F1) will cover it."""
-        assert not is_destructive("chmod 777 /etc/shadow")
+        assert not is_destructive("chmod 777 /etc/nginx")
+
+    def test_chmod_on_a_credential_file_is_gated(self):
+        """Not by the blocklist but by the credential-file floor: making
+        /etc/shadow world-readable exposes every password hash."""
+        assert is_destructive("chmod 777 /etc/shadow")
 
     def test_kill_9_not_in_blocklist(self):
         """kill -9 is not destructive to data and is routine on a server."""
