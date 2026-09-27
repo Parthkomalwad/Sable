@@ -50,6 +50,7 @@ _HELP_TEXT = (
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
+    "  /tools         Tools each agent role may call, and at which tier\n"
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
     "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
@@ -351,6 +352,16 @@ def handle_builtin(
     if cmd == "/audit" or cmd.startswith("/audit "):
         from sable.app.builtins.audit import handle_audit
         return handle_audit(cmd[len("/audit"):])
+
+    if cmd == "/tools":
+        from sable.tools import registry
+
+        for role in ("orchestrator", "worker"):
+            _out(f"{role}:")
+            for t in registry.for_role(role):
+                _out(f"  {t.signature():<40} {t.tier.value:<8} {t.description}")
+        _out("policy files can raise a tool's tier: match `tool:<name>` in a [[rule]]")
+        return True
 
     if cmd == "/approve" or cmd.startswith("/approve "):
         return _handle_approve_builtin(cmd[len("/approve"):].strip(), db)
