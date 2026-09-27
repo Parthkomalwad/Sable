@@ -5,7 +5,7 @@ Applied on both the bash path and the agentic path before any execution.
 Key responsibilities:
 - DESTRUCTIVE_PATTERNS regex blocklist
 - Shannon entropy check for secrets in privacy mode
-- Confirmation flow (requires literal 'YES')
+- decide() tiers a command; gate() turns the tier into run, YES, or refuse
 - Dry-run option for file-touching commands
 - strip_secrets() for privacy mode
 """
@@ -16,6 +16,7 @@ import sys
 from collections import Counter
 
 from sable.policy import rules
+from sable.policy.tiers import Decision, Tier
 
 # The rules themselves live in defaults/policy.toml (Phase 0.5 step 4), so a
 # pattern can be read and audited without reading code, and so each one
@@ -54,28 +55,52 @@ def looks_like_secret(token: str) -> bool:
     return len(token) >= 20 and shannon_entropy(token) > 4.5
 
 
-def is_destructive(command: str) -> bool:
-    """Return True if command matches any destructive pattern."""
-    for pattern in DESTRUCTIVE_PATTERNS:
-        if re.search(pattern, command):
-            return True
-    return False
+def decide(command: str) -> Decision:
+    """The tier policy gives this command, and the rule that gave it.
 
-
-def confirm_destructive(command: str, reason: str = "") -> bool:
-    """Display warning and require 'YES' to proceed. Returns True if confirmed.
-
-    Args:
-        command: The command to confirm.
-        reason: Optional reason string (e.g. 'AI flagged as unsafe').
+    An unmatched command is `allow`. That is not the last line of defence it
+    looks like: a model's command is still previewed before it runs, and a
+    worker's runs inside its sandbox. The rules are for what a preview or a
+    sandbox would not stop a tired human from approving.
     """
-    label = reason if reason else "pattern matched as destructive"
+    rule = rules.match_destructive(command)
+    if rule is None:
+        return Decision(tier=Tier.ALLOW, rule=None, why="", source="default")
+    return Decision(tier=rule.tier, rule=rule, why=rule.why, source=str(rules.POLICY_PATH))
+
+
+def gate(command: str, *, role: str) -> bool:
+    """Decide, then act on it. True means the command may run.
+
+    `role` is "user" (a typed line), "orchestrator" (a model's command in the
+    user's session) or "worker" (a sub-agent nobody is watching). A worker is
+    never prompted: its tmux window has no reader, so a prompt there blocks
+    forever. It runs `allow` and refuses everything else.
+    """
+    d = decide(command)
+    if d.tier is Tier.ALLOW:
+        return True
+    if d.tier is Tier.DENY:
+        if role != "worker":
+            _warn(f"refused by policy: {d.rule.name}", command, d.why)
+        return False
+    if role == "worker":
+        return False
+    return _confirm(command, d)
+
+
+def _warn(label: str, command: str, why: str) -> None:
     sys.stdout.write(
         f"\n\033[38;5;203m  ⚠ {label}\033[0m\n"
         f"  \033[2;37mcommand:\033[0m {command}\n"
-        f"  \033[2;37mThis operation may be irreversible.\033[0m\n"
+        f"  \033[2;37m{why}\033[0m\n"
     )
     sys.stdout.flush()
+
+
+def _confirm(command: str, d: Decision) -> bool:
+    """Show which rule fired and why, and require the literal word YES."""
+    _warn(f"DESTRUCTIVE  {d.rule.name}", command, d.why)
     try:
         answer = input("  type YES to confirm: ").strip()
     except (EOFError, KeyboardInterrupt):

@@ -475,12 +475,13 @@ class TaskAgent:
             command = parsed.get("command", "")
 
             if command:
-                from sable.policy.engine import is_destructive
-                if is_destructive(command):
-                    logger.warning("Blocked destructive command: %s", command)
+                from sable.policy.engine import decide, gate
+                if not gate(command, role="worker"):
+                    d = decide(command)
+                    logger.warning("Refused by policy (%s): %s", d.rule.name, command)
                     self._memory.add_turns([
                         {"role": "assistant", "content": f"[blocked] {command}"},
-                        {"role": "user", "content": "That command was blocked as destructive. Try a safer approach."},
+                        {"role": "user", "content": f"That command was refused by policy rule {d.rule.name}: {d.why}. Try a safer approach."},
                     ])
                     continue
 
