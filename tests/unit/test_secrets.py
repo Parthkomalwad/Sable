@@ -1,0 +1,133 @@
+"""F6 secret broker: resolve at exec time, refuse rather than fall back."""
+from __future__ import annotations
+
+import importlib.util
+
+import pytest
+
+from sable.core.config import keyring
+from sable.policy import secrets
+
+VALUE = "hunter2 with spaces"
+
+
+@pytest.fixture
+def fake_keyring(monkeypatch):
+    store = {"secret:db_pass": VALUE}
+    monkeypatch.setattr(keyring, "lookup", store.get)
+    monkeypatch.setattr(keyring, "store_api_key", store.__setitem__)
+    monkeypatch.setattr(keyring, "delete", lambda s: store.pop(s, None) is not None)
+    monkeypatch.setattr(keyring, "services", lambda p="": sorted(k for k in store if k.startswith(p)))
+    return store
+
+
+@pytest.fixture
+def no_keyring(monkeypatch):
+    def boom(*_a, **_k):
+        raise keyring.KeyringUnavailable("no dbus")
+    for fn in ("lookup", "store_api_key", "delete", "services"):
+        monkeypatch.setattr(keyring, fn, boom)
+
+
+def test_no_placeholder_never_touches_keyring(no_keyring):
+    assert secrets.resolve("ls -la") == ("ls -la", {}, {})
+
+
+def test_rewrites_to_env_reference_and_keeps_value_out_of_command(fake_keyring):
+    cmd, env, reveal = secrets.resolve("psql -W $SECRET:db_pass")
+    assert cmd == 'psql -W "${SABLE_SECRET_db_pass}"'
+    assert VALUE not in cmd
+    assert env == {"SABLE_SECRET_db_pass": VALUE}
+    assert reveal == {VALUE: "$SECRET:db_pass"}
+
+
+def test_inside_double_quotes_is_not_requoted(fake_keyring):
+    cmd, _, _ = secrets.resolve('psql "postgres://u:$SECRET:db_pass@h/db"')
+    assert cmd == 'psql "postgres://u:${SABLE_SECRET_db_pass}@h/db"'
+
+
+def test_inside_single_quotes_refuses(fake_keyring):
+    with pytest.raises(secrets.SecretError, match="single quotes"):
+        secrets.resolve("echo '$SECRET:db_pass'")
+
+
+def test_unknown_name_refuses_before_running(fake_keyring):
+    with pytest.raises(secrets.SecretError, match="no secret named 'nope'"):
+        secrets.resolve("echo $SECRET:nope")
+
+
+def test_unavailable_keyring_refuses_not_falls_back(no_keyring, monkeypatch):
+    monkeypatch.setenv("SABLE_SECRET_db_pass", "from-env")
+    with pytest.raises(secrets.SecretError, match="keyring unavailable"):
+        secrets.resolve("echo $SECRET:db_pass")
+
+
+def test_names_differing_only_in_case_do_not_share_a_value(fake_keyring):
+    fake_keyring["secret:DB_PASS"] = "other"
+    cmd, env, _ = secrets.resolve("x $SECRET:db_pass $SECRET:DB_PASS")
+    assert env == {"SABLE_SECRET_db_pass": VALUE, "SABLE_SECRET_DB_PASS": "other"}
+    assert cmd == 'x "${SABLE_SECRET_db_pass}" "${SABLE_SECRET_DB_PASS}"'
+
+
+def test_redact_puts_placeholder_back(fake_keyring):
+    _, _, reveal = secrets.resolve("echo $SECRET:db_pass")
+    assert secrets.redact(f"pw={VALUE}\n", reveal) == "pw=$SECRET:db_pass\n"
+
+
+def test_refusal_is_what_the_model_reads(fake_keyring):
+    pytest.importorskip("ptyprocess")
+    from sable.agents import runtime
+    out = runtime.run_command("echo $SECRET:nope", cwd=".")
+    assert out.startswith("[blocked:") and "nope" in out
+    assert runtime.exit_code_of(out) is None
+
+
+@pytest.mark.skipif(importlib.util.find_spec("ptyprocess") is None, reason="pty is Unix-only")
+def test_command_runs_with_value_and_output_is_redacted(fake_keyring, tmp_path):
+    from sable.agents import runtime
+    seen = tmp_path / "seen"
+    out = runtime.run_command(
+        f'printf %s $SECRET:db_pass > {seen}; echo "$SECRET:db_pass"', cwd=str(tmp_path)
+    )
+    assert seen.read_text() == VALUE          # the child got the real value
+    assert VALUE not in out                   # the model does not
+    assert "$SECRET:db_pass" in out
+
+
+def test_builtin_add_list_rm(fake_keyring, capsys):
+    from sable.app.builtins.secret import _handle_secret_builtin
+    _handle_secret_builtin("add api_tok", prompt=lambda _p: "s3cr3t")
+    assert fake_keyring["secret:api_tok"] == "s3cr3t"
+    _handle_secret_builtin("list")
+    listed = capsys.readouterr().out
+    assert "api_tok" in listed and "db_pass" in listed and "s3cr3t" not in listed
+    _handle_secret_builtin("rm api_tok")
+    assert "secret:api_tok" not in fake_keyring
+
+
+def test_builtin_reports_unavailable_keyring(no_keyring, capsys):
+    from sable.app.builtins.secret import _handle_secret_builtin
+    assert _handle_secret_builtin("list") is True
+    assert "keyring unavailable" in capsys.readouterr().out
+
+
+def test_audit_ledger_holds_placeholder_never_value(fake_keyring, tmp_path, monkeypatch):
+    import sable.core.db as db
+    from sable.core import audit
+    from sable.policy.engine import gate
+
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "sessions.db")
+    command = "echo $SECRET:db_pass"
+    assert gate(command, role="orchestrator") is True   # the call sites' order:
+    secrets.resolve(command)                            # gate + audit, then resolve
+    (row,) = audit.query(db_path=tmp_path / "sessions.db")
+    assert "$SECRET:db_pass" in row["command"]
+    assert VALUE not in str(dict(row))
+
+
+def test_output_is_redacted_before_untrusted_wrapping(fake_keyring):
+    from sable.policy.taint import wrap_untrusted
+
+    _, _, reveal = secrets.resolve("echo $SECRET:db_pass")
+    wrapped = wrap_untrusted(secrets.redact(f"pw={VALUE}", reveal))
+    assert VALUE not in wrapped and "$SECRET:db_pass" in wrapped

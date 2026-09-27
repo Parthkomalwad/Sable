@@ -51,6 +51,7 @@ _HELP_TEXT = (
     "  /why [agent]   What the model saw when it last decided\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
+    "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
     "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
@@ -329,6 +330,10 @@ def handle_builtin(
 
     if cmd == "/approve" or cmd.startswith("/approve "):
         return _handle_approve_builtin(cmd[len("/approve"):].strip(), db)
+
+    if cmd == "/secret" or cmd.startswith("/secret "):
+        from sable.app.builtins.secret import _handle_secret_builtin
+        return _handle_secret_builtin(cmd[len("/secret"):].strip())
 
     if cmd == "/corrections" or cmd.startswith("/corrections "):
         return _handle_corrections_builtin(cmd[len("/corrections"):].strip(), db)

@@ -440,9 +440,6 @@ starts with `tainted context`. A bumped `allow` carries a stand-in rule named
 `tainted-context` (source `taint`). Taint never blocks a turn; it only makes
 acting on what was read cost a human's YES. `tests/evals/injection/` pins it:
 30+ hostile outputs, a model that obeys them, zero commands executed.
-
----
-
 ### 7.7 Audit ledger (Phase 3, F4)
 
 Every `gate()` decision writes one row to `audit_ledger` in `sessions.db`;
@@ -460,6 +457,26 @@ Every `gate()` decision writes one row to `audit_ledger` in `sessions.db`;
 `/audit [--since 30m|1h|2d] [--agent NAME]` prints the rows as a table.
 `--export jsonl` writes them to `~/.sable/audit/audit-<stamp>.jsonl` and
 prints that path. A ledger write never raises.
+
+### 7.8 Secret broker (Phase 3)
+
+`sable/policy/secrets.py`. A command may contain `$SECRET:<name>` (`name` =
+`[A-Za-z_][A-Za-z0-9_]*`). The model, preview, `gate()`, audit, event bus and
+`agent_turns` see only the placeholder; resolution happens in the runner
+(`agents/runtime.run_command`, `agents/planner`). Each placeholder is rewritten
+to `"${SABLE_SECRET_<name>}"` (name case kept, so `db_pass` and `DB_PASS` never
+share a variable; bare `${...}` inside double quotes) and the value
+is passed in the child's environment, never in the command string or script
+file. Inside single quotes, an unknown name, or an unavailable keyring: the
+command does not run and the model reads `[blocked: <reason>]`. No plaintext or
+env fallback. Resolved values in output are replaced by their placeholder
+before the model or memory sees it. Storage: keyring item attributes
+`{application: "agentic-shell", service: "secret:<name>"}`
+(`core/config/keyring.py`). `/secret add <name>` (no echo), `/secret list`
+(names only), `/secret rm <name>`. Raw bash lines typed by the user are not
+resolved.
+
+---
 
 ## 8. Skills, corrections and aliases
 
