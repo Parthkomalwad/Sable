@@ -890,13 +890,19 @@ class OrchestratorAgent:
 
         # A matched `confirm` rule asks for YES here, as the docs always said;
         # it used to refuse outright, which no rule could express.
-        if not gate(command, role="orchestrator", tainted=self._tainted):
+        if not gate(command, role="orchestrator", tainted=self._tainted, goal=self._goal,
+                    model=self._config.model_for("orchestrator")):
             _out(f"[orchestrator] not run: {command}")
             return "[blocked: refused by policy or not confirmed by the user]"
 
-        return runtime.run_command(
+        from sable.core import audit
+
+        output = runtime.run_command(
             command, cwd=self._cwd, timeout=timeout, prefix="orch_"
         )
+        # run_command returns text, not a status, so only duration is known.
+        audit.finish()
+        return output
 
 
 def _out(text: str) -> None:

@@ -493,7 +493,8 @@ class TaskAgent:
                 try:
                     approved = policy_queue.take_approved(conn, self._name, command)
                     if not gate(command, role="worker", approved=approved,
-                                tainted=self._tainted):
+                                tainted=self._tainted, agent=self._name, goal=self._goal,
+                                model=self._config.model_for("worker")):
                         d = decide(command, tainted=self._tainted)
                         if d.tier is Tier.CONFIRM and not approved:
                             # Nobody can type YES in this window: ask the user
@@ -524,6 +525,8 @@ class TaskAgent:
                 output = self._run_command(
                     command, timeout=runtime.escalated_timeout(command)
                 )
+                from sable.core import audit
+                audit.finish()  # duration only: the output carries no status
                 print(f"[agent] output: {output[:200]}", flush=True)
                 from sable.policy import taint
                 if taint.is_tainting(command, self._workspace):
