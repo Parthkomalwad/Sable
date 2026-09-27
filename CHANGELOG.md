@@ -5,6 +5,12 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 3 (F1): sub-agents ask for approval instead of giving up.** A sub-agent runs in a window nobody reads, so it can never type `YES`. A command that needs one is now queued in a new `policy_queue` table, the model is told its number and why, and the terminal prints `waiting for approval: /approve <id>`. `/approve` lists what is waiting; `/approve <id>` lets the command run the next time that agent proposes exactly it, once; `/approve reject <id>` refuses it. A `deny` is never queued and an approval can never lift one, and the `pre_command` hook still runs. The table is what Phase 5's `/inbox` will read. 10 tests.
+
+### Fixed
+- A sub-agent crashed when a `pre_command` hook blocked a command no policy rule matched: it read the name of a rule that did not exist. It now tells the model the hook blocked it.
+
+### Added
 - **Phase 3 (F1): lifecycle hooks.** Executables in `~/.sable/hooks/` named `pre_command`, `post_command`, `pre_spawn` and `on_skill_use` get one JSON object on stdin, the same contract as Claude Code's hooks. Exit 2 blocks and stdout says why; exit 0 allows, and JSON stdout can carry a `message` for you and a `context` for the model. Any other failure, including a hang past 10 seconds, is reported and does not block, because a broken hook must not wedge the shell.
 - `pre_command` runs inside `gate()`, after policy, so every path that runs a command gets it and a hook can block but never unblock: a command policy refused never reaches it. `docs/contracts.md` §7.2 lists every hook and its payload. `tests/unit/conftest.py` keeps a developer's own hooks out of the test suite. 12 tests.
 

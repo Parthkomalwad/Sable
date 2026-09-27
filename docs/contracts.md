@@ -411,6 +411,15 @@ the model reads). Other stdout is shown as text. Exit 0 allows; any other
 non-zero exit, or running past 10 s, is reported on stderr and does **not**
 block. A hook never sees a command policy refused, so it cannot loosen one.
 
+### 7.3 Approval queue (Phase 3)
+
+`policy_queue` (`sable/policy/queue.py`): `id`, `created_at`, `agent`, `command`,
+`rule`, `why`, `status` = `pending | approved | rejected | used`. A worker
+enqueues a `confirm` command instead of prompting; one pending row per
+agent and command. `/approve <id>` sets `approved`; the worker's next proposal
+of exactly that command by that agent consumes it (`used`), so an approval
+runs once. `deny` is never enqueued, and `gate(approved=True)` never lifts it.
+
 ---
 
 ## 8. Skills, corrections and aliases
