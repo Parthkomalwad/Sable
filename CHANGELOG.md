@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Fixed
+- `scripts/build-assets.py --check` crashed in CI with `TypeError: Path.read_text() got an unexpected keyword argument 'newline'`. That argument is Python 3.13+, and the runner is older. The file is now read as bytes and decoded, which also keeps its line endings exactly as committed.
+
 ### Changed
 - **The README now leads with the problem rather than the feature list.** The old opening described what Sable *is* in one dense sentence; a reader who did not already know the category had no way in. A "What it solves" section now names the actual loop it removes — leave the terminal, search, paste a command you have not fully read onto production — before any architecture. The safety claim is stated as the project's one-line promise ("the shell that asks first"), and the alpha warning moved next to the comparison table, where a reader is deciding whether to install rather than skimming the header.
 - The architecture table cited `main.py`, `loop.py`, `safety.py` and `tasks/orchestrator.py`, which are the pre-Phase-0.5 names. Every path in it is now the `sable/` one and was checked to exist; `policy.yaml` in the v0.7 roadmap line is `policy.toml`, matching CLAUDE.md's rule that these files are read with `tomllib`.
