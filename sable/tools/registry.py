@@ -2,12 +2,14 @@
 
 A call is checked in this order, and each step can end it with a result the
 model reads rather than an exception: the tool exists, the role may use it,
-the arguments fit, policy allows it (`gate()` with the tool's tier as a
+the arguments fit, the agent's per-tool budget (J12, `ctx.budget`) has
+room, policy allows it (`gate()` with the tool's tier as a
 floor, which writes the audit row), then it runs. Every call that reaches
 `run` publishes one `tool` event on the bus.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import time
 
@@ -76,6 +78,11 @@ def call(name: str, args, ctx: ToolContext, *, publish=None) -> ToolResult:
     if problem:
         return ToolResult(ok=False, output=f"invalid args for {name}: {problem}")
 
+    if ctx.budget is not None:
+        refused = ctx.budget.before_tool(name)
+        if refused:
+            return ToolResult(ok=False, output=refused)
+
     command = as_command(name, args)
     if not engine.gate(command, role=ctx.role, tainted=ctx.tainted, agent=ctx.agent,
                        model=ctx.model, goal=ctx.goal, floor=tool.tier):
@@ -88,6 +95,13 @@ def call(name: str, args, ctx: ToolContext, *, publish=None) -> ToolResult:
         result = ToolResult(ok=False, output=f"{name} failed: {exc}")
     duration_ms = int((time.monotonic() - started) * 1000)
     audit.finish(0 if result.ok else 1)
+    if ctx.budget is not None:
+        keep, notice = ctx.budget.after_tool(name, len(result.output.encode()), result.cost_usd)
+        if notice:
+            output = result.output
+            if keep is not None:
+                output = output.encode()[:keep].decode(errors="ignore")
+            result = dataclasses.replace(result, output=f"{output}\n{notice}")
     if publish is not None:
         publish("tool", {
             "name": name, "args": args, "ok": result.ok, "duration_ms": duration_ms,

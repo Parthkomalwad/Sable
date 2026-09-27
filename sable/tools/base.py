@@ -36,6 +36,9 @@ class ToolContext:
     goal: str | None = None
     model: str | None = None
     tainted: bool = False
+    #: J12: the agent's Breaker (`before_tool` / `after_tool`), or None for
+    #: no per-tool budgets. The registry calls it and never sees its DB.
+    budget: object | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,8 @@ class ToolResult:
     #: True when the output came from outside the workspace (a web page, a
     #: file elsewhere): the caller wraps it as untrusted and taints the agent.
     taints: bool = False
+    #: What the call cost, for a tool that pays per call (J12 `max_cost`).
+    cost_usd: float = 0.0
 
 
 @dataclass(frozen=True)

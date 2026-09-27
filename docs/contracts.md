@@ -521,6 +521,22 @@ another job's trip and stops only on its own goal's limits. `/breaker`
 lists open trips; `/breaker reset` sets them `reset`. Phase 5's `/inbox` reads
 this table.
 
+**Tool budgets (Phase 3.5, J12).** Config `tool_budgets` maps a tool name or
+a prefix to `{max_calls_per_goal, max_bytes, max_cost}` (any key absent or
+null is unlimited; `{}` is the default). A key covers that tool and every tool
+under it: `web` counts `web.search` and `web.fetch`, not `webby`. Counts live
+on the job's `Breaker`, so they reset with each goal (orchestrator) or task
+(worker). `registry.call()` asks the breaker through `ToolContext.budget`
+after the args are validated and before `gate()`: a call that would exceed
+`max_calls_per_goal`, or whose budget is already spent, never runs and
+returns `[breaker: tool <name>: <key>.<limit> limit reached ...]` to the
+model. `max_bytes` and `max_cost` are known only afterwards: the call that
+crosses `max_bytes` has its output cut to what the budget had left, and the
+call that crosses `max_cost` (from `ToolResult.cost_usd`) keeps its output.
+Any of the three trips the breaker at once: a `breaker_trips` row with the
+tool named in `reason`, shown by `/breaker`, and the job stops before its next
+turn. A call refused by policy after passing the budget still counts.
+
 ### 7.6 Blast radius (Phase 3, F3)
 
 `sable/policy/blast.py`: `classify(command) -> Level`, one of `read-only`

@@ -46,6 +46,9 @@ class ShellConfig:
     # Per-tool settings (Phase 3.5), e.g. {"web": {"search_provider": "brave"}}.
     # Empty means every tool's defaults, so DuckDuckGo search.
     tools: dict = field(default_factory=dict)
+    # Per-tool budgets (J12). A tool name or prefix (`web` covers web.search)
+    # to {max_calls_per_goal, max_bytes, max_cost}; empty is unlimited.
+    tool_budgets: dict[str, dict[str, float]] = field(default_factory=dict)
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -131,6 +134,19 @@ class ShellConfig:
         provider = tools.get("web", {}).get("search_provider")
         if provider is not None and provider not in ("duckduckgo", "searxng", "brave", "tavily"):
             raise ValueError(f"Unknown tools.web.search_provider: {provider!r}")
+        tool_budgets = data.get("tool_budgets") or {}
+        if not isinstance(tool_budgets, dict):
+            raise ValueError(f"tool_budgets must be an object, got {tool_budgets!r}")
+        for tool, spec in tool_budgets.items():
+            if not isinstance(tool, str) or not tool.strip() or not isinstance(spec, dict):
+                raise ValueError(f"tool_budgets.{tool} must map a tool name to an object, got {spec!r}")
+            for key, limit in spec.items():
+                if key not in ("max_calls_per_goal", "max_bytes", "max_cost"):
+                    raise ValueError(f"Unknown tool_budgets.{tool} key: {key!r}")
+                integer = key != "max_cost"
+                if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int if integer else (int, float)) or limit <= 0):
+                    kind = "positive int" if integer else "positive number"
+                    raise ValueError(f"tool_budgets.{tool}.{key} must be a {kind} or null, got {limit!r}")
 
         cfg = ShellConfig(
             backend=backend,
@@ -146,6 +162,8 @@ class ShellConfig:
             per_job_budget={k: v for k, v in per_job.items() if v is not None},
             breaker_consecutive_failures=failures,
             tools=tools,
+            tool_budgets={t: {k: v for k, v in spec.items() if v is not None}
+                          for t, spec in tool_budgets.items()},
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -167,5 +185,6 @@ class ShellConfig:
             "per_job_budget": dict(self.per_job_budget),
             "breaker_consecutive_failures": self.breaker_consecutive_failures,
             "tools": dict(self.tools),
+            "tool_budgets": {t: dict(spec) for t, spec in self.tool_budgets.items()},
             "api_key": getattr(self, "api_key", ""),
         }
