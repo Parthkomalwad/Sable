@@ -35,7 +35,7 @@ class TestDecide:
 class TestGate:
     def _deny(self, monkeypatch):
         rule = engine.rules.Rule(name="no-rm", pattern="^rm ", why="nope", tier=Tier.DENY)
-        monkeypatch.setattr(engine.rules, "match_destructive", lambda c: rule if c.startswith("rm ") else None)
+        monkeypatch.setattr(engine.rules, "match", lambda c: rule if c.startswith("rm ") else None)
 
     def test_allow_runs_without_asking(self, monkeypatch):
         monkeypatch.setattr("builtins.input", lambda *_: pytest.fail("asked"))

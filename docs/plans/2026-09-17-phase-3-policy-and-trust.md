@@ -213,18 +213,24 @@ position, to be written down rather than papered over:
 
 **Files:** Modify `sable/policy/rules.py`; create `sable/policy/privilege.py`
 
-- [ ] **Step 1: failing tests.** Precedence is defaults -> `/etc/sable/policy.toml`
+- [x] **Step 1: failing tests.** Precedence is defaults -> `/etc/sable/policy.toml`
       -> `~/.sable/policy.toml`. A user rule **may make a command stricter and
       may not make it looser**: a user `allow` against an admin `deny` stays
       `deny`, and the `Decision.source` says which file won. A malformed *user*
       file is a loud error but does not prevent startup with the shipped
       defaults; a malformed *defaults* file still raises, as today.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** The floor comparison is on tier severity, not file
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** The floor comparison is on tier severity, not file
       order, which is why `Tier` needs an ordering. `privilege.py` also holds the
       uid-0 refusal and forces any `sudo` command to `confirm` regardless of what
       matched, since that is the one escalation no rule should be able to relax.
-- [ ] **Step 4:** green. Commit: `feat(policy): user rules layered under an admin floor they cannot loosen`
+- [x] **Step 4:** green. Commit: `feat(policy): user rules layered under an admin floor they cannot loosen`
+
+> **Done, with two additions agreed 2026-09-27:** a malformed *admin* file also
+> raises, since the floor must not vanish on a typo; and as root Sable execs
+> `bash -l` with a message rather than exiting, so root is never locked out
+> of a login shell. `policy_queue` and `/approve` (moved here from Task 2) are
+> still owed and move to Task 4, which already touches the worker path.
 
 ## Task 4: Lifecycle hooks (F1)
 

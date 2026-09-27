@@ -368,6 +368,31 @@ A missing or malformed policy file **raises at import**. It does not degrade to
 an empty list, because an empty blocklist is a shell that runs `rm -rf /`
 without asking.
 
+### 7.1 Layers (Phase 3)
+
+Three files, each optional except the first:
+
+| File | Section | Malformed |
+|---|---|---|
+| `sable/policy/defaults/policy.toml` | `[[destructive]]` | raises |
+| `/etc/sable/policy.toml` (admin) | `[[rule]]` | raises: the floor must not vanish on a typo |
+| `~/.sable/policy.toml` (user) | `[[rule]]` | warns on stderr, then ignored |
+
+```toml
+[[rule]]
+name = "no-rm-rf"
+pattern = "^rm -rf"
+tier = "deny"          # allow | confirm | deny; missing means confirm
+why = "optional; a fallback names the rule and file"
+```
+
+The **floor** is the admin file's first match, else the defaults' first match.
+A user rule wins only when its tier is strictly more severe
+(`allow < confirm < deny`), so a user `allow` never loosens a floor
+`confirm`. `sudo` as a command word is always at least `confirm`, from
+`policy/privilege.py`, whatever any file says. `Decision.source` names the file
+whose rule won, or `built-in` for `sudo`.
+
 ---
 
 ## 8. Skills, corrections and aliases
