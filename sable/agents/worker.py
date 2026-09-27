@@ -254,6 +254,14 @@ class TaskAgent:
 
         self._bus = EventBus(db_path=self._db_path)
 
+        # I2: checked before every step, never during one.
+        from sable.policy.breaker import Breaker, Limits
+
+        # Another job's trip pauses this one (wait_while_held) rather than
+        # stopping it, so check() only answers for this job's own limits.
+        self._breaker = Breaker(task_name, Limits.from_config(config), db_path,
+                                held_by_trips=False)
+
     def _open_db(self):
         class _DB:
             def __init__(self, path):
@@ -273,6 +281,11 @@ class TaskAgent:
             except queue.Empty:
                 break
         return "\n".join(lines)
+
+    def _on_breaker_pause(self, reason: str) -> None:
+        print(f"[breaker] paused: {reason}. /breaker reset to resume", flush=True)
+        self._update_task_status("paused")
+        self._publish(EventKind.STATUS, paused=True, reason=reason)
 
     def _db_conn(self):
         return sqlite3.connect(self._db_path, check_same_thread=False)
@@ -413,6 +426,18 @@ class TaskAgent:
                 )
                 break
 
+            from sable.policy.breaker import block
+
+            if self._breaker.wait_while_held(on_pause=self._on_breaker_pause):
+                print("[breaker] resumed", flush=True)
+                self._update_task_status("running")
+            reason = self._breaker.check()
+            if reason:
+                print(block(self._name, reason), flush=True)
+                self._update_task_status("lost")
+                self._publish(EventKind.FAILED, reason=f"circuit breaker: {reason}", steps=_step - 1)
+                break
+
             guidance = self._drain_guidance()
             skills = self._skill_loader.load_relevant(self._goal)
             messages = self._memory.build_context()
@@ -514,6 +539,11 @@ class TaskAgent:
                             {"role": "assistant", "content": f"[blocked] {command}"},
                             {"role": "user", "content": reply},
                         ])
+                        # A refused turn still spent tokens and a turn.
+                        self._breaker.record(
+                            tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
+                            usd=getattr(response, "cost_usd", 0.0),
+                        )
                         continue
                 finally:
                     conn.close()
@@ -559,6 +589,12 @@ class TaskAgent:
                 {"role": "user", "content": _untrusted(output)},
             ])
             self._memory.save_snapshot()
+            self._breaker.record(
+                tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
+                usd=getattr(response, "cost_usd", 0.0),
+                # Non-zero, or None (error, timeout, unknown status), is a failure.
+                failed=bool(command) and runtime.exit_code_of(output or "") != 0,
+            )
 
             if parsed.get("done"):
                 self._update_task_status("completed")
