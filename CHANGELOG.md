@@ -9,6 +9,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - A broken user file prints a warning and Sable carries on with the other rules. A broken admin file stops Sable from starting, because a typo must not silently remove the floor.
 - **`sudo` is always at least `confirm`**, from the new `sable/policy/privilege.py`, whatever any file says. Only `sudo` as a command word counts, so `man sudo` and `grep sudoers` are unaffected.
 - **Sable does not run its agents as root.** As uid 0 it prints why and hands the session to `bash -l`, so root is never locked out of a login shell.
+- `SABLE_ALLOW_ROOT=1` opts out of that, for throwaway containers where root is the only user. The playground image sets it, through `ENV` for `docker run` and `/etc/environment` for SSH logins. It is not a security boundary; the check exists so nobody runs a model's commands as root by accident.
 - `tests/unit/conftest.py` points both policy paths at empty files for every unit test, so a developer's own rules cannot change a result. `docs/contracts.md` §7.1 documents the layers. 15 tests.
 
 ### Changed
