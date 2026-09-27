@@ -84,7 +84,10 @@ with a reason rather than being guessed at.
 ```
 
 Backends put the whole answer in `LLMResponse.raw`; the orchestrator and the
-worker read `name` and `args` from there. The call is checked in order: the
+worker read `name` and `args` from there. Models also send the tool's name
+as the action with flat arguments, `{"action": "fs.read", "path": ...}`;
+`registry.normalize_action` maps that to the same call. An action that is
+neither ours nor a tool is reported by name, never turned into `done`. The call is checked in order: the
 tool exists, the role may use it, `args` fit its schema, then
 `gate("tool:<name> <args as sorted JSON>", floor=<tool tier>)`, which applies
 policy and writes the audit row. A policy `[[rule]]` can match that text to
@@ -109,6 +112,9 @@ It is a shell command that must exit 0, or one of:
 
 The runtime checks it after the action succeeds (`agents/runtime.run_verify`).
 A verify command goes through `gate()` with the agent's role, like any command.
+A string that spells a structured check (`exit: 0`, `exit == 0`,
+`stdout_contains: x`, `file_exists: path`) is read as that check, not run: the
+Phase 3.5 gate saw gpt-4o-mini send `"verify": "exit: 0"`.
 `http_status` accepts only `localhost` / `127.0.0.1` URLs. A failed check is appended to the output the model reads as
 `{"verify": "failed", "check": ..., "got": ...}` followed by `[exit 1]`, so
 `exit_code_of`, skill grading and the breaker count it as a failure.
@@ -785,6 +791,24 @@ The tool interface is `sable/tools/base.py` (`Tool`, `ToolContext`,
 the tool's tier as a floor. A tool may set `preview(args, ctx) -> str`: the
 orchestrator's confirm block shows it under the call instead of the raw JSON
 args. A preview that raises `ToolError` shows the error instead.
+
+### 9.1 Every tool at a glance
+
+| Tool | Tier (floor) | Taints | Notes |
+|---|---|---|---|
+| `echo(text)` | allow | no | tests the tool path |
+| `web.search(query, k?)` | allow | yes | DuckDuckGo by default; `tools.web.search_provider` |
+| `web.fetch(url, max_bytes?)` | allow | yes | public http(s) only; SSRF-checked per hop |
+| `fs.read(path, start?, end?)` | allow | outside the root only | orchestrator may read outside (tainted); worker may not |
+| `fs.write(path, content)` | confirm | no | diff preview; atomic |
+| `fs.patch(path, diff)` | confirm | no | diff preview; applies cleanly or not at all |
+| `fs.search(glob, regex?)`, `fs.tree(path?, depth?)` | allow | no | capped, skips `.git`, `node_modules` |
+| `docs.man`, `docs.help`, `docs.tldr` | allow | no | local lookups; `docs.help` sandboxed |
+| `docs.pkg(name)` | allow | npm only | apt-cache and pip are local |
+
+Taint raises every tier one step for the rest of the goal, so after a web
+tool each further tool call or command asks for `YES` (a worker is refused).
+`/tools` prints this list for the running version.
 
 ### 9.2 web.search and web.fetch
 

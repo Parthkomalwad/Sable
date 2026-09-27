@@ -81,6 +81,12 @@ servers themselves.
 | A credential reaches a model or a log | `$SECRET:name` resolved at exec time into the child's env; the value is redacted from output | `policy/secrets.py` (F6) |
 | Site-specific rules the defaults cannot know | `pre_command` hooks can block any command; a broken hook never blocks | `policy/hooks.py` (F1) |
 | Sub-agent damages the host | `bwrap` sandbox: workspace read-write, everything else read-only | `agents/sandbox.py` |
+| A tool call skips policy | Every tool call goes through `gate()` with the tool's tier as a floor: previewed, hooked, audited, taint-aware | `tools/registry.py` (J1) |
+| The model is steered into fetching an internal address (SSRF) | `web.fetch` resolves the host, refuses private, loopback, link-local and metadata addresses, pins the connection to the checked IP and re-checks every redirect | `tools/web.py` (J2) |
+| A file tool escapes the working directory | Paths resolved with `realpath` and confined to the cwd or workspace; `..`, absolute paths and symlinks out are refused; writes are atomic and shown as a diff first | `tools/fs.py` (J3) |
+| A `--help` lookup does something else | `docs.help` runs only `--help`, never `-h`, with no shell, in bwrap with no network and no `/run`; a worker without bwrap is refused | `tools/docs.py` (J7) |
+| A curious agent crawls the web or loops on a failure | Per-tool budgets trip the breaker; the runtime refuses a third identical command | `policy/breaker.py`, `agents/runtime.py` (J12, J5) |
+| A model reads a credential file | Any command or tool call naming a private key, cloud or registry credentials, Sable's config, `/etc/shadow` or `/etc/sudoers` is at least `confirm` | `policy/privilege.py` |
 | A shell that hangs SSH file transfers | Non-interactive SSH bypass is the first executable line | `app/main.py` |
 
 ## 5. What Sable does not protect against
@@ -124,6 +130,17 @@ mitigations than they deliver.
 10. **Blast radius is a heuristic.** Unknown commands show as "unknown", never
     green, but a green can still be wrong for a program with a side effect the
     table does not know.
+11. **An untainted sub-agent can put data in a URL.** `web.fetch` is `allow`,
+    so a sub-agent that has not read untrusted content can fetch any public
+    URL without a prompt, and a URL can carry workspace data out. Once it is
+    tainted, a fetch needs `YES`, which a sub-agent cannot give, so injected
+    text cannot use this path; a model misbehaving on its own could.
+12. **`verify` proves what it checks, nothing more.** A passing
+    `docker compose config` says the file parses, not that the service is
+    healthy. A model chooses its own checks, and a weak one passes easily.
+13. **Web content steers the model even when framed.** Search results and
+    fetched pages taint the agent and are framed as data, but a model can
+    still be misled by them in what it says, not only in what it runs.
 
 ## 6. Not implemented yet
 

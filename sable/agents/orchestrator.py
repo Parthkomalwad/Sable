@@ -971,9 +971,20 @@ class OrchestratorAgent:
         spawn = getattr(response, "spawn", None)
 
         # A tool call (J1) is not in the typed fields; `raw` has all of it.
-        if action == "tool":
-            return getattr(response, "raw", "") or json.dumps(
-                {"action": "done", "explanation": "tool action with no body"})
+        # Models also send the tool's name as the action (see
+        # registry.normalize_action), so any action that is not one of ours
+        # is checked against the registry before anything else.
+        if action not in ("run", "spawn", "done"):
+            from sable.tools import registry
+
+            body = runtime.parse_json_action(getattr(response, "raw", "") or "", {})
+            call = registry.normalize_action(body) if body else None
+            if call is not None:
+                return json.dumps(call)
+            if action:
+                # Never let an action we do not know become a silent `done`:
+                # that read as "the model declined this goal" (Phase 3.5 gate).
+                return json.dumps({"action": action, "explanation": explanation})
 
         # If the backend captured the action field directly, use it
         if action in ("run", "spawn", "done"):

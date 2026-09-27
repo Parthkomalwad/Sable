@@ -152,6 +152,7 @@ Principles:
 6. RELATIVE PATHS ONLY never cd outside the workspace.
 7. SANDBOX LIMITS `docker compose` (v2) only, no apt/dpkg, no global npm/yarn installs.
 8. VERIFY any command or tool call that changes state MUST carry "verify": a shell command that exits 0 on success, or one of {{"exit": 0}}, {{"stdout_contains": "text"}}, {{"file_exists": "path"}}, {{"http_status": {{"url": "http://localhost:PORT/", "status": 200}}}}. A failed verify comes back as {{"verify": "failed", ...}}. The same command is refused after it has run twice.
+9. PREFER TOOLS read and edit files with fs.read / fs.patch / fs.write, never sed -i or heredocs; check flags with docs.help before guessing; call a tool as {{"action": "tool", "name": "<tool>", "args": {{...}}, "explanation": "..."}}.
 
 For each turn respond with JSON only no markdown, no extra text:
 {{
@@ -379,15 +380,21 @@ class TaskAgent:
 
     @staticmethod
     def _parse_typed(response) -> dict:
-        # A tool call (J1) is not in the typed fields; `raw` carries it.
-        if getattr(response, "action", "") == "tool":
+        # A tool call (J1) is not in the typed fields; `raw` carries it. The
+        # model may name the tool as the action itself (normalize_action).
+        action = getattr(response, "action", "")
+        if action and action not in ("run", "done"):
+            from sable.tools import registry
+
             body = runtime.parse_json_action(getattr(response, "raw", "") or "", {})
-            return {
-                "command": "",
-                "tool": {"name": str(body.get("name", "")), "args": body.get("args", {})},
-                "explanation": body.get("explanation", "") or getattr(response, "explanation", ""),
-                "done": False,
-            }
+            call = registry.normalize_action(body) if body else None
+            if call is not None:
+                return {
+                    "command": "",
+                    "tool": {"name": call["name"], "args": call["args"]},
+                    "explanation": call["explanation"] or getattr(response, "explanation", ""),
+                    "done": False,
+                }
         # LLMResponse now carries a done field populated by the backend from the parsed JSON.
         if hasattr(response, "command") and hasattr(response, "explanation"):
             return {

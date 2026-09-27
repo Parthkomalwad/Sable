@@ -5,6 +5,15 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Fixed
+- **Phase 3.5 gate run: all five lines passed at least once, and three bugs the unit suite missed.** `scripts/gate_phase3_5.py` drives the real REPL against a live model; every run is recorded in `docs/history/phase-3.5-gate-2026-09-28.md`, including the recovery line that the final run did not reproduce.
+- **A tool named as the action became a silent "the model declined this goal".** Models send `{"action": "fs.read", "path": ...}` rather than `{"action": "tool", "name": ..., "args": ...}`. `registry.normalize_action` accepts both on the orchestrator and the worker, and an action that is neither ours nor a tool is now reported by name instead of becoming `done`.
+- **The model did not know when to use tools.** Asked about a CVE, it proposed `docker-compose down` to "inspect the nginx version safely". Both prompts now say when to use web, file and docs tools, and the orchestrator's says never to stop or remove things in order to inspect them. After the change the model reached for `web.search`, `web.fetch` and `fs.patch` on its own.
+- **`"verify": "exit: 0"` ran as a shell command** and could never pass, so a successful `fs.read` was retried away. String spellings of the structured checks (`exit: N`, `exit == N`, `stdout_contains: x`, `file_exists: path`) now mean the check. 17 tests.
+
+### Changed
+- `docs/THREAT_MODEL.md` covers the tools: the registry gate, SSRF, file confinement, `docs.help`, budgets and credential files as mitigations, and three new limits (an untainted sub-agent can put data in a URL, `verify` proves only what it checks, web content can still mislead what a model says). `docs/contracts.md` §9.1 lists every tool with its tier and taint. `ROADMAP.md` ticks agent tools: **v0.7 is complete**.
+
+### Fixed
 - **The daily budget undercounted every day east of UTC.** Token events are stored with UTC timestamps, but "today" was matched with the local date, so in IST the daily spend read zero from local midnight until 05:30 and spend in that window was counted on the wrong day. Spend is now counted from local midnight, converted to UTC. Found when a cost test started failing just after midnight.
 
 ### Added
