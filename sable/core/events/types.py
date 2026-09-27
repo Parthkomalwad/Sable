@@ -58,6 +58,7 @@ class EventKind:
     COMMAND = "command"          # a command was executed
     GUIDANCE = "guidance"        # a human steered the agent (Ctrl+G)
     SKILL_USED = "skill_used"    # a skill was injected, payload carries confidence
+    TOOL = "tool"                # a tool call ran: name, args, ok, duration, size (J1)
 
     #: Kinds that mean the agent will publish nothing further.
     TERMINAL = frozenset({COMPLETED, FAILED, LOST})

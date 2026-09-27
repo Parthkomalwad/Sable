@@ -26,7 +26,7 @@ from sable.policy import hooks, taint
 #: The actions this role may emit. `wait` and `ask` are specified in
 #: docs/contracts.md and not yet implemented; `mcp` is reserved for Phase 6.
 #: Anything outside this set stops the loop rather than being guessed at.
-ORCHESTRATOR_ACTIONS = frozenset({"run", "spawn", "done"})
+ORCHESTRATOR_ACTIONS = frozenset({"run", "spawn", "done", "tool"})
 
 # Loaded from sable/data/spinner_verbs.txt (Phase 0.5 step 4): 187 lines of
 # list literal in the middle of this module made it harder to read for no
@@ -80,6 +80,13 @@ class _Spinner:
 # Editable markdown at sable/llm/prompts/orchestrator.md, so tuning the
 # orchestrator's instructions is not a code change.
 _SYSTEM_PROMPT = prompts.load("orchestrator")
+
+
+def _system_prompt() -> str:
+    """The orchestrator prompt plus the tools it may call (J1)."""
+    from sable.tools import registry
+
+    return _SYSTEM_PROMPT + "\n\n" + registry.describe("orchestrator")
 
 
 def _make_slug(goal: str) -> str:
@@ -247,6 +254,8 @@ class OrchestratorAgent:
                     self._handle_run(action)
                 elif action_type == "spawn":
                     self._handle_spawn(action)
+                elif action_type == "tool":
+                    self._handle_tool(action)
                 elif action_type == "done":
                     self._handle_done(action)
                     break
@@ -333,6 +342,59 @@ class OrchestratorAgent:
                 "explanation": f"Command '{confirmed_cmd}' timed out handing off full goal to sub-agent",
             })
             raise _TimeoutDelegated()
+
+    def _handle_tool(self, action: dict) -> None:
+        """One tool call (J1): preview, registry, then the result to the model.
+
+        Previewed like a command, because the threat model promises nothing a
+        model proposes runs unseen. Policy, audit and the event happen inside
+        `registry.call`, so this path cannot skip them.
+        """
+        from sable.tools import registry
+        from sable.tools.base import ToolContext
+
+        name = str(action.get("name", "")).strip()
+        args = action.get("args", {})
+        explanation = action.get("explanation", "")
+        call_text = registry.as_command(name, args)
+        if not self._confirm_tool(name, args, explanation):
+            self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})
+            return
+
+        result = registry.call(name, args, ToolContext(
+            role="orchestrator", cwd=self._cwd, agent="orchestrator", goal=self._goal,
+            model=self._config.model_for("orchestrator"), tainted=self._tainted,
+        ), publish=lambda kind, payload: self._bus.publish("orchestrator", kind, payload))
+        if result.output.strip():
+            sys.stdout.write(f'\n{result.output.rstrip()}\n\n')
+            sys.stdout.flush()
+        if result.taints:
+            self._tainted = True
+        # A tool call is work done: without this, a goal finished by a tool
+        # was reported as "the model declined this goal" (live J1 smoke run).
+        self._commands_run += 1
+        # The step record carries an exit marker so grading and the breaker
+        # read a failed tool call as a failure, like a failed command.
+        self._record_step(call_text, result.output if result.ok else f"{result.output}\n[exit 1]")
+        self._history.append({"role": "assistant", "content": json.dumps(action)})
+        self._history.append({"role": "user", "content": taint.wrap_untrusted(result.output)})
+
+    def _confirm_tool(self, name: str, args, explanation: str) -> bool:
+        """Show a tool call and ask ↵ run / q cancel. No edit: args are JSON."""
+        DIM, BRIGHT, RESET = '\033[2;37m', '\033[1;37m', '\033[0m'
+        sys.stdout.write(f'\n  ⚙ {explanation}\n\n')
+        sys.stdout.write(f'  {BRIGHT}{name}{RESET} {DIM}{json.dumps(args)}{RESET}\n\n')
+        sys.stdout.write(f'  {DIM}↵ run   q cancel  ›{RESET}\n')
+        sys.stdout.flush()
+        try:
+            answer = input('').strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return False
+        if answer == 'q':
+            sys.stdout.write(f'  {DIM}cancelled{RESET}\n')
+            sys.stdout.flush()
+            return False
+        return True
 
     def _handle_spawn(self, action: dict) -> None:
         name = action.get("name", "").strip().replace(" ", "-")
@@ -714,7 +776,7 @@ class OrchestratorAgent:
             agent="orchestrator",
             role="orchestrator",
             turn=turn,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=_system_prompt(),
             messages=messages,
             response=raw,
             model=model,
@@ -788,7 +850,7 @@ class OrchestratorAgent:
     def _call_llm(self, messages: list[dict]):
         from sable.llm.registry import build_backend
         backend = build_backend(self._config, role="orchestrator")
-        return runtime.call_llm(backend, messages, _SYSTEM_PROMPT)
+        return runtime.call_llm(backend, messages, _system_prompt())
 
     def _extract_raw(self, response) -> str:
         """Reconstruct orchestrator action JSON from LLMResponse."""
@@ -797,6 +859,11 @@ class OrchestratorAgent:
         explanation = getattr(response, "explanation", "") or ""
         done = getattr(response, "done", False)
         spawn = getattr(response, "spawn", None)
+
+        # A tool call (J1) is not in the typed fields; `raw` has all of it.
+        if action == "tool":
+            return getattr(response, "raw", "") or json.dumps(
+                {"action": "done", "explanation": "tool action with no body"})
 
         # If the backend captured the action field directly, use it
         if action in ("run", "spawn", "done"):

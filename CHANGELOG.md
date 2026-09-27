@@ -5,6 +5,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 3.5 (J1): agents can call tools.** A new JSON action, `{"action": "tool", "name": ..., "args": {...}}`, works on every backend: the contract grows by one action and its shape is unchanged. Tools live in a new `sable/tools/` package, one layer between `policy` and `agents`, and `test_layering.py` enforces the new line. `registry.call()` checks the tool exists, the role may use it and the args fit its schema, then runs it through `gate()` with the tool's own tier as a floor policy can raise and never lower, so every call is tiered, hooked and audited like a command. Failures come back to the model as text, never a crash. The orchestrator previews every call; a worker is never prompted. Each call publishes a `tool` bus event. `/tools` lists what each role may call and at which tier. Only `echo` ships in this PR, so the whole path is testable before the real tools in Tasks 2 to 5. A live smoke run with `gpt-4o-mini` called `echo` end to end, and found that a goal finished by a tool was reported as "declined", now fixed. 20 tests.
+
+### Added
 - **Phase 3.5 plan** (`docs/plans/2026-09-27-phase-3.5-agent-tools.md`): a tool registry reached through a new JSON `tool` action on every backend, DuckDuckGo search with no key, stdlib-only HTML parsing, and every tool call going through `gate()`, taint and the audit ledger. Task 1 (the registry) goes first; Tasks 2 to 6 then run in parallel; Task 7 runs the gate against a live model.
 
 ### Changed
