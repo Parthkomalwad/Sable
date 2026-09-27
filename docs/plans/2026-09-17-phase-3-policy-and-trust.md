@@ -159,21 +159,21 @@ position, to be written down rather than papered over:
 **Files:** Create `sable/policy/tiers.py`; modify `sable/policy/rules.py`,
 `sable/policy/defaults/policy.toml`, `docs/structure.md`, `ROADMAP.md`
 
-- [ ] **Step 1: failing tests.** A rule with `tier = "deny"` parses and keeps its
+- [x] **Step 1: failing tests.** A rule with `tier = "deny"` parses and keeps its
       tier. A rule with no `tier` defaults to `confirm`, not `allow`: an
       unreadable or forgotten field must fail safe. An unknown tier string is a
       `PolicyError` naming the rule, the same way an invalid regex is today. Rule
       order is still the contract and first match still wins.
-- [ ] **Step 2: run, confirm they fail** (no `tier` field is parsed).
-- [ ] **Step 3: implement.** `Tier` as a `str` enum so it survives a SQLite
+- [x] **Step 2: run, confirm they fail** (no `tier` field is parsed).
+- [x] **Step 3: implement.** `Tier` as a `str` enum so it survives a SQLite
       round trip and a JSON payload without a converter. `Decision` carries
       `tier`, `rule`, `why` and `source` (which file the rule came from) so a
       confirm block and `/policy explain` read the same object. Give each of the
       11 shipped patterns an explicit tier; none becomes `deny` yet, because that
       would change behaviour before the callers can express it.
-- [ ] **Step 4:** correct `structure.md` §3.1 and the `ROADMAP.md` line to
+- [x] **Step 4:** correct `structure.md` §3.1 and the `ROADMAP.md` line to
       `policy.toml`, with the one-line reason.
-- [ ] **Step 5:** `pytest tests/unit/ -q` green. Commit: `feat(policy): tiers as data, with the shipped rules given explicit tiers`
+- [x] **Step 5:** `pytest tests/unit/ -q` green. Commit: `feat(policy): tiers as data, with the shipped rules given explicit tiers`
 
 ## Task 2: `decide()` replaces `is_destructive` at all six call sites (F1)
 

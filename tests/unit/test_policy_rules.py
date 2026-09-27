@@ -9,11 +9,14 @@ that `engine.py`'s public lists are unchanged in content and order.
 """
 from __future__ import annotations
 
+import json
 import re
+import tomllib
 
 import pytest
 
 from sable.policy import rules
+from sable.policy.tiers import Decision, Tier
 from sable.policy.engine import DESTRUCTIVE_PATTERNS, SECRET_PATTERNS
 
 
@@ -192,3 +195,63 @@ class TestLoaderRefusesBadInput:
         monkeypatch.setattr(rules, "POLICY_PATH", bad)
         with pytest.raises(rules.PolicyError, match="no 'why'"):
             rules.load()
+
+
+class TestTiers:
+    """Phase 3 Task 1: a rule carries a tier, not just a match.
+
+    A boolean cannot say "refuse outright", which is what F1 exists to add.
+    The tier is parsed here; `decide()` in Task 2 is what acts on it.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        rules.load.cache_clear()
+        yield
+        rules.load.cache_clear()
+
+    def _load(self, monkeypatch, tmp_path, destructive: str):
+        path = tmp_path / "policy.toml"
+        path.write_text(
+            destructive + "[[secret]]\nname = 's'\npattern = 'p'\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(rules, "POLICY_PATH", path)
+        return rules.destructive_rules()
+
+    def test_explicit_tier_is_kept(self, monkeypatch, tmp_path):
+        (rule,) = self._load(monkeypatch, tmp_path,
+            "[[destructive]]\nname = 'x'\npattern = 'a'\nwhy = 'w'\ntier = 'deny'\n")
+        assert rule.tier is Tier.DENY
+
+    def test_missing_tier_fails_safe_to_confirm(self, monkeypatch, tmp_path):
+        """A forgotten field must not quietly become `allow`."""
+        (rule,) = self._load(monkeypatch, tmp_path,
+            "[[destructive]]\nname = 'x'\npattern = 'a'\nwhy = 'w'\n")
+        assert rule.tier is Tier.CONFIRM
+
+    def test_unknown_tier_raises_naming_the_rule(self, monkeypatch, tmp_path):
+        with pytest.raises(rules.PolicyError, match=r"\(x\).*tier"):
+            self._load(monkeypatch, tmp_path,
+                "[[destructive]]\nname = 'x'\npattern = 'a'\nwhy = 'w'\ntier = 'maybe'\n")
+
+    def test_first_match_still_wins(self, monkeypatch, tmp_path):
+        self._load(monkeypatch, tmp_path,
+            "[[destructive]]\nname = 'first'\npattern = 'rm'\nwhy = 'w'\ntier = 'confirm'\n"
+            "[[destructive]]\nname = 'second'\npattern = 'rm'\nwhy = 'w'\ntier = 'deny'\n")
+        assert rules.match_destructive("rm x").name == "first"
+
+    def test_tier_is_a_plain_string_for_sqlite_and_json(self):
+        assert Tier.DENY == "deny"
+        assert json.dumps({"t": Tier.DENY}) == '{"t": "deny"}'
+
+    def test_every_shipped_rule_has_an_explicit_confirm_tier(self):
+        """None is `deny` yet: callers cannot express it until Task 2."""
+        raw = tomllib.loads(rules.POLICY_PATH.read_text(encoding="utf-8"))
+        for entry in raw["destructive"]:
+            assert entry.get("tier") == "confirm", entry["name"]
+
+    def test_decision_carries_rule_why_and_source(self):
+        rule = rules.match_destructive("rm -rf /tmp/x")
+        d = Decision(tier=rule.tier, rule=rule, why=rule.why, source=str(rules.POLICY_PATH))
+        assert d.tier is Tier.CONFIRM and d.rule.name == "recursive-delete"
