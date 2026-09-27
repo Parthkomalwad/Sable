@@ -283,16 +283,16 @@ position, to be written down rather than papered over:
 **Files:** Create `sable/policy/breaker.py`; modify `sable/app/budget.py`,
 `sable/agents/orchestrator.py`, `sable/core/db.py`
 
-- [ ] **Step 1: failing tests.** `per_job = {tokens, usd, turns, wall_s}`. A goal
+- [x] **Step 1: failing tests.** `per_job = {tokens, usd, turns, wall_s}`. A goal
       exceeding any one of them stops **before the next turn**, never mid-command.
       Tripping writes a queue item and publishes a bus event. `consecutive_failures`
       trips independently. `/breaker reset` clears it. An exhausted budget is a
       block with a reason, not a silent stop.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** `app/budget.py` is session-scoped and stays; this is
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** `app/budget.py` is session-scoped and stays; this is
       per-job and sits beside it rather than inside it, because a daemon job in
       Phase 5 has a budget and no session.
-- [ ] **Step 4:** green. Commit: `feat(policy): a per-job circuit breaker that stops between turns, not mid-command`
+- [x] **Step 4:** green. Commit: `feat(policy): a per-job circuit breaker that stops between turns, not mid-command`
 
 ## Task 7: Blast radius and the confirm block (F3)
 
