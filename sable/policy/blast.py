@@ -13,6 +13,7 @@ round trip to every command.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shlex
 from enum import Enum
@@ -59,7 +60,10 @@ _WRITERS = frozenset(
     "tar zip unzip gzip gunzip apt apt-get dnf yum pip pip3 npm kill pkill "
     "killall systemctl service useradd userdel crontab docker git make".split()
 )
-_SEGMENTS = re.compile(r"\|\|?|&&|;")
+# `\;` is find's -exec terminator, not a command separator; splitting on it
+# left a dangling backslash that shlex rejected, so the most common form of
+# `find -exec rm {} \;` came out "unknown". Found by the Phase 3 gate run.
+_SEGMENTS = re.compile(r"\|\|?|&&|(?<!\\);")
 # `>` or `>>` to anything but /dev/null or another descriptor.
 _REDIRECT = re.compile(r"(?<![0-9&])>>?(?!&)\s*(?!/dev/null)\S")
 
@@ -85,6 +89,8 @@ def _static(command: str) -> Level:
     if _REDIRECT.search(command):
         return Level.WRITES
     levels = [_segment(s) for s in _SEGMENTS.split(command) if s.strip()]
+    if Level.DESTRUCTIVE in levels:
+        return Level.DESTRUCTIVE
     if Level.WRITES in levels:
         return Level.WRITES
     # `$(...)` or backticks run a command the segment split cannot see.
@@ -103,6 +109,16 @@ def _segment(segment: str) -> Level:
     if not words:
         return Level.UNKNOWN
     prog, args = words[0], words[1:]
+    # Deleting has no undo, so it is red even without a policy rule: `rm file`,
+    # `find -delete`, `find -exec rm`. The gate run showed "delete old logs"
+    # coming out amber as `find ... -exec rm -f {} +`, which undersold it.
+    if prog in ("rm", "shred", "unlink"):
+        return Level.DESTRUCTIVE
+    if prog == "find" and ("-delete" in args or any(
+            a in ("-exec", "-execdir", "-ok", "-okdir") and i + 1 < len(args)
+            and os.path.basename(args[i + 1]) in ("rm", "shred", "unlink")
+            for i, a in enumerate(args))):
+        return Level.DESTRUCTIVE
     if prog == "git":
         return Level.READ_ONLY if args and args[0] in _GIT_READ_ONLY else Level.WRITES
     if prog == "find" and _FIND_WRITES & set(args):

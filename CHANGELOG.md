@@ -4,6 +4,14 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Fixed
+- **Phase 3 gate run: eight of nine lines pass, one untested, and five bugs the unit suite missed.** `scripts/gate_phase3.py` drives the real REPL on a pty in the playground against a live model and writes the transcript for every gate line; this run is in `docs/history/phase-3-gate-2026-09-27.md`.
+- **`/secret add` crashed the login shell** on any host with no D-Bus session. `secretstorage` raises its own `SecretStorageException` family, which none of `keyring.py`'s handlers caught, so the exception escaped `main()`. Every keyring call now catches it, including `get_api_key`.
+- **The orchestrator's "Running" spinner overwrote the `type YES` prompt.** It started before `gate()`, which is where the prompt has lived since Phase 3 Task 2. It now starts after.
+- **Delegating laundered taint.** A tainted orchestrator's handoff carries its recent history, hostile output included, and every sub-agent started clean. A spawned sub-agent now starts tainted.
+- **Deleting files showed amber.** `rm`, `shred`, `unlink`, `find -delete` and `find -exec rm` are red.
+- **`find ... -exec rm {} \;` showed unknown.** The segment split broke on the escaped `;` and left a backslash `shlex` rejected.
+
 ### Added
 - **Phase 3 (I1): `docs/THREAT_MODEL.md`.** What Sable protects, the four kinds of attacker it defends against, the five trust boundaries, a mitigations table pointing at each Phase 3 module, and ten stated limits: the orchestrator is not sandboxed, an unmatched command is `allow`, the `strip_secrets` hole, exact-value secret redaction, word-level taint detection, advisory framing, the eval proving only its corpus, a ledger that is not tamper-evident, typed lines not resolving `$SECRET:`, and blast radius being a heuristic. `SECURITY.md` points to it. `docs/contracts.md` §7 now describes `decide()` and `gate()` as the single decision path, and §7.9 marks F2, F5 and `/policy explain` as not implemented.
 
