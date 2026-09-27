@@ -237,14 +237,15 @@ class TestSafety:
         destructive resolved command is still recognised as destructive by
         the same policy check the bash path uses.
         """
-        from sable.policy.engine import is_destructive
+        from sable.policy.engine import decide
+        from sable.policy.tiers import Tier
         from sable.skills.aliases import add_alias, match_alias
 
         database, _ = db
         add_alias(database, "nuke the volumes", "rm -rf /var/lib/data")
 
         hit = match_alias(database, "nuke the volumes")
-        assert is_destructive(hit["command"]) is True
+        assert decide(hit["command"]).tier is not Tier.ALLOW
 
 
 class TestBuiltin:
