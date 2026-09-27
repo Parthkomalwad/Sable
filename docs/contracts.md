@@ -827,3 +827,25 @@ prompted, so the two `confirm` tools are refused for it by `gate()`.
   cut at 100 KB; `fs.search` stops at 200 results, `fs.tree` at 500 entries.
   `.git`, `node_modules`, `__pycache__` and `.venv` are skipped by search and
   not descended by tree.
+
+### 9.4 docs tools
+
+`sable/tools/docs.py` (J7). All four are tier `allow` and `taints=False` (local
+documentation, plan section 0.3), with one exception: a `docs.pkg` answer from
+`npm view` is registry metadata anyone can author, so it has `taints=True`
+(`apt-cache` and `pip show` are local and stay untainted). All cap output at 16,000 characters with a
+`[truncated: N more chars]` marker. They run argv lists through
+`subprocess.run` with a 5 second timeout, never a shell and never a pty.
+
+| Tool | Args | Runs |
+|------|------|------|
+| `docs.man` | `cmd`, `section?` | `man -P cat [section] cmd`, `MANWIDTH=80`, backspace overstrike stripped |
+| `docs.help` | `cmd` | `<path> --help` only (never `-h`: `shutdown -h` halts); inside `bwrap` (read-only root, tmpfs `/tmp`, `/run` and `/var/run`, `--clearenv` with minimal PATH/HOME/LANG, `--unshare-net`, `--unshare-pid`) when available. Without bwrap it is refused for workers and runs unsandboxed only for the orchestrator, whose calls are previewed |
+| `docs.tldr` | `cmd` | `tldr cmd` |
+| `docs.pkg` | `name` | first success of `apt-cache show`, `pip show`, `npm view --json` |
+
+Names must match `^[A-Za-z0-9][A-Za-z0-9._+-]*$`: no paths, spaces, shell
+metacharacters or leading `-` or `.`. `docs.help` also refuses a program not on
+PATH. A bad name, a missing binary (including `tldr` not installed), a timeout
+or an empty lookup returns `ok=False` with a message for the model, never an
+exception.
