@@ -166,6 +166,37 @@ class TestOrchestrator:
         assert spawned == ["echo hi"]          # the verify never reached a shell
         assert "blocked" in orch._steps[-1]["output"] and orch._run_failed()
 
+    def test_failure_block_is_printed(self, orch, monkeypatch, capsys):
+        monkeypatch.setattr(orch, "_run_command", lambda c, **k: "done")
+        _run(orch, "make", {"stdout_contains": "OK"})
+        out = capsys.readouterr().out
+        assert "↻ step failed: " in out and "(got: done)" in out
+        assert "next: retry 1 of 2" in out
+
+    def test_rungs_are_labelled(self, orch, monkeypatch, capsys):
+        monkeypatch.setattr(orch, "_run_command", lambda c, **k: "boom\n[exit 2]")
+        monkeypatch.setattr(orch, "_ask_user", lambda: "")
+        for i in range(4):
+            _run(orch, f"s{i}")
+        out = capsys.readouterr().out
+        assert "step failed: exit 2 (got: boom)" in out
+        for label in ("retry 1 of 2", "try an alternative", "asking you", "marked failed, moving on"):
+            assert f"next: {label}" in out
+
+    def test_next_action_is_labelled_and_published(self, orch, monkeypatch, capsys):
+        from sable.core.events.types import EventKind
+        monkeypatch.setattr(orch, "_run_command", lambda c, **k: "(no output; exit 1)")
+        published = []
+        monkeypatch.setattr(orch._bus, "publish", lambda *a: published.append(a))
+        _run(orch, "make")
+        orch._show_reflection("make needs a Makefile; create it first")
+        orch._show_reflection("not a reflection")       # only once per failure
+        out = capsys.readouterr().out
+        assert "↻ reflection: make needs a Makefile" in out and "not a reflection" not in out
+        (agent, kind, payload), = [p for p in published if p[1] == EventKind.REFLECTION]
+        assert payload["rung"] == "retry 1 of 2" and payload["check"] == "exit 1"
+        assert payload["reflection"].startswith("make needs") and "step" in payload and "got" in payload
+
     def test_verify_survives_extract_raw(self):
         from sable.agents.orchestrator import OrchestratorAgent
         raw = json.dumps({"action": "run", "command": "x", "explanation": "e", "verify": {"exit": 0}})
@@ -203,6 +234,20 @@ class TestWorker:
             assert [p["command"] for p in policy_queue.pending(conn)] == ["make"]
         finally:
             conn.close()
+
+    def test_block_printed_and_reflection_published(self, worker, monkeypatch, capsys):
+        from sable.core.events.types import EventKind
+        published = []
+        monkeypatch.setattr(worker, "_publish", lambda kind, **p: published.append((kind, p)), raising=False)
+        worker._step = 4
+        worker._climb_ladder('x\n{"verify": "failed", "check": "test -f a", "got": "(no output; exit 1)"}\n[exit 1]', "k")
+        worker._show_reflection("a was never written; write it")
+        out = capsys.readouterr().out
+        assert "↻ step failed: test -f a" in out and "next: retry 1 of 2" in out
+        assert "↻ reflection: a was never written" in out
+        assert published == [(EventKind.REFLECTION, {"step": 4, "rung": "retry 1 of 2", "check": "test -f a",
+                                                     "got": "(no output; exit 1)",
+                                                     "reflection": "a was never written; write it"})]
 
     def test_verify_command_is_gated(self, worker, monkeypatch):
         monkeypatch.setattr(engine, "gate", lambda cmd, **kw: kw["role"] == "worker" and False)

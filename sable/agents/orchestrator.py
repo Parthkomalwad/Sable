@@ -205,6 +205,8 @@ class OrchestratorAgent:
         # failures climb the retry ladder (runtime.LADDER).
         self._guard = runtime.RepeatGuard()
         self._failures = 0
+        self._turn = 0
+        self._pending_reflection: dict | None = None
 
     # ------------------------------------------------------------------
     # Public
@@ -255,6 +257,8 @@ class OrchestratorAgent:
             action = self._parse_action(raw)
 
             action_type = action.get("action", "")
+            self._turn = _turn
+            self._show_reflection(action.get("explanation", ""))
             steps_before = len(self._steps)
             try:
                 if action_type == "run":
@@ -430,6 +434,12 @@ class OrchestratorAgent:
         self._failures += 1
         if self._failures > len(runtime.LADDER):
             self._failures = 0
+        check, got = runtime.failure_of(output)
+        rung = runtime.rung_label(self._failures)
+        _out(runtime.failure_block(check, got, rung))
+        # Published with the model's reflection once its next action arrives.
+        self._pending_reflection = {"step": self._turn, "rung": rung, "check": check, "got": got}
+        if self._failures == 0:
             note = ("[step failed] This step failed after every retry and is marked "
                     "failed. Move on to the next step, or finish and say what did not work.")
         else:
@@ -438,9 +448,17 @@ class OrchestratorAgent:
                 guidance = self._ask_user()
                 if guidance:
                     note += f"\n[user guidance] {guidance}"
-        _out(f"  [reflect] {note.splitlines()[0][:120]}")
         # Appended to the result message, so roles still alternate.
         self._history[-1]["content"] += "\n\n" + note
+
+    def _show_reflection(self, explanation: str) -> None:
+        """J5: the first action after a failure carries the model's reflection.
+        Label it before the usual preview, and publish it on the bus."""
+        if self._pending_reflection is None:
+            return
+        payload, self._pending_reflection = self._pending_reflection, None
+        _out(f"  ↻ reflection: {explanation}")
+        self._bus.publish("orchestrator", EventKind.REFLECTION, {**payload, "reflection": explanation})
 
     def _ask_user(self) -> str:
         """The ladder's third rung: ask the human what to try. Empty means skip."""

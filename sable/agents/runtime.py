@@ -306,8 +306,10 @@ def failed_output(output: str) -> bool:
 
 
 def _local_url(url: str) -> bool:
-    # ponytail: localhost only until Task 2's URL policy (web.py) lands; then
-    # reuse its resolve-and-check helper here and drop this.
+    # Localhost only, deliberately: verify exists to check the user's own
+    # local services, and this keeps a model-chosen URL off the network and
+    # off metadata addresses. web.py's URL policy refuses localhost, so it is
+    # the wrong check to reuse here.
     from urllib.parse import urlsplit
 
     parts = urlsplit(url)
@@ -352,6 +354,30 @@ def run_verify(verify, *, output: str, cwd: str, run: Callable[[str], str]) -> d
             return fail(verify, str(exc))
         return None if got == status else fail(verify, got)
     return fail(verify, "unknown verify form")
+
+
+def failure_of(output: str) -> tuple[str, str]:
+    """(check, got) for a failed step, short enough for one terminal line."""
+    for line in reversed((output or "").splitlines()):
+        if line.startswith('{"verify": "failed"'):
+            try:
+                v = json.loads(line)
+            except json.JSONDecodeError:
+                break
+            check = v.get("check")
+            return (check if isinstance(check, str) else json.dumps(check)), str(v.get("got"))[-80:]
+    code = exit_code_of(output or "")
+    lines = [l for l in (output or "").splitlines() if l.strip() and not _EXIT_MARKER.search(l)]
+    return (f"exit {code}" if code is not None else "no exit status"), (lines[-1] if lines else "")[-80:]
+
+
+def rung_label(failures: int, ask: str = "asking you") -> str:
+    """What happens next, for the visible block. 0 means marked failed."""
+    return {1: "retry 1 of 2", 2: "try an alternative", 3: ask}.get(failures, "marked failed, moving on")
+
+
+def failure_block(check: str, got: str, next_: str) -> str:
+    return f"  ↻ step failed: {check} (got: {got})\n    next: {next_}"
 
 
 def reflection(failures: int, what: str) -> str:

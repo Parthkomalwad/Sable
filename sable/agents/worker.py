@@ -272,6 +272,8 @@ class TaskAgent:
         # failures climb the retry ladder (runtime.LADDER).
         self._guard = runtime.RepeatGuard()
         self._failures = 0
+        self._step = 0
+        self._pending_reflection: dict | None = None
 
     def _open_db(self):
         class _DB:
@@ -464,14 +466,30 @@ class TaskAgent:
         self._failures += 1
         if self._failures > len(runtime.LADDER):
             self._failures = 0
+        check, got = runtime.failure_of(output)
+        rung = runtime.rung_label(self._failures, ask="asking you (queued)")
+        print(runtime.failure_block(check, got, rung), flush=True)
+        # Published with the model's reflection once its next action arrives.
+        self._pending_reflection = {"step": getattr(self, "_step", 0), "rung": rung,
+                                    "check": check, "got": got}
+        if self._failures == 0:
             note = ("[step failed] This step failed after every retry and is marked "
                     "failed. Move on to the next step, or finish and say what did not work.")
         else:
             note = runtime.reflection(self._failures, output[-300:])
             if runtime.LADDER[self._failures - 1] == "ask":
                 note += f"\n[queued] {self._queue_for_user(key)}"
-        print(f"[agent] {note.splitlines()[0][:120]}", flush=True)
         return "\n\n" + note
+
+    def _show_reflection(self, explanation: str) -> None:
+        """J5: the first action after a failure carries the model's reflection.
+        Label it in the window, and publish it on the bus."""
+        pending = getattr(self, "_pending_reflection", None)
+        if pending is None:
+            return
+        self._pending_reflection = None
+        print(f"  ↻ reflection: {explanation}", flush=True)
+        self._publish(EventKind.REFLECTION, **pending, reflection=explanation)
 
     def _queue_for_user(self, key: str) -> str:
         """Nobody reads a worker's window, so the ladder's "ask" rung queues."""
@@ -623,6 +641,8 @@ class TaskAgent:
 
             parsed = self._parse_response(response)
             self._record_turn(_step, messages, parsed, response)
+            self._step = _step
+            self._show_reflection(parsed.get("explanation", ""))
             command = parsed.get("command", "")
 
             # J5: the third identical command or tool call is refused here, in
