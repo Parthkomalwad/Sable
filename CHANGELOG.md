@@ -7,6 +7,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ### Fixed
 - `scripts/build-assets.py --check` crashed in CI with `TypeError: Path.read_text() got an unexpected keyword argument 'newline'`. That argument is Python 3.13+, and the runner is older. The file is now read as bytes and decoded, which also keeps its line endings exactly as committed.
 
+### Added
+- **Phase 3 (F1): policy rules carry a tier.** Each rule in `policy.toml` now says `allow`, `confirm` or `deny`, and `sable/policy/tiers.py` adds the `Tier` enum and a `Decision` record (tier, rule, why, source) that a confirm block and `/policy explain` will both read. A rule with no tier is `confirm`, never `allow`, so a forgotten field fails safe; an unknown tier stops the shell with the rule named, like an invalid regex does. All 11 shipped rules are explicitly `confirm`: none becomes `deny` until Task 2 gives the callers a way to act on it. `docs/structure.md` now says `policy.toml` throughout. 7 tests.
+
 ### Changed
 - **The README now leads with the problem rather than the feature list.** The old opening described what Sable *is* in one dense sentence; a reader who did not already know the category had no way in. A "What it solves" section now names the actual loop it removes — leave the terminal, search, paste a command you have not fully read onto production — before any architecture. The safety claim is stated as the project's one-line promise ("the shell that asks first"), and the alpha warning moved next to the comparison table, where a reader is deciding whether to install rather than skimming the header.
 - The architecture table cited `main.py`, `loop.py`, `safety.py` and `tasks/orchestrator.py`, which are the pre-Phase-0.5 names. Every path in it is now the `sable/` one and was checked to exist; `policy.yaml` in the v0.7 roadmap line is `policy.toml`, matching CLAUDE.md's rule that these files are read with `tomllib`.
