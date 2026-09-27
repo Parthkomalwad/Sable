@@ -101,3 +101,25 @@ def test_builtin_reports_unavailable_keyring(no_keyring, capsys):
     from sable.app.builtins.secret import _handle_secret_builtin
     assert _handle_secret_builtin("list") is True
     assert "keyring unavailable" in capsys.readouterr().out
+
+
+def test_audit_ledger_holds_placeholder_never_value(fake_keyring, tmp_path, monkeypatch):
+    import sable.core.db as db
+    from sable.core import audit
+    from sable.policy.engine import gate
+
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "sessions.db")
+    command = "echo $SECRET:db_pass"
+    assert gate(command, role="orchestrator") is True   # the call sites' order:
+    secrets.resolve(command)                            # gate + audit, then resolve
+    (row,) = audit.query(db_path=tmp_path / "sessions.db")
+    assert "$SECRET:db_pass" in row["command"]
+    assert VALUE not in str(dict(row))
+
+
+def test_output_is_redacted_before_untrusted_wrapping(fake_keyring):
+    from sable.policy.taint import wrap_untrusted
+
+    _, _, reveal = secrets.resolve("echo $SECRET:db_pass")
+    wrapped = wrap_untrusted(secrets.redact(f"pw={VALUE}", reveal))
+    assert VALUE not in wrapped and "$SECRET:db_pass" in wrapped
