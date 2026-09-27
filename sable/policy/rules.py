@@ -19,14 +19,21 @@ contract rather than an accident.
 from __future__ import annotations
 
 import re
+import sys
 import tomllib
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from sable.core.paths import SABLE_HOME
 from sable.policy.tiers import Tier
 
 POLICY_PATH = Path(__file__).parent / "defaults" / "policy.toml"
+# Phase 3 Task 3. The admin file is a floor: a user rule may make a command
+# stricter than it and never looser. Both are optional; a missing file is no
+# rules, not an error.
+ADMIN_POLICY_PATH = Path("/etc/sable/policy.toml")
+USER_POLICY_PATH = SABLE_HOME / "policy.toml"
 
 
 class PolicyError(RuntimeError):
@@ -42,6 +49,7 @@ class Rule:
     category: str = ""
     why: str = ""
     tier: Tier = Tier.CONFIRM
+    source: str = ""   # the file this rule was read from
 
     @property
     def compiled(self) -> re.Pattern[str]:
@@ -54,15 +62,19 @@ def _compile(pattern: str) -> re.Pattern[str]:
     return re.compile(pattern)
 
 
-def _require(condition: bool, message: str) -> None:
+def _require(condition: bool, message: str, path: Path | None = None) -> None:
     if not condition:
-        raise PolicyError(f"{POLICY_PATH}: {message}")
+        raise PolicyError(f"{path or POLICY_PATH}: {message}")
 
 
-def _parse_rules(raw: dict, key: str, *, need_metadata: bool) -> tuple[Rule, ...]:
+def _parse_rules(
+    raw: dict, key: str, *, need_metadata: bool, path: Path | None = None, required: bool = True,
+) -> tuple[Rule, ...]:
+    path = path or POLICY_PATH
     entries = raw.get(key, [])
-    _require(isinstance(entries, list), f"[[{key}]] must be a list of tables")
-    _require(bool(entries), f"no [[{key}]] rules found; refusing to run unguarded")
+    _require(isinstance(entries, list), f"[[{key}]] must be a list of tables", path)
+    if required:
+        _require(bool(entries), f"no [[{key}]] rules found; refusing to run unguarded", path)
 
     rules: list[Rule] = []
     seen: set[str] = set()
@@ -70,21 +82,21 @@ def _parse_rules(raw: dict, key: str, *, need_metadata: bool) -> tuple[Rule, ...
         where = f"[[{key}]] #{index + 1}"
         name = entry.get("name", "")
         pattern = entry.get("pattern", "")
-        _require(bool(name), f"{where} has no name")
-        _require(bool(pattern), f"{where} ({name}) has no pattern")
-        _require(name not in seen, f"duplicate rule name {name!r}")
+        _require(bool(name), f"{where} has no name", path)
+        _require(bool(pattern), f"{where} ({name}) has no pattern", path)
+        _require(name not in seen, f"duplicate rule name {name!r}", path)
         seen.add(name)
 
         try:
             _compile(pattern)
         except re.error as exc:
-            raise PolicyError(f"{POLICY_PATH}: {where} ({name}) has an invalid regex: {exc}") from exc
+            raise PolicyError(f"{path}: {where} ({name}) has an invalid regex: {exc}") from exc
 
         if need_metadata:
             # Only enforced for destructive rules: their `why` is what the
             # user is shown when a command is held for confirmation, so a
             # blank one is a real gap rather than a style nit.
-            _require(bool(entry.get("why")), f"{where} ({name}) has no 'why'")
+            _require(bool(entry.get("why")), f"{where} ({name}) has no 'why'", path)
 
         # A missing tier is `confirm`, never `allow`: a forgotten field must
         # fail safe rather than quietly wave the command through.
@@ -92,7 +104,7 @@ def _parse_rules(raw: dict, key: str, *, need_metadata: bool) -> tuple[Rule, ...
             tier = Tier(entry.get("tier", Tier.CONFIRM))
         except ValueError as exc:
             raise PolicyError(
-                f"{POLICY_PATH}: {where} ({name}) has an unknown tier "
+                f"{path}: {where} ({name}) has an unknown tier "
                 f"{entry['tier']!r}; expected one of {[t.value for t in Tier]}"
             ) from exc
 
@@ -100,8 +112,11 @@ def _parse_rules(raw: dict, key: str, *, need_metadata: bool) -> tuple[Rule, ...
             name=name,
             pattern=pattern,
             category=entry.get("category", ""),
-            why=entry.get("why", ""),
+            # User and admin rules may omit `why`; the prompt still says
+            # which rule in which file fired, never a blank line.
+            why=entry.get("why") or f"{tier.value} by rule {name} in {path}",
             tier=tier,
+            source=str(path),
         ))
     return tuple(rules)
 
@@ -126,7 +141,29 @@ def load() -> tuple[tuple[Rule, ...], tuple[Rule, ...]]:
     return (
         _parse_rules(raw, "destructive", need_metadata=True),
         _parse_rules(raw, "secret", need_metadata=False),
+        _load_layer(ADMIN_POLICY_PATH, strict=True),
+        _load_layer(USER_POLICY_PATH, strict=False),
     )
+
+
+def _load_layer(path: Path, *, strict: bool) -> tuple[Rule, ...]:
+    """Optional `[[rule]]` entries from an admin or user file.
+
+    Missing is fine. Malformed is where the two differ: a broken admin file
+    raises, because a typo must not silently remove the floor users cannot
+    loosen. A broken user file only warns, because the shipped rules and the
+    floor still stand without it and the user can fix it from the shell.
+    """
+    try:
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
+        return _parse_rules(raw, "rule", need_metadata=False, path=path, required=False)
+    except FileNotFoundError:
+        return ()
+    except (tomllib.TOMLDecodeError, PolicyError, OSError) as exc:
+        if strict:
+            raise PolicyError(f"{path}: cannot be read ({exc}); refusing to run without the admin floor") from exc
+        sys.stderr.write(f"sable: ignoring {path}: {exc}\n")
+        return ()
 
 
 def destructive_rules() -> tuple[Rule, ...]:
@@ -135,6 +172,25 @@ def destructive_rules() -> tuple[Rule, ...]:
 
 def secret_rules() -> tuple[Rule, ...]:
     return load()[1]
+
+
+def _first(layer: tuple[Rule, ...], command: str) -> Rule | None:
+    return next((r for r in layer if r.compiled.search(command)), None)
+
+
+def match(command: str) -> Rule | None:
+    """The rule that decides this command, across all three files.
+
+    The floor is the admin file's first match, else the shipped defaults'.
+    A user rule replaces it only when it is strictly more severe, so a user
+    `allow` never beats a floor `confirm`, while a user `deny` beats anything.
+    """
+    defaults, _, admin, user = load()
+    floor = _first(admin, command) or _first(defaults, command)
+    mine = _first(user, command)
+    if mine and (floor is None or mine.tier.severity > floor.tier.severity):
+        return mine
+    return floor
 
 
 def match_destructive(command: str) -> Rule | None:

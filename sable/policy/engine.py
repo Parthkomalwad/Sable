@@ -15,7 +15,7 @@ import re
 import sys
 from collections import Counter
 
-from sable.policy import rules
+from sable.policy import privilege, rules
 from sable.policy.tiers import Decision, Tier
 
 # The rules themselves live in defaults/policy.toml (Phase 0.5 step 4), so a
@@ -63,10 +63,13 @@ def decide(command: str) -> Decision:
     worker's runs inside its sandbox. The rules are for what a preview or a
     sandbox would not stop a tired human from approving.
     """
-    rule = rules.match_destructive(command)
+    rule = rules.match(command)
+    sudo = privilege.sudo_rule(command)
+    if sudo and (rule is None or sudo.tier.severity > rule.tier.severity):
+        rule = sudo
     if rule is None:
         return Decision(tier=Tier.ALLOW, rule=None, why="", source="default")
-    return Decision(tier=rule.tier, rule=rule, why=rule.why, source=str(rules.POLICY_PATH))
+    return Decision(tier=rule.tier, rule=rule, why=rule.why, source=rule.source)
 
 
 def gate(command: str, *, role: str) -> bool:
