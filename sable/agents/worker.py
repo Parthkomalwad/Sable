@@ -475,15 +475,36 @@ class TaskAgent:
             command = parsed.get("command", "")
 
             if command:
+                from sable.policy import queue as policy_queue
                 from sable.policy.engine import decide, gate
-                if not gate(command, role="worker"):
-                    d = decide(command)
-                    logger.warning("Refused by policy (%s): %s", d.rule.name, command)
-                    self._memory.add_turns([
-                        {"role": "assistant", "content": f"[blocked] {command}"},
-                        {"role": "user", "content": f"That command was refused by policy rule {d.rule.name}: {d.why}. Try a safer approach."},
-                    ])
-                    continue
+                from sable.policy.tiers import Tier
+
+                conn = self._db_conn()
+                try:
+                    approved = policy_queue.take_approved(conn, self._name, command)
+                    if not gate(command, role="worker", approved=approved):
+                        d = decide(command)
+                        if d.tier is Tier.CONFIRM and not approved:
+                            # Nobody can type YES in this window: ask the user
+                            # through the queue instead of refusing outright.
+                            qid = policy_queue.enqueue(conn, self._name, command, d)
+                            print(f"[agent] waiting for approval: /approve {qid}", flush=True)
+                            reply = (f"That command needs the user's approval (rule {d.rule.name}: "
+                                     f"{d.why}). It is queued as #{qid}. Try another approach, or "
+                                     f"propose exactly the same command again once it is approved.")
+                        elif d.tier is Tier.DENY:
+                            reply = f"That command was refused by policy rule {d.rule.name}: {d.why}. Try a safer approach."
+                        else:
+                            # Policy allowed it, so a pre_command hook blocked it.
+                            reply = "That command was blocked by the user's pre_command hook. Try a different approach."
+                        logger.warning("Not run (%s): %s", d.tier.value, command)
+                        self._memory.add_turns([
+                            {"role": "assistant", "content": f"[blocked] {command}"},
+                            {"role": "user", "content": reply},
+                        ])
+                        continue
+                finally:
+                    conn.close()
 
             output = ""
             if command:

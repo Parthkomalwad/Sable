@@ -73,13 +73,16 @@ def decide(command: str) -> Decision:
     return Decision(tier=rule.tier, rule=rule, why=rule.why, source=rule.source)
 
 
-def gate(command: str, *, role: str) -> bool:
+def gate(command: str, *, role: str, approved: bool = False) -> bool:
     """Decide, then act on it. True means the command may run.
 
     `role` is "user" (a typed line), "orchestrator" (a model's command in the
     user's session) or "worker" (a sub-agent nobody is watching). A worker is
     never prompted: its tmux window has no reader, so a prompt there blocks
     forever. It runs `allow` and refuses everything else.
+
+    `approved` is a `/approve` from the queue: it stands in for the YES a
+    `confirm` would ask for, and never lifts a `deny`.
 
     The `pre_command` hook runs last, only for a command policy would run,
     so a hook can block and never unblock.
@@ -89,7 +92,7 @@ def gate(command: str, *, role: str) -> bool:
         if role != "worker":
             _warn(f"refused by policy: {d.rule.name}", command, d.why)
         return False
-    if d.tier is Tier.CONFIRM and (role == "worker" or not _confirm(command, d)):
+    if d.tier is Tier.CONFIRM and not approved and (role == "worker" or not _confirm(command, d)):
         return False
 
     result = hooks.run("pre_command", {
