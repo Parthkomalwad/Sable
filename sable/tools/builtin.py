@@ -17,3 +17,5 @@ register(Tool(
     tier=Tier.ALLOW,
     run=lambda args, ctx: ToolResult(ok=True, output=args["text"]),
 ))
+
+from sable.tools import web  # noqa: E402,F401  registers web.search and web.fetch
