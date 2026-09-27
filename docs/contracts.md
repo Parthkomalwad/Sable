@@ -443,6 +443,24 @@ acting on what was read cost a human's YES. `tests/evals/injection/` pins it:
 
 ---
 
+### 7.7 Audit ledger (Phase 3, F4)
+
+Every `gate()` decision writes one row to `audit_ledger` in `sessions.db`;
+§5's `audit.log` line is unchanged and still what the skill watcher parses.
+
+| column | meaning |
+|---|---|
+| `ts`, `uid` | UTC ISO time; `os.getuid()` (NULL where there is none) |
+| `agent`, `role`, `model` | who: agent name (defaults to role), `user`/`orchestrator`/`worker`, model id |
+| `goal`, `tier`, `rule`, `why` | why: the goal it served, and the policy decision |
+| `command`, `cwd` | what: `command` and `goal` pass through `strip_secrets` first |
+| `outcome` | `allowed`, `confirmed`, `approved`, `refused`, `unconfirmed`, `hook_blocked` |
+| `exit_code`, `duration_ms` | filled by `core.audit.finish()` after the command runs; agents record duration only, `exit_code` stays NULL |
+
+`/audit [--since 30m|1h|2d] [--agent NAME]` prints the rows as a table.
+`--export jsonl` writes them to `~/.sable/audit/audit-<stamp>.jsonl` and
+prints that path. A ledger write never raises.
+
 ## 8. Skills, corrections and aliases
 
 Phase 2 (B1, B2, B3, B5, K3, K4). Four contracts: the `SKILL.md` file, the

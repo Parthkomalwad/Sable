@@ -50,6 +50,7 @@ _HELP_TEXT = (
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
+    "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
     "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
@@ -321,6 +322,10 @@ def handle_builtin(
 
     if cmd == "/alias" or cmd.startswith("/alias "):
         return _handle_alias_builtin(cmd[len("/alias"):].strip(), db)
+
+    if cmd == "/audit" or cmd.startswith("/audit "):
+        from sable.app.builtins.audit import handle_audit
+        return handle_audit(cmd[len("/audit"):])
 
     if cmd == "/approve" or cmd.startswith("/approve "):
         return _handle_approve_builtin(cmd[len("/approve"):].strip(), db)

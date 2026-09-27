@@ -148,8 +148,10 @@ def _after_alias_use(db, alias_hit: dict) -> None:
 
 def _post_command(command: str, exit_code: int, cwd: str) -> None:
     """Run the user's post_command hook after a typed line. Never blocks."""
+    from sable.core import audit
     from sable.policy import hooks
 
+    audit.finish(exit_code)  # F4: stamp the row gate() wrote for this line
     hooks.show("post_command", hooks.run("post_command", {
         "command": command, "exit_code": exit_code, "role": "user", "cwd": cwd,
     }))

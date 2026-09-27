@@ -314,16 +314,16 @@ position, to be written down rather than papered over:
 
 **Files:** Modify `sable/core/{audit,db}.py`; create `sable/app/builtins/audit.py`
 
-- [ ] **Step 1: failing tests.** Every decision writes a row: uid, agent, model,
+- [x] **Step 1: failing tests.** Every decision writes a row: uid, agent, model,
       command, tier, rule, outcome, and the goal that led to it. `/audit --since`,
       `--agent` and `--export jsonl` each filter correctly. **`write_command`'s
       tab-separated format is unchanged** and `skills/watcher.py` still parses it;
       a test pins this, because changing that format silently breaks skill
       crystallisation.
-- [ ] **Step 2: run, confirm they fail.**
-- [ ] **Step 3: implement.** The extended ledger is a new table, not a widened
+- [x] **Step 2: run, confirm they fail.**
+- [x] **Step 3: implement.** The extended ledger is a new table, not a widened
       log line, so the watcher's format and the audit schema can evolve apart.
-- [ ] **Step 4:** green. Commit: `feat(policy): a provenance ledger with who, why, what and outcome`
+- [x] **Step 4:** green. Commit: `feat(policy): a provenance ledger with who, why, what and outcome`
 
 ## Task 9: The secret broker (F6)
 
