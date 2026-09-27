@@ -353,11 +353,11 @@ position, to be written down rather than papered over:
 **Files:** Create `docs/THREAT_MODEL.md`; modify `docs/contracts.md`,
 `CHANGELOG.md`, `README.md`
 
-- [ ] **Step 1:** Write `THREAT_MODEL.md`: assets, actors, trust boundaries, and
+- [x] **Step 1:** Write `THREAT_MODEL.md`: assets, actors, trust boundaries, and
       a mitigations table pointing at the tasks above. It must state §0.4's three
       honest limits, including the named `strip_secrets` hole, rather than
       claiming a guarantee the code does not make.
-- [ ] **Step 2:** `contracts.md` §7 rewritten for tiers, the three-file merge
+- [x] **Step 2:** `contracts.md` §7 rewritten for tiers, the three-file merge
       order and the floor rule, the hook contract (stdin JSON, exit 2, timeout),
       the `policy_queue` and extended audit DDL, and the taint bump. Mark F2 and
       F5 not implemented, the way §1.3 marks `wait`/`ask`.
