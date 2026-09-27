@@ -129,7 +129,15 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
                 _console.print(f"\n[{RED}]  plan aborted[/{RED}]")
                 return exit_code
             elif choice == "r":
+                # A retry is its own run: gate it again, which writes its own
+                # audit row, so the ledger records the retry's exit code
+                # instead of keeping only the failure it replaced.
+                if not gate(cmd, role="orchestrator"):
+                    _step_line(step_num, total, cmd + "  (retry)", "skip")
+                    sys.stdout.write("\n")
+                    continue
                 exit_code2, _ = _run_step(cmd, current_cwd)
+                audit.finish(exit_code2)
                 current_cwd = os.getcwd()
                 last_exit = exit_code2
                 state2 = "ok" if exit_code2 == 0 else "fail"

@@ -5,6 +5,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Fixed
+- **A retried plan step skipped policy and kept the wrong exit code in the audit ledger.** The `[r]etry` choice called the runner directly: no `gate()`, so a rule or hook added since the first attempt was not consulted, and no audit row, so `/audit` showed only the failed first attempt even when the retry succeeded. A retry is now gated and audited as its own run. 2 tests.
+
+### Fixed
 - **The daily budget undercounted every day east of UTC.** Token events are stored with UTC timestamps, but "today" was matched with the local date, so in IST the daily spend read zero from local midnight until 05:30 and spend in that window was counted on the wrong day. Spend is now counted from local midnight, converted to UTC. Found when a cost test started failing just after midnight.
 
 ### Added
