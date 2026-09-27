@@ -34,8 +34,14 @@ def _euid() -> int:
 
 
 def root_refusal() -> str | None:
-    """The message to show instead of starting as root, or None."""
-    if _euid() != 0:
+    """The message to show instead of starting as root, or None.
+
+    `SABLE_ALLOW_ROOT=1` opts out, for throwaway containers such as the
+    playground where root is the only user. It is not a security boundary:
+    root can do anything anyway. The check exists so nobody runs a model's
+    commands as root by accident.
+    """
+    if _euid() != 0 or os.environ.get("SABLE_ALLOW_ROOT") == "1":
         return None
     return ("sable: not starting the agent layer as root. A model's commands "
             "would run with full privileges. Continuing in plain bash; log in "

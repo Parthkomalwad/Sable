@@ -44,7 +44,13 @@ RUN ssh-keygen -A \
     && cat /root/.ssh/id_ed25519.pub >> /root/.ssh/authorized_keys \
     && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
     && printf 'Host localhost\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' > /root/.ssh/config \
-    && chsh -s /usr/local/bin/sable root
+    && chsh -s /usr/local/bin/sable root \
+    && echo 'SABLE_ALLOW_ROOT=1' >> /etc/environment
+
+# Root is the only user here, and Sable refuses to start its agents as root
+# (I4). This throwaway container opts out: ENV covers `docker run`, and
+# /etc/environment covers SSH logins, which start with a clean environment.
+ENV SABLE_ALLOW_ROOT=1
 
 # Config is written at container start by scripts/playground-entry.sh from env vars
 COPY docker/playground-entry.sh /usr/local/bin/playground-entry.sh
