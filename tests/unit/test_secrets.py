@@ -79,6 +79,7 @@ def test_refusal_is_what_the_model_reads(fake_keyring):
     from sable.agents import runtime
     out = runtime.run_command("echo $SECRET:nope", cwd=".")
     assert out.startswith("[blocked:") and "nope" in out
+    assert runtime.exit_code_of(out) is None
 
 
 @pytest.mark.skipif(importlib.util.find_spec("ptyprocess") is None, reason="pty is Unix-only")
