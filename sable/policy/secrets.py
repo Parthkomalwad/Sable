@@ -6,9 +6,9 @@ happens in the runner, after every one of them has already run.
 
 **How the value reaches the command.** Not spliced into the command string:
 that would put it in `ps`, in the temp script on disk and in bash's argv. Each
-placeholder is rewritten to a reference to `SABLE_SECRET_<NAME>` and the value
+placeholder is rewritten to a reference to `SABLE_SECRET_<name>` (case kept) and the value
 travels in the child's environment only. Outside double quotes the reference
-is emitted quoted (`"${SABLE_SECRET_DB_PASS}"`) so a value with spaces stays
+is emitted quoted (`"${SABLE_SECRET_db_pass}"`) so a value with spaces stays
 one word; inside double quotes it is emitted bare so the quoting is not
 broken. Inside single quotes it would never expand, so that is refused.
 
@@ -36,7 +36,9 @@ class SecretError(Exception):
 
 
 def env_name(name: str) -> str:
-    return "SABLE_SECRET_" + name.upper()
+    # Case kept: db_pass and DB_PASS are two keyring entries, so they must
+    # be two variables. Upper-casing made them share one and leak across.
+    return "SABLE_SECRET_" + name
 
 
 def _quote_state(command: str, end: int) -> str | None:

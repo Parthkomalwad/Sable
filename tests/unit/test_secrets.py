@@ -35,15 +35,15 @@ def test_no_placeholder_never_touches_keyring(no_keyring):
 
 def test_rewrites_to_env_reference_and_keeps_value_out_of_command(fake_keyring):
     cmd, env, reveal = secrets.resolve("psql -W $SECRET:db_pass")
-    assert cmd == 'psql -W "${SABLE_SECRET_DB_PASS}"'
+    assert cmd == 'psql -W "${SABLE_SECRET_db_pass}"'
     assert VALUE not in cmd
-    assert env == {"SABLE_SECRET_DB_PASS": VALUE}
+    assert env == {"SABLE_SECRET_db_pass": VALUE}
     assert reveal == {VALUE: "$SECRET:db_pass"}
 
 
 def test_inside_double_quotes_is_not_requoted(fake_keyring):
     cmd, _, _ = secrets.resolve('psql "postgres://u:$SECRET:db_pass@h/db"')
-    assert cmd == 'psql "postgres://u:${SABLE_SECRET_DB_PASS}@h/db"'
+    assert cmd == 'psql "postgres://u:${SABLE_SECRET_db_pass}@h/db"'
 
 
 def test_inside_single_quotes_refuses(fake_keyring):
@@ -57,9 +57,16 @@ def test_unknown_name_refuses_before_running(fake_keyring):
 
 
 def test_unavailable_keyring_refuses_not_falls_back(no_keyring, monkeypatch):
-    monkeypatch.setenv("SABLE_SECRET_DB_PASS", "from-env")
+    monkeypatch.setenv("SABLE_SECRET_db_pass", "from-env")
     with pytest.raises(secrets.SecretError, match="keyring unavailable"):
         secrets.resolve("echo $SECRET:db_pass")
+
+
+def test_names_differing_only_in_case_do_not_share_a_value(fake_keyring):
+    fake_keyring["secret:DB_PASS"] = "other"
+    cmd, env, _ = secrets.resolve("x $SECRET:db_pass $SECRET:DB_PASS")
+    assert env == {"SABLE_SECRET_db_pass": VALUE, "SABLE_SECRET_DB_PASS": "other"}
+    assert cmd == 'x "${SABLE_SECRET_db_pass}" "${SABLE_SECRET_DB_PASS}"'
 
 
 def test_redact_puts_placeholder_back(fake_keyring):
