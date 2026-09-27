@@ -452,7 +452,10 @@ The **floor** is the admin file's first match, else the defaults' first match.
 A user rule wins only when its tier is strictly more severe
 (`allow < confirm < deny`), so a user `allow` never loosens a floor
 `confirm`. `sudo` as a command word is always at least `confirm`, from
-`policy/privilege.py`, whatever any file says. `Decision.source` names the file
+`policy/privilege.py`, whatever any file says. So is any command or tool call that names a
+credential file (`~/.ssh` private keys, `~/.aws/credentials`, `~/.gnupg/`, `.netrc`,
+`.pgpass`, `.git-credentials`, docker and kube configs, Sable's own config,
+`/etc/shadow`, `/etc/sudoers`); public keys and `known_hosts` are not included. `Decision.source` names the file
 whose rule won, or `built-in` for `sudo`.
 
 ### 7.2 Hooks (Phase 3)

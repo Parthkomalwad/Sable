@@ -29,6 +29,30 @@ def sudo_rule(command: str) -> Rule | None:
     return SUDO_RULE if SUDO_RULE.compiled.search(command) else None
 
 
+# Credential files. Anything that names one, a `cat` or a `tool:fs.read`
+# alike, is at least `confirm`: a model that reads a private key has put it in
+# a prompt sent to a provider, which is the leak. A worker is never prompted,
+# so for it this is a refusal. Public keys (`id_*.pub`) and `known_hosts` are
+# not secrets and do not match.
+CREDENTIALS_RULE = Rule(
+    name="credential-file",
+    pattern=(
+        r"\.ssh/(id_[\w-]+(?![\w.-])|[\w-]*_key(?![\w.-])|authorized_keys)"
+        r"|\.aws/credentials|\.gnupg/|\.netrc\b|\.pgpass\b|\.git-credentials\b"
+        r"|\.docker/config\.json|\.kube/config\b|\.config/agentic-shell/config\.json"
+        r"|/etc/(g?shadow|sudoers)\b"
+    ),
+    category="credentials",
+    why="reads a credential file; whatever a model reads is sent to its provider",
+    tier=Tier.CONFIRM,
+    source="built-in",
+)
+
+
+def credentials_rule(command: str) -> Rule | None:
+    return CREDENTIALS_RULE if CREDENTIALS_RULE.compiled.search(command) else None
+
+
 def _euid() -> int:
     return os.geteuid() if hasattr(os, "geteuid") else -1
 

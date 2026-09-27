@@ -70,9 +70,10 @@ def decide(command: str, *, tainted: bool = False, floor: Tier | None = None) ->
     `tainted-context`, so every caller that prints `d.rule.name` still can.
     """
     rule = rules.match(command)
-    sudo = privilege.sudo_rule(command)
-    if sudo and (rule is None or sudo.tier.severity > rule.tier.severity):
-        rule = sudo
+    # Built-in floors no policy file can relax: sudo, and credential files.
+    for floor_rule in (privilege.sudo_rule(command), privilege.credentials_rule(command)):
+        if floor_rule and (rule is None or floor_rule.tier.severity > rule.tier.severity):
+            rule = floor_rule
     if rule is None:
         d = Decision(tier=Tier.ALLOW, rule=None, why="", source="default")
     else:
