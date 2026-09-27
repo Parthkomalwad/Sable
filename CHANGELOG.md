@@ -4,6 +4,13 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+- **Phase 3 (F1, I4): your own policy file, under an admin floor it cannot loosen.** `~/.sable/policy.toml` and `/etc/sable/policy.toml` take `[[rule]]` entries with `name`, `pattern`, `tier` and an optional `why`. A user rule wins only when it is stricter than the admin or shipped rule for the same command, so a user `allow` never loosens a shipped `confirm` and a user `deny` beats anything. `Tier` gains a `severity` ordering for that comparison, and the confirm prompt names the file whose rule fired.
+- A broken user file prints a warning and Sable carries on with the other rules. A broken admin file stops Sable from starting, because a typo must not silently remove the floor.
+- **`sudo` is always at least `confirm`**, from the new `sable/policy/privilege.py`, whatever any file says. Only `sudo` as a command word counts, so `man sudo` and `grep sudoers` are unaffected.
+- **Sable does not run its agents as root.** As uid 0 it prints why and hands the session to `bash -l`, so root is never locked out of a login shell.
+- `tests/unit/conftest.py` points both policy paths at empty files for every unit test, so a developer's own rules cannot change a result. `docs/contracts.md` §7.1 documents the layers. 15 tests.
+
 ### Changed
 - **CI's integration job runs in about half the time.** Five test files ran twice: once in their own named step, so a failure names what broke, and again in "Full integration suite". The full run now skips them, which was most of its 82 seconds. Both Docker images build through buildx with the GitHub Actions layer cache, so an unchanged Dockerfile reuses its apt and pip layers.
 
