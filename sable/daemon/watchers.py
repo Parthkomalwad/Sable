@@ -4,7 +4,7 @@ Each check is a pure function over injected readers. A watcher fires once per
 state change, not every tick: a full disk fires when it crosses the line and
 again only after it has dropped back under. Tiers: `notify` publishes
 `watch.fired`, `run` starts its approved plan through `jobs.run_plan` (so
-policy still gates each step), `approve` queues its steps to the inbox.
+policy still gates each step), `approve` opens a run that waits in the inbox before its first step.
 """
 from __future__ import annotations
 
@@ -17,8 +17,6 @@ import time
 from types import SimpleNamespace
 
 from sable.daemon import jobs, service
-from sable.policy import queue
-from sable.policy.engine import decide
 
 KINDS = ("disk", "file", "log", "http")
 TIERS = ("notify", "run", "approve")
@@ -182,8 +180,7 @@ def _fire(conn: sqlite3.Connection, w: dict, detail: str) -> None:
     if w["tier"] == "run":
         jobs.run_plan(conn, agent, w["steps"], cwd=os.path.expanduser("~"))
     elif w["tier"] == "approve":
-        for step in w["steps"]:
-            queue.enqueue(conn, agent, step, decide(step))
+        jobs.start_waiting(conn, agent, w["steps"], cwd=os.path.expanduser("~"))
 
 
 _checked: dict[int, float] = {}

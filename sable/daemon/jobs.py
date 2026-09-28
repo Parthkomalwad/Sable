@@ -63,7 +63,7 @@ def _set(conn, rid: int, **cols) -> None:
 
 
 def _continue(conn, rid: int, job: str, steps: list[str], start: int, cwd: str, run: Run,
-              output: str = "") -> str:
+              output: str = "", approved: int | None = None) -> str:
     _set(conn, rid, status="running")
     for i in range(start, len(steps)):
         step = steps[i]
@@ -71,7 +71,7 @@ def _continue(conn, rid: int, job: str, steps: list[str], start: int, cwd: str, 
         if d.tier is Tier.DENY:
             output += f"refused by policy: {step} ({d.why})\n"
             return _finish(conn, rid, job, "failed", i, output)
-        if d.tier is not Tier.ALLOW and not queue.take_approved(conn, _agent(job), step):
+        if d.tier is not Tier.ALLOW and i != approved and not queue.take_approved(conn, _agent(job), step):
             queue.enqueue(conn, _agent(job), step, d)
             _set(conn, rid, status="waiting", step=i, output=output)
             _publish("job.queued", {"job": job, "run": rid, "command": step})
@@ -104,6 +104,20 @@ def run_plan(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: str,
     return cur.lastrowid
 
 
+def start_waiting(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: str) -> int:
+    """A run that waits for a human before its first step, whatever its tier.
+    Approving it in /inbox lets the next tick run the plan, still under policy."""
+    ensure_table(conn)
+    cur = conn.execute(
+        "INSERT INTO job_runs (job, started_at, status, steps_json, cwd) VALUES (?, ?, 'waiting', ?, ?)",
+        (job, time.time(), json.dumps(steps), cwd),
+    )
+    conn.commit()
+    queue.enqueue(conn, _agent(job), steps[0], decide(steps[0]))
+    _publish("job.queued", {"job": job, "run": cur.lastrowid, "command": steps[0]})
+    return cur.lastrowid
+
+
 def resume_waiting(conn: sqlite3.Connection, *, cwd: str | None = None,
                    run: Run = runtime.run_command) -> None:
     """Resume each waiting run whose queued step has been approved (or rejected)."""
@@ -123,7 +137,10 @@ def resume_waiting(conn: sqlite3.Connection, *, cwd: str | None = None,
         if status[0] == "rejected":
             _finish(conn, rid, job, "failed", step, output + f"rejected: {steps[step]}\n")
             continue
-        _continue(conn, rid, job, steps, step, cwd or run_cwd, run, output)
+        # Consume the approval here, so it covers exactly this step once and
+        # never lingers for a later identical command.
+        queue.take_approved(conn, _agent(job), steps[step])
+        _continue(conn, rid, job, steps, step, cwd or run_cwd, run, output, approved=step)
 
 
 def mark_lost(conn: sqlite3.Connection) -> int:

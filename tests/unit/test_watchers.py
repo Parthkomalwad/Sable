@@ -87,11 +87,21 @@ class TestHandler:
         watchers.run_due(c, now=1031.0, readers=_r(**FULL))  # still over: no refire
         assert len(events) == 1
 
-    def test_approve_tier_queues_steps(self, conn):
+    def test_approve_tier_waits_then_runs_once_approved(self, conn, monkeypatch):
         c, _ = conn
-        wid = watchers.add(c, "disk", "/", "90", tier="approve", steps=["rm -rf /tmp/x"])
+        monkeypatch.setattr(watchers.jobs, "_audit", lambda cwd, cmd: None)
+        wid = watchers.add(c, "disk", "/", "90", tier="approve", steps=["df -h", "rm -rf /tmp/x"])
         watchers.run_due(c, now=1.0, readers=_r(**FULL))
-        assert [(p["agent"], p["command"]) for p in queue.pending(c)] == [(f"watch:{wid}", "rm -rf /tmp/x")]
+        assert [(p["agent"], p["command"]) for p in queue.pending(c)] == [(f"daemon:watch:{wid}", "df -h")]
+        ran = []
+        run = lambda cmd, cwd, **kw: ran.append(cmd) or "(no output; exit 0)"
+        watchers.jobs.resume_waiting(c, run=run)
+        assert ran == []                                   # still pending: nothing runs
+        queue.decide_request(c, queue.pending(c)[0]["id"], approve=True)
+        watchers.jobs.resume_waiting(c, run=run)
+        assert ran == ["df -h"]                            # the confirm-tier rm waits again
+        assert [p["command"] for p in queue.pending(c)] == ["rm -rf /tmp/x"]
+        assert c.execute("SELECT count(*) FROM policy_queue WHERE status = 'approved'").fetchone()[0] == 0
 
     def test_run_tier_goes_through_run_plan(self, conn, monkeypatch):
         c, _ = conn
