@@ -32,9 +32,21 @@ SERVER_NAME = re.compile(r"[A-Za-z0-9_-]+\Z")
 _DESC_CAP = 300
 _JSON_TYPES = {"string", "integer", "number", "boolean", "object", "array"}
 
-#: Task 2 plugs the shell's elicitation prompt in here; None fails an
-#: input_required call with "needs input; run it from the shell".
-ON_INPUT: Callable[[dict], dict] | None = None
+#: Tests override how a server's questions are answered, as
+#: `ON_INPUT(requests, server)`. None means the default below.
+ON_INPUT: Callable[[dict, str], dict] | None = None
+
+
+def _on_input(server: str, ctx: ToolContext):
+    """Who answers a server's questions: the user at an interactive shell,
+    else nobody, and the call fails with "needs input; run it from the shell"."""
+    if ON_INPUT is not None:
+        return lambda requests: ON_INPUT(requests, server)
+    import sys
+    if ctx.role != "orchestrator" or not sys.stdin.isatty():
+        return None
+    from sable.mcp import elicit
+    return lambda requests: elicit.ask(requests, server)
 
 _clients: dict[str, Client] = {}
 _failed: dict[str, str] = {}
@@ -144,10 +156,10 @@ def _schema(input_schema) -> dict[str, str]:
     return out
 
 
-def _runner(client: Client, mcp_name: str):
+def _runner(client: Client, mcp_name: str, server: str):
     def run(args: dict, ctx: ToolContext) -> ToolResult:
         try:
-            r = client.call_tool(mcp_name, args, on_input=ON_INPUT)
+            r = client.call_tool(mcp_name, args, on_input=_on_input(server, ctx))
         except (McpError, OSError) as exc:
             raise ToolError(str(exc)) from exc
         return ToolResult(ok=not r.is_error, output=r.text, taints=True)
@@ -163,7 +175,7 @@ def make_tools(server: str, client: Client, trusted) -> list[Tool]:
             description=_clean(t.get("description"), _DESC_CAP) or f"MCP tool from {server}",
             schema=_schema(t.get("inputSchema")),
             tier=Tier.ALLOW if key in trusted else Tier.CONFIRM,
-            run=_runner(client, str(t.get("name", ""))),
+            run=_runner(client, str(t.get("name", "")), server),
         ))
     return tools
 
