@@ -116,14 +116,18 @@ def test_builtin_offline_prints_one_line(capsys):
     assert capsys.readouterr().out.strip() == "mcp search: MCP Registry unreachable (offline?)"
 
 
-def test_builtin_table_and_add_fallback(capsys, monkeypatch):
+def test_builtin_table_and_add(capsys, monkeypatch):
+    from sable.app.builtins import mcp
     monkeypatch.setenv("COLUMNS", "300")
+    added = []
+    monkeypatch.setattr(mcp, "handle_mcp", lambda a: added.append(a) or True)
     hits = rs.search("x", limit=20, client=_ok())
     mcp_search.handle_mcp_search("slack", search=lambda q: hits)
     assert "remote-filesystem" in capsys.readouterr().out
-    mcp_search.handle_mcp_search("slack --add 2", search=lambda q: hits)
-    out = capsys.readouterr().out
-    assert "/mcp add slack uvx mcparmory-slack" in out
+    mcp_search.handle_mcp_search("slack --add 2", search=lambda q: hits, confirm=lambda: False)
+    assert "/mcp add slack uvx mcparmory-slack" in capsys.readouterr().out and added == []
+    mcp_search.handle_mcp_search("slack --add 2", search=lambda q: hits, confirm=lambda: True)
+    assert added == ["add slack uvx mcparmory-slack"]
 
 
 def test_dispatch_routes_search(monkeypatch):

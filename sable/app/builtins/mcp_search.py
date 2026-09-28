@@ -1,8 +1,8 @@
 """`/mcp search <query> [--add N]` over the MCP Registry (D3).
 
-`--add N` hands the chosen line to `/mcp add` when that builtin exists
-(`sable.app.builtins.mcp.handle_mcp`), after a confirm. Until it lands, the
-line is printed for the user to run.
+`--add N` hands the chosen line to `/mcp add`
+(`sable.app.builtins.mcp.handle_mcp`) after a confirm, unless it still has
+<placeholders> the user must fill in.
 """
 from __future__ import annotations
 
@@ -68,11 +68,8 @@ def handle_mcp_search(argument: str, search=registry_search.search, confirm=_con
     _out(f"  {hit.add_line}")
     if hit.needs:
         _out(f"  needs: {', '.join(hit.needs)}")
-    try:
-        from sable.app.builtins.mcp import handle_mcp
-    except ImportError:
-        _out("  /mcp add is not available yet: run the line above yourself")
-        return True
+    from sable.app.builtins.mcp import handle_mcp
+
     if "<" in hit.add_line:
         _out("  fill in the <placeholders> and run the line above yourself")
     elif confirm():

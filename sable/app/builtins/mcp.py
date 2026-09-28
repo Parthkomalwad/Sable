@@ -1,7 +1,7 @@
 """`/mcp add|list|remove|trust|untrust` (Phase 6, D1 D4).
 
-Servers live in config.json under `mcp` (see sable/mcp/servers.py). Other
-subcommands (Task 3's `search`) get the usage line until they are wired.
+Servers live in config.json under `mcp` (see sable/mcp/servers.py).
+`/mcp search` is routed to `mcp_search.py` before this handler.
 """
 from __future__ import annotations
 
