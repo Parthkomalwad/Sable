@@ -422,6 +422,10 @@ def handle_builtin(
     if cmd == "/dash":
         return _handle_dash_builtin()
 
+    if cmd == "/notify" or cmd.startswith("/notify "):
+        from sable.app.builtins.notify import _handle_notify_builtin
+        return _handle_notify_builtin(cmd[len("/notify"):])
+
     if cmd == "/breaker" or cmd.startswith("/breaker "):
         return _handle_breaker_builtin(cmd[len("/breaker"):].strip(), db)
 
