@@ -7,6 +7,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ### Added
 - **Reading a credential file always needs `YES`.** A model that reads a private key has sent it to its provider, which is the leak. Any command or tool call that names one (`~/.ssh` private keys and `authorized_keys`, `~/.aws/credentials`, `~/.gnupg/`, `.netrc`, `.pgpass`, `.git-credentials`, docker and kube configs, Sable's own config file, `/etc/shadow`, `/etc/sudoers`) is at least `confirm`, from a built-in floor in `policy/privilege.py` beside the `sudo` one, so no policy file can relax it and a sub-agent is refused. `cat` and `fs.read` are covered by the same rule. Public keys and `known_hosts` are not affected. 24 tests.
 
+### Changed
+- **Research no longer asks for `YES` on every page.** After a search the agent is tainted, and taint made each later `web.fetch` need `YES`. Two calls are now exempt from the taint bump, and only these: `web.search`, whose query goes to the search provider, and `web.fetch` of a URL this goal's search returned, exactly. A hostile page cannot choose an arbitrary URL, so the data-out path through a fetch stays closed: a URL the model made up or copied from a page, or a search result with anything appended, still needs `YES` (and a sub-agent is refused). Commands and writes are bumped as before. A live run with `gpt-4o-mini` answering "no" to every prompt searched, read a result and finished with no prompt at all. 6 tests.
+
 ### Fixed
 - **The daily budget undercounted every day east of UTC.** Token events are stored with UTC timestamps, but "today" was matched with the local date, so in IST the daily spend read zero from local midnight until 05:30 and spend in that window was counted on the wrong day. Spend is now counted from local midnight, converted to UTC. Found when a cost test started failing just after midnight.
 
