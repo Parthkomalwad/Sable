@@ -57,6 +57,7 @@ _HELP_TEXT = (
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
     "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
     "  /watch add|list|rm  Daemon watchers: disk, file, log, http\n"
+    "  /mcp search <query> [--add N]  Find MCP servers in the official registry\n"
     "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
@@ -396,6 +397,10 @@ def handle_builtin(
 
     if cmd == "/alias" or cmd.startswith("/alias "):
         return _handle_alias_builtin(cmd[len("/alias"):].strip(), db)
+
+    if cmd == "/mcp search" or cmd.startswith("/mcp search "):
+        from sable.app.builtins.mcp_search import handle_mcp_search
+        return handle_mcp_search(cmd[len("/mcp search"):])
 
     if cmd == "/audit" or cmd.startswith("/audit "):
         from sable.app.builtins.audit import handle_audit
