@@ -213,6 +213,9 @@ class OrchestratorAgent:
         # mark is what sent a user to `/why` to find out nothing had
         # happened.
         self._commands_run = 0
+        # Consecutive `q` answers. Two in a row end the goal: the model
+        # otherwise proposes the same command again (Phase 4 gate finding).
+        self._cancels = 0
 
         # Sub-agent progress arrives on the bus, not by polling status.md.
         # The cursor starts at the current head so this run only ever sees
@@ -306,6 +309,9 @@ class OrchestratorAgent:
                     break
             except _TimeoutDelegated:
                 break
+            if self._cancels >= 2:
+                _out("[orchestrator] cancelled twice in a row, stopping this goal. Rephrase it to try again.")
+                break
             new_steps = self._steps[steps_before:]
             self._breaker.record(
                 tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
@@ -336,11 +342,13 @@ class OrchestratorAgent:
 
         confirmed_cmd = self._confirm_command(command, explanation)
         if confirmed_cmd is None:
+            self._cancels += 1
             self._history.append({
                 "role": "user",
                 "content": f"[user cancelled command: {command}]",
             })
             return
+        self._cancels = 0
 
         t0 = time.monotonic()
         output = self._run_command(confirmed_cmd)
@@ -418,8 +426,10 @@ class OrchestratorAgent:
             seen_urls=self._seen_urls,
         )
         if not self._confirm_tool(name, args, explanation, ctx):
+            self._cancels += 1
             self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})
             return
+        self._cancels = 0
 
         result = registry.call(name, args, ctx, publish=lambda kind, payload: self._bus.publish("orchestrator", kind, payload))
         self._guard.ran(runtime.action_key(action))
