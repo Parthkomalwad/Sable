@@ -29,7 +29,7 @@ class AnthropicBackend(LLMBackend):
         self.api_key = api_key
         self.model = model
 
-    async def complete(self, messages: list[dict], system: str) -> LLMResponse:
+    async def complete(self, messages: list[dict], system: str, on_text=None) -> LLMResponse:
         """Send a completion request to Anthropic with SSE streaming.
 
         Always includes 'anthropic-version: 2023-06-01' header.
@@ -77,7 +77,10 @@ class AnthropicBackend(LLMBackend):
                             if event_type == "content_block_delta":
                                 delta = data.get("delta", {})
                                 if delta.get("type") == "text_delta":
-                                    full_text += delta.get("text", "")
+                                    text = delta.get("text", "")
+                                    full_text += text
+                                    if on_text and text:
+                                        on_text(text)
 
                             elif event_type == "message_delta":
                                 usage = data.get("usage", {})

@@ -5,6 +5,7 @@ JSON parse fallback chain lives here and is shared by all backends.
 """
 from __future__ import annotations
 import json as _json
+import re as _re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,12 +50,15 @@ class LLMBackend(ABC):
     """Abstract base class for LLM backends."""
 
     @abstractmethod
-    async def complete(self, messages: list[dict], system: str) -> LLMResponse:
+    async def complete(self, messages: list[dict], system: str, on_text=None) -> LLMResponse:
         """Send messages to the LLM and return a structured response.
 
         Args:
             messages: Conversation history as list of {role, content} dicts.
             system: System prompt string.
+            on_text: Optional callable given each chunk of text as it streams
+                in. Display only: the response is still parsed from the full
+                text. A backend that cannot stream never calls it.
 
         Returns:
             Parsed LLMResponse.
@@ -138,6 +142,56 @@ def parse_llm_json(raw: str) -> dict:
     if not isinstance(decoded, dict):
         raise ValueError(f"Cannot parse LLM JSON response: {cleaned[:200]}")
     return decoded
+
+
+_ESCAPES = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f",
+            "n": "\n", "r": "\r", "t": "\t"}
+_EXPLANATION_KEY = _re.compile(r'"explanation"\s*:\s*"')
+
+
+class ExplanationStream:
+    """Pulls the `explanation` string out of a JSON answer while it streams.
+
+    `feed(chunk)` returns the explanation decoded so far ("" until the field
+    starts). An escape split across chunks is held back until it completes.
+    Display only; the real parse is `parse_llm_json` on the full text.
+    """
+
+    def __init__(self) -> None:
+        self._buf = ""
+
+    def feed(self, chunk: str) -> str:
+        # ponytail: re-scans the whole buffer per chunk, O(n^2) on answers
+        # of a few hundred bytes; keep a cursor if answers get large.
+        self._buf += chunk
+        m = _EXPLANATION_KEY.search(self._buf)
+        if not m:
+            return ""
+        s, i, out = self._buf, m.end(), []
+        while i < len(s):
+            c = s[i]
+            if c == '"':
+                break
+            if c != "\\":
+                out.append(c)
+                i += 1
+                continue
+            if i + 1 >= len(s):
+                break
+            e = s[i + 1]
+            if e == "u":
+                hexpart = s[i + 2:i + 6]
+                if len(hexpart) < 4:
+                    break
+                try:
+                    out.append(chr(int(hexpart, 16)))
+                except ValueError:
+                    pass
+                i += 6
+            else:
+                out.append(_ESCAPES.get(e, e))
+                i += 2
+        return "".join(out)
 
 
 def _load_pricing() -> dict:

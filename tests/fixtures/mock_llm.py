@@ -16,6 +16,7 @@ run-then-done sequence, so an unscripted goal still terminates.
 """
 from __future__ import annotations
 
+import json
 import os
 
 from sable.llm.base import LLMBackend, LLMResponse
@@ -227,7 +228,7 @@ class MockLLMBackend(LLMBackend):
             else DEFAULT_WORKER_SCRIPT
         )
 
-    async def complete(self, messages: list[dict], system: str) -> LLMResponse:
+    async def complete(self, messages: list[dict], system: str, on_text=None) -> LLMResponse:
         """Return the next canned response.
 
         In single mode this is keyed by the last user message. In orchestrator
@@ -241,12 +242,12 @@ class MockLLMBackend(LLMBackend):
             step = max(self._step, _turns_taken(messages))
             response = script[min(step, len(script) - 1)]
             self._step = step + 1
-            return response
+            return _streamed(response, on_text)
 
         last_user = _last_user_message(messages)
         for key, response in CANNED_RESPONSES.items():
             if key in last_user:
-                return response
+                return _streamed(response, on_text)
 
         return LLMResponse(
             command="echo 'unknown input'",
@@ -257,6 +258,17 @@ class MockLLMBackend(LLMBackend):
             completion_tokens=20,
             cost_usd=0.0,
         )
+
+
+def _streamed(response: LLMResponse, on_text) -> LLMResponse:
+    """Feed on_text the response as JSON in a few chunks, like a real
+    streaming backend, so the G3 display path runs under SABLE_MOCK_LLM."""
+    if on_text:
+        text = json.dumps({"action": response.action, "explanation": response.explanation,
+                           "command": response.command})
+        for i in range(0, len(text), 16):
+            on_text(text[i:i + 16])
+    return response
 
 
 def mock_llm_enabled() -> bool:

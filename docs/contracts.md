@@ -56,6 +56,12 @@ agent has to report and carry on from, not an exception that ends the run. A
 response that parses to a non-object (a bare list, a string, a number) counts as
 unparseable, since every caller reads keys off the result.
 
+Streaming (G3) is display only. `complete(..., on_text=None)` and
+`call_llm(..., on_text=None)` hand each streamed chunk to `on_text`, and the
+orchestrator shows the `explanation` field as it grows (`llm/base.py:
+ExplanationStream`). The response is still parsed from the full text by the
+chain above; nothing streamed is ever acted on.
+
 ### 1.3 The agent action schema
 
 Agents extend the base schema with an `action` discriminator. One action per
