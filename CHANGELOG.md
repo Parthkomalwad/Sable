@@ -5,6 +5,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 4 plan** (`docs/plans/2026-09-28-phase-4-command-center.md`): blocks in normal scrollback with `/block N`, a Textual sidebar and a full-screen `/dash` with an approval queue, streaming reasoning, a `Ctrl+P` palette, themes, directory-aware ghost text and explain-last-error. It adds `textual` as a dependency, with the case for it written out; the shell itself never imports it.
+
+### Added
 - **Reading a credential file always needs `YES`.** A model that reads a private key has sent it to its provider, which is the leak. Any command or tool call that names one (`~/.ssh` private keys and `authorized_keys`, `~/.aws/credentials`, `~/.gnupg/`, `.netrc`, `.pgpass`, `.git-credentials`, docker and kube configs, Sable's own config file, `/etc/shadow`, `/etc/sudoers`) is at least `confirm`, from a built-in floor in `policy/privilege.py` beside the `sudo` one, so no policy file can relax it and a sub-agent is refused. `cat` and `fs.read` are covered by the same rule. Public keys and `known_hosts` are not affected. 24 tests.
 
 ### Changed
