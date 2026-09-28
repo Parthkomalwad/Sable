@@ -165,3 +165,10 @@ def test_http_timeout_is_mcperror():
     with pytest.raises(McpError) as e:
         _http(handler).call_tool("x")
     assert e.value.kind == "timeout"
+
+
+def test_a_stdio_server_does_not_inherit_secrets(monkeypatch):
+    from sable.mcp.transports import base_env
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-should-not-leak")
+    env = base_env({"FS_ROOT": "/app"})
+    assert "OPENAI_API_KEY" not in env and env["FS_ROOT"] == "/app" and "PATH" in env

@@ -16,6 +16,16 @@ import httpx
 from httpx_sse import SSEError, connect_sse
 
 TIMEOUT = 30.0
+# What a third-party server inherits from us. Everything else (API keys,
+# tokens, the user's whole environment) stays out unless configured per server.
+_PASS_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TERM", "TMPDIR", "SYSTEMROOT", "APPDATA")
+
+
+def base_env(extra: dict | None = None) -> dict:
+    import os
+    env = {k: os.environ[k] for k in _PASS_ENV if k in os.environ}
+    env.update(extra or {})
+    return env
 _STDERR_LINES = 200
 
 
@@ -38,6 +48,7 @@ class StdioTransport:
 
     def __init__(self, argv: list[str], env: dict | None = None, cwd: str | None = None,
                  timeout: float = TIMEOUT):
+        """`env` is added to a minimal base (`base_env`), never the full environment."""
         self.timeout = timeout
         self.protocol_version: str | None = None  # unused on stdio, set by the client
         self._stderr: collections.deque[str] = collections.deque(maxlen=_STDERR_LINES)
@@ -46,7 +57,7 @@ class StdioTransport:
         try:
             self._proc = subprocess.Popen(
                 argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=env, cwd=cwd,
+                stderr=subprocess.PIPE, env=base_env(env), cwd=cwd,
             )
         except OSError as e:
             raise McpError(f"could not start {argv[0]}: {e}", kind="dead") from e
