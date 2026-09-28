@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Fixed
+- **Ctrl+B never worked.** The key binding set a `global _bypass_next` in the prompt module while the REPL read its own `_bypass_next`, so Ctrl+B printed "[bash mode]" and the next line was routed as usual. With text already typed it also called `_record_router_correction`, which the prompt module never imported, and raised `NameError`. The binding now only records the request (`session.take_bypass()`), and the REPL takes it before routing and records the correction itself, since `ui` may not import `app`. Checked live on a pty: after Ctrl+B, "show me the files" ran in bash. Found while reviewing Phase 4 Task 5. 3 tests.
+
 ### Added
 - **Phase 4 plan** (`docs/plans/2026-09-28-phase-4-command-center.md`): blocks in normal scrollback with `/block N`, a Textual sidebar and a full-screen `/dash` with an approval queue, streaming reasoning, a `Ctrl+P` palette, themes, directory-aware ghost text and explain-last-error. It adds `textual` as a dependency, with the case for it written out; the shell itself never imports it.
 

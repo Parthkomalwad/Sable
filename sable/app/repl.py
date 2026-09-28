@@ -33,6 +33,7 @@ from sable.ui.prompt.session import (
     _ShellCompleter,
     _make_key_bindings,
     _render_prompt,
+    take_bypass,
 )
 
 
@@ -276,8 +277,13 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
             # exhausted budget below are the same: each runs the line as
             # bash, so each is gated like the bash route. All three used to
             # run ungated, which Phase 3 Task 2's call-site count missed.
+            if take_bypass():
+                _bypass_next = True
             if _bypass_next:
                 _bypass_next = False
+                # The user reached for the bypass, so the router would have
+                # got this line wrong: record it as a bash correction (I3).
+                _record_router_correction(line, "bash", db=db)
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
