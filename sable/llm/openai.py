@@ -27,7 +27,7 @@ class OpenAIBackend(LLMBackend):
         self.api_key = api_key
         self.model = model
 
-    async def complete(self, messages: list[dict], system: str) -> LLMResponse:
+    async def complete(self, messages: list[dict], system: str, on_text=None) -> LLMResponse:
         """Send a completion request to OpenAI with SSE streaming.
 
         Always sets timeout=httpx.Timeout(30.0).
@@ -73,6 +73,8 @@ class OpenAIBackend(LLMBackend):
                         content = delta.get("content")
                         if content:
                             full_text += content
+                            if on_text:
+                                on_text(content)
 
                     # Usage comes in the final chunk when stream_options.include_usage=True
                     usage = chunk.get("usage")

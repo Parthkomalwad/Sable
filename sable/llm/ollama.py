@@ -22,7 +22,7 @@ class OllamaBackend(LLMBackend):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    async def complete(self, messages: list[dict], system: str) -> LLMResponse:
+    async def complete(self, messages: list[dict], system: str, on_text=None) -> LLMResponse:
         """Send a completion request to Ollama with NDJSON streaming.
 
         Always sets timeout=httpx.Timeout(30.0).
@@ -60,7 +60,10 @@ class OllamaBackend(LLMBackend):
                         continue
 
                     if "message" in chunk and "content" in chunk["message"]:
-                        full_text += chunk["message"]["content"]
+                        text = chunk["message"]["content"]
+                        full_text += text
+                        if on_text and text:
+                            on_text(text)
 
                     if chunk.get("done"):
                         prompt_tokens = chunk.get("prompt_eval_count", 0)

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
 import re
 import sqlite3
 import sys
@@ -22,6 +23,7 @@ from sable import data
 from sable.agents import context, runtime
 from sable.core.events.types import EventKind
 from sable.llm import prompts
+from sable.llm.base import ExplanationStream
 from sable.policy import hooks, taint
 
 #: The actions this role may emit. `wait` and `ask` are specified in
@@ -48,6 +50,30 @@ class _Spinner:
         self._fixed_verb = verb  # if set, don't cycle
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._reasoning = ExplanationStream()
+        self._streamed = False
+
+    def feed(self, chunk: str) -> None:
+        """G3: take a streamed chunk of the model's JSON answer. Once its
+        explanation starts, the spinner gives way to one dim line updated in
+        place. Nothing streams, nothing changes: the spinner keeps going."""
+        text = self._reasoning.feed(chunk)
+        if not text:
+            return
+        if not self._streamed:
+            self._streamed = True
+            self._halt()
+        width = shutil.get_terminal_size().columns - 3
+        line = " ".join(text.split())
+        if len(line) > width:
+            line = line[:width - 3] + "..."
+        sys.stdout.write(f"\r\033[2K\033[2m  {line}\033[0m")
+        sys.stdout.flush()
+
+    def _halt(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1)
 
     def start(self) -> None:
         self._stop.clear()
@@ -55,10 +81,9 @@ class _Spinner:
         self._thread.start()
 
     def stop(self) -> None:
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=1)
-        sys.stdout.write('\r' + ' ' * 40 + '\r')
+        self._halt()
+        # The whole line, so a long streamed explanation leaves nothing behind.
+        sys.stdout.write('\r\033[2K')
         sys.stdout.flush()
 
     def _run(self) -> None:
@@ -230,6 +255,7 @@ class OrchestratorAgent:
                 break
             messages = self._build_messages()
             spinner = _Spinner()
+            self._spinner = spinner
             spinner.start()
             try:
                 response = self._call_llm(messages)
@@ -975,7 +1001,9 @@ class OrchestratorAgent:
     def _call_llm(self, messages: list[dict]):
         from sable.llm.registry import build_backend
         backend = build_backend(self._config, role="orchestrator")
-        return runtime.call_llm(backend, messages, _system_prompt())
+        spinner = getattr(self, "_spinner", None)
+        return runtime.call_llm(backend, messages, _system_prompt(),
+                                on_text=spinner.feed if spinner else None)
 
     def _extract_raw(self, response) -> str:
         """Reconstruct orchestrator action JSON from LLMResponse."""

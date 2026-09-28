@@ -229,7 +229,8 @@ def _reap(proc) -> int | None:
         return None
 
 
-def call_llm(backend, messages: list[dict], system: str, timeout: float = LLM_TIMEOUT):
+def call_llm(backend, messages: list[dict], system: str, timeout: float = LLM_TIMEOUT,
+             on_text=None):
     """Run one `backend.complete()` to completion on a private event loop.
 
     Both agents are synchronous loops calling an async backend, so each one
@@ -239,12 +240,17 @@ def call_llm(backend, messages: list[dict], system: str, timeout: float = LLM_TI
 
     Raises LLMUnavailable on timeout so a caller can retry or give up
     deliberately, rather than reading it out of a generic exception.
+
+    `on_text`, if given, is passed to the backend and called with each chunk
+    of text as it streams (G3, display only). Omitted when None so a backend
+    written before G3 still works.
     """
+    kwargs = {"on_text": on_text} if on_text else {}
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
         return loop.run_until_complete(
-            asyncio.wait_for(backend.complete(messages, system), timeout=timeout)
+            asyncio.wait_for(backend.complete(messages, system, **kwargs), timeout=timeout)
         )
     except asyncio.TimeoutError as exc:
         raise LLMUnavailable(f"LLM call timed out after {timeout:g}s") from exc
