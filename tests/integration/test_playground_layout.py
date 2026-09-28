@@ -200,16 +200,14 @@ class TestPlaygroundLayout:
         the database and rendered.
         """
         rendered = _wait_for_content(layout["sidebar"], "AGENTS")
-        assert "INBOX (" in rendered, f"sidebar rendered without the inbox:
-{rendered}"
+        assert "INBOX (" in rendered, f"sidebar rendered without the inbox:\n{rendered}"
 
     def test_sidebar_renders_the_system_section(self, layout):
         """A later section, so a partial render that stops after the first
         one does not pass.
         """
         rendered = _wait_for_content(layout["sidebar"], "SYSTEM")
-        assert "load" in rendered, f"system section has no load row:
-{rendered}"
+        assert "load" in rendered, f"system section has no load row:\n{rendered}"
 
     def test_tasks_bar_renders_its_header(self, layout):
         """`shell/tasks/panel.py` draws a "TASKS" panel with a TASK/GOAL
