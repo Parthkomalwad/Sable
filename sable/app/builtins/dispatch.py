@@ -49,7 +49,7 @@ _HELP_TEXT = (
     "  /alias \"phrase\" = <command>   Name a command in your own words\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
-    "  /inbox [show|approve|reject N]  Everything waiting on you, in one list\n"
+    "  /inbox [show|approve|reject K]  Everything waiting on you, in one list\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
     "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
     "  /tools       Tools each agent role may call, and at which tier\n"

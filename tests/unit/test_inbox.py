@@ -61,24 +61,31 @@ def test_inbox_lists_everything(env, capsys):
 
 
 def test_show_and_unknown(env, capsys):
-    assert "no undo" in _run("/inbox show 2", env, capsys)
-    assert "no item 9" in _run("/inbox approve 9", env, capsys)
-    assert "usage" in _run("/inbox approve x", env, capsys)
+    assert "no undo" in _run("/inbox show a1", env, capsys)
+    assert "no item a9" in _run("/inbox approve a9", env, capsys)
+    assert "usage" in _run("/inbox approve", env, capsys)
 
 
 def test_approve_reject_go_through_queue(env, capsys):
-    _run("/inbox approve 4", env, capsys)      # the daemon's step: its next tick resumes the run
-    _run("/inbox reject 2", env, capsys)
+    _run("/inbox approve a2", env, capsys)      # the daemon's step: its next tick resumes the run
+    _run("/inbox reject a1", env, capsys)
     rows = dict(env.conn.execute("SELECT agent, status FROM policy_queue").fetchall())
     assert rows == {"daemon:nightly": "approved", "deploy": "rejected"}
 
 
 def test_approve_breaker_resets(env, capsys):
-    _run("/inbox approve 3", env, capsys)
+    _run("/inbox approve b1", env, capsys)
     assert breaker.tripped(env.conn) == []
 
 
 def test_skill_approve(env, capsys):
-    _run("/inbox approve 1", env, capsys)
+    _run("/inbox approve tidy-logs", env, capsys)
     data = json.loads((env.home / "skills" / "skills_index.json").read_text())
     assert data[0]["status"] == "enabled"
+
+
+def test_keys_do_not_shift_after_a_decision(env, capsys):
+    _run("/inbox reject a1", env, capsys)
+    _run("/inbox reject a1", env, capsys)       # typed again from the old listing
+    rows = dict(env.conn.execute("SELECT agent, status FROM policy_queue").fetchall())
+    assert rows == {"deploy": "rejected", "daemon:nightly": "pending"}

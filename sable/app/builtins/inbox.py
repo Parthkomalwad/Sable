@@ -16,7 +16,13 @@ from rich.table import Table
 from sable.ui import state
 from sable.ui.console import out as _out
 
-_USAGE = "usage: /inbox [show|approve|reject N]"
+_USAGE = "usage: /inbox [show|approve|reject KEY]   (KEY as listed: a7, b2, or a skill name)"
+
+
+def key(item) -> str:
+    """A stable handle: deciding one item never changes another's key, so a
+    number typed from an older listing cannot land on a different item."""
+    return {"approval": f"a{item.id}", "breaker": f"b{item.id}"}.get(item.kind, item.text)
 
 
 def _age(created_at: float) -> str:
@@ -32,12 +38,12 @@ def _list(items) -> None:
         _out("inbox empty: nothing is waiting on you")
         return
     table = Table(title="inbox")
-    for col in ("#", "kind", "age", "source", "what"):
+    for col in ("key", "kind", "age", "source", "what"):
         table.add_column(col)
-    for n, i in enumerate(items, 1):
-        table.add_row(str(n), i.kind, _age(i.created_at), i.agent, i.text)
+    for i in items:
+        table.add_row(key(i), i.kind, _age(i.created_at), i.agent, i.text)
     Console(markup=False).print(table)   # a command's [brackets] are not style tags
-    _out("/inbox show N, /inbox approve N, /inbox reject N")
+    _out("/inbox show KEY, /inbox approve KEY, /inbox reject KEY")
 
 
 def _decide(item, approve: bool, db) -> str:
@@ -50,7 +56,7 @@ def _decide(item, approve: bool, db) -> str:
         return f"{verb}: {item.text}"
     if item.kind == "breaker":
         if not approve:
-            return "a breaker trip can only be reset: /inbox approve N"
+            return "a breaker trip can only be reset: /inbox approve KEY"
         from sable.policy import breaker
 
         n = breaker.reset(db._conn)
@@ -69,16 +75,15 @@ def handle_inbox(argument: str, db) -> bool:
     if not parts:
         _list(items)
         return True
-    if len(parts) != 2 or parts[0] not in ("show", "approve", "reject") or not parts[1].isdigit():
+    if len(parts) != 2 or parts[0] not in ("show", "approve", "reject"):
         _out(_USAGE)
         return True
-    n = int(parts[1])
-    if not 1 <= n <= len(items):
-        _out(f"no item {n} in the inbox ({len(items)} waiting); /inbox to list")
+    item = next((i for i in items if key(i) == parts[1]), None)
+    if item is None:
+        _out(f"no item {parts[1]} in the inbox ({len(items)} waiting); /inbox to list")
         return True
-    item = items[n - 1]
     if parts[0] == "show":
-        _out(f"#{n}  {item.kind}  from {item.agent}, {_age(item.created_at)} ago")
+        _out(f"{key(item)}  {item.kind}  from {item.agent}, {_age(item.created_at)} ago")
         _out(f"  {item.text}")
         _out(f"  {item.why}")
         return True
