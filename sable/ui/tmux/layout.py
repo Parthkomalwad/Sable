@@ -159,3 +159,72 @@ def toggle_sidebar() -> None:
     except (ImportError, OSError, subprocess.SubprocessError, AttributeError,
             IndexError, ValueError):
         return
+
+
+# ---------------------------------------------------------------------------
+# G6 layout presets
+# ---------------------------------------------------------------------------
+
+#: preset -> (main pane zoomed, sidebar shown, tasks strip shown)
+PRESETS: dict[str, tuple[bool, bool, bool]] = {
+    "focus": (True, False, False),
+    "fleet": (False, True, True),
+    "minimal": (False, False, True),
+}
+
+
+def _pick_panes(panes: list[tuple[str, int, int]], main_id: str) -> tuple[str | None, str | None]:
+    """(sidebar, tasks) pane ids from `(id, width, height)` rows.
+
+    create_session makes the sidebar a full-height column and the tasks panel
+    a short strip, so among the panes that are not ours the tallest is the
+    sidebar and the other is the tasks strip.
+    """
+    others = sorted((p for p in panes if p[0] != main_id), key=lambda p: -p[2])
+    sidebar = others[0][0] if len(others) >= 2 else None
+    tasks = others[-1][0] if others else None
+    return sidebar, tasks
+
+
+def preset_commands(name: str, main_id: str, panes: list[tuple[str, int, int]],
+                    zoomed: bool, term_width: int, term_height: int) -> list[list[str]]:
+    """The tmux argv lists that turn the current layout into preset `name`."""
+    zoom, show_sidebar, show_tasks = PRESETS[name]
+    sidebar, tasks = _pick_panes(panes, main_id)
+    cmds: list[list[str]] = []
+    if zoom != zoomed:
+        cmds.append(["tmux", "resize-pane", "-Z", "-t", main_id])
+    if zoom:
+        return cmds
+    if sidebar:
+        width = max(20, term_width // 5) if show_sidebar else 1
+        cmds.append(["tmux", "resize-pane", "-t", sidebar, "-x", str(width)])
+    if tasks:
+        height = max(3, term_height * TASKS_PANEL_HEIGHT_PERCENT // 100) if show_tasks else 1
+        cmds.append(["tmux", "resize-pane", "-t", tasks, "-y", str(height)])
+    return cmds
+
+
+def apply_preset(name: str) -> str:
+    """Apply a layout preset to the current tmux window. Returns a message."""
+    if name not in PRESETS:
+        return f"usage: /layout {'|'.join(PRESETS)}"
+    main_id = os.environ.get("TMUX_PANE", "")
+    if not os.environ.get("TMUX") or not main_id:
+        return "layout: not inside tmux, nothing to change"
+    try:
+        res = subprocess.run(
+            ["tmux", "list-panes", "-t", main_id,
+             "-F", "#{pane_id} #{pane_width} #{pane_height} #{window_zoomed_flag}"
+             " #{window_width} #{window_height}"],
+            capture_output=True, text=True, timeout=2,
+        )
+        rows = [line.split() for line in res.stdout.splitlines() if line.strip()]
+        panes = [(r[0], int(r[1]), int(r[2])) for r in rows]
+        zoomed = rows[0][3] == "1"
+        width, height = int(rows[0][4]), int(rows[0][5])
+        for cmd in preset_commands(name, main_id, panes, zoomed, width, height):
+            subprocess.run(cmd, capture_output=True, timeout=2)
+    except (OSError, subprocess.SubprocessError, IndexError, ValueError):
+        return "layout: tmux did not answer"
+    return f"layout: {name}"

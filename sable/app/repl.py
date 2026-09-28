@@ -13,11 +13,11 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.formatted_text import HTML, ANSI
 from prompt_toolkit.key_binding import merge_key_bindings
 from prompt_toolkit.key_binding.bindings.emacs import load_emacs_bindings
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 
 from sable.core.config.schema import ShellConfig
 
 from sable.app import budget
+from sable.app import explain
 from sable.app.builtins.dispatch import handle_builtin as _handle_builtin
 
 # Still used directly by the loop: Ctrl+B records a router correction.
@@ -29,6 +29,7 @@ from sable.core.audit import write_action as _audit_log
 from sable.core.audit import write_command as _write_audit_log
 
 from sable.ui.console import out as _out
+from sable.ui.prompt.ghost import CwdHistorySuggest
 from sable.ui.prompt.session import (
     _ShellCompleter,
     _make_key_bindings,
@@ -46,6 +47,8 @@ from sable.ui.prompt.session import (
 _bypass_next: bool = False
 _offline_mode: bool = False
 _last_exit: int = 0
+# K2: the last typed command that failed, offered to `?` / `!` once.
+_last_failure: explain.Failure | None = None
 
 
 def set_offline_mode(offline: bool) -> None:
@@ -158,6 +161,19 @@ def _post_command(command: str, exit_code: int, cwd: str) -> None:
     }))
 
 
+def _after_bash(command: str, exit_code: int, output: str, cwd: str) -> None:
+    """Hook and the K2 offer after a typed command ran.
+
+    The block footer already shows the exit code, so this adds only the
+    `? explain   ! fix` line under it.
+    """
+    global _last_failure
+    _post_command(command, exit_code, cwd)
+    if exit_code != 0:
+        _out(explain.hint())
+        _last_failure = explain.Failure(command, exit_code, output or "", cwd)
+
+
 def pending_skills_banner() -> str:
     """One line naming how many drafted skills are waiting for approval.
 
@@ -207,8 +223,50 @@ def _save_turns_if_needed(
         pass
 
 
+def _run_goal(goal: str, cwd: str, config: ShellConfig, db, session_id: str,
+              turns: list[dict], tainted: bool = False) -> None:
+    """Hand a goal to the orchestrator: a typed request, or K2's `!`."""
+    from sable.agents.manager import TaskManager
+    from sable.agents.orchestrator import OrchestratorAgent
+    from sable.core.db import DB_PATH
+    task_manager = TaskManager(config=config, db=db)
+    # The composition root for a typed goal. Constructing these here
+    # rather than inside OrchestratorAgent is what keeps the
+    # `agents -> skills` edge out of the layering rule, the same
+    # inversion `corrections_db` and the worker's collaborators use.
+    #
+    # "orchestrator" is a task name with no task-local skills
+    # directory, which is correct: a typed goal has no workspace, so
+    # only global approved skills apply.
+    from sable.skills.index import SkillIndex
+    from sable.skills.loader import TaskSkillLoader
+
+    _tasks_base = str(Path(config.tasks_base_dir).expanduser())
+    agent = OrchestratorAgent(
+        goal=goal,
+        cwd=cwd,
+        config=config,
+        db_path=str(DB_PATH),
+        task_manager=task_manager,
+        session_id=session_id,
+        corrections_db=db,
+        skill_loader=TaskSkillLoader("orchestrator", _tasks_base),
+        skill_index=SkillIndex(),
+        crystalliser=_crystalliser_or_none(config),
+    )
+    if tainted:
+        agent._tainted = True
+    try:
+        agent.run()
+        turns.append({"role": "user", "content": goal})
+        turns.append({"role": "assistant", "content": f"[orchestrator handled: {goal}]"})
+        _save_turns_if_needed(turns, session_id, config)
+    except KeyboardInterrupt:
+        _out("[interrupted]")
+
+
 def start(config: ShellConfig, session_id: str, session_context: str = "") -> None:
-    global _bypass_next, _last_exit
+    global _bypass_next, _last_exit, _last_failure
 
     from sable.app.builtins.block import run_block
     from sable.agents.router import classify, Route
@@ -226,6 +284,7 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
     history_file = Path.home() / ".local" / "share" / "agentic-shell" / "history"
     history_file.parent.mkdir(parents=True, exist_ok=True)
 
+    ghost = CwdHistorySuggest()  # K1: history ranked by directory
     kb = _make_key_bindings(db=db)
     os.environ.setdefault("PROMPT_TOOLKIT_NO_CPR", "1")
     session = PromptSession(
@@ -233,8 +292,11 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
         key_bindings=merge_key_bindings([load_emacs_bindings(), kb]),
         completer=_ShellCompleter(),
         complete_while_typing=False,
-        auto_suggest=AutoSuggestFromHistory(),
+        auto_suggest=ghost,
     )
+    from sable.ui.theme import set_theme
+    set_theme(getattr(config, "theme", "default"))
+    prefill = ""  # G5: what the palette put at the next prompt
 
     # Track conversation turns for session continuity
     global _active_turns
@@ -261,14 +323,34 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                     _out("[cwd deleted moved to home]")
                 user_input = session.prompt(
                     ANSI(_render_prompt(cwd, _last_exit)),
-                    in_thread=True
+                    in_thread=True, default=prefill,
                 )
+                prefill = ""
             except EOFError:
                 break
 
             line = user_input.strip()
             if not line:
                 continue
+
+            ghost.record(cwd, line)
+
+            # K2: `?` or `!` straight after a failure; the offer lapses on
+            # any other line.
+            failure, _last_failure = _last_failure, None
+            if explain.handle(line, failure, config, lambda goal, tainted: _run_goal(
+                    goal, cwd, config, db, session_id, turns, tainted)):
+                continue
+
+            if line == "/palette":
+                from sable.ui.palette import open_palette
+                picked = open_palette(db)
+                if picked is None:
+                    continue
+                if not picked.run:
+                    prefill = picked.text
+                    continue
+                line = picked.text
 
             if _handle_builtin(line, db, session_id, config, turns=_active_turns):
                 continue
@@ -287,16 +369,16 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = run_block(line, cwd, db, session_id)
-                _post_command(line, exit_code, cwd)
+                exit_code, output = run_block(line, cwd, db, session_id)
+                _after_bash(line, exit_code, output, cwd)
                 continue
 
             if _offline_mode:
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = run_block(line, cwd, db, session_id)
-                _post_command(line, exit_code, cwd)
+                exit_code, output = run_block(line, cwd, db, session_id)
+                _after_bash(line, exit_code, output, cwd)
                 continue
 
             # K4: an alias resolves before the router is consulted. This is
@@ -311,8 +393,8 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(resolved, role="user"):
                     _audit_log("destructive_blocked", resolved)
                     continue
-                exit_code, _ = run_block(resolved, cwd, db, session_id)
-                _post_command(resolved, exit_code, cwd)
+                exit_code, output = run_block(resolved, cwd, db, session_id)
+                _after_bash(resolved, exit_code, output, cwd)
                 _last_exit = exit_code
                 _audit_log("alias", resolved, exit_code)
                 _write_audit_log(session_id, cwd, resolved)
@@ -336,8 +418,8 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = run_block(line, cwd, db, session_id)
-                _post_command(line, exit_code, cwd)
+                exit_code, output = run_block(line, cwd, db, session_id)
+                _after_bash(line, exit_code, output, cwd)
                 _last_exit = exit_code
                 _audit_log("bash", line, exit_code)
                 _write_audit_log(session_id, cwd, line)
@@ -347,46 +429,10 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = run_block(line, cwd, db, session_id)
-                _post_command(line, exit_code, cwd)
+                exit_code, output = run_block(line, cwd, db, session_id)
+                _after_bash(line, exit_code, output, cwd)
                 continue
 
-            # NL path: hand off to OrchestratorAgent reasoning loop
-            from sable.agents.manager import TaskManager
-            from sable.agents.orchestrator import OrchestratorAgent
-            from sable.core.db import DB_PATH
-            task_manager = TaskManager(config=config, db=db)
-            # The composition root for a typed goal. Constructing these here
-            # rather than inside OrchestratorAgent is what keeps the
-            # `agents -> skills` edge out of the layering rule, the same
-            # inversion `corrections_db` and the worker's collaborators use.
-            #
-            # "orchestrator" is a task name with no task-local skills
-            # directory, which is correct: a typed goal has no workspace, so
-            # only global approved skills apply.
-            from sable.skills.index import SkillIndex
-            from sable.skills.loader import TaskSkillLoader
-
-            _tasks_base = str(Path(config.tasks_base_dir).expanduser())
-            agent = OrchestratorAgent(
-                goal=line,
-                cwd=cwd,
-                config=config,
-                db_path=str(DB_PATH),
-                task_manager=task_manager,
-                session_id=session_id,
-                corrections_db=db,
-                skill_loader=TaskSkillLoader("orchestrator", _tasks_base),
-                skill_index=SkillIndex(),
-                crystalliser=_crystalliser_or_none(config),
-            )
-            try:
-                agent.run()
-                turns.append({"role": "user", "content": line})
-                turns.append({"role": "assistant", "content": f"[orchestrator handled: {line}]"})
-                _save_turns_if_needed(turns, session_id, config)
-            except KeyboardInterrupt:
-                _out("[interrupted]")
-                continue
+            _run_goal(line, cwd, config, db, session_id, turns)
     finally:
         _save_turns_if_needed(turns, session_id, config)

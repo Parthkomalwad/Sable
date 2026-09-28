@@ -23,6 +23,14 @@ VALID_ROUTING_MODES = {"auto", "prefix"}
 MODEL_ROLES = ("router", "orchestrator", "worker", "summariser")
 
 
+#: G6 palettes; the colours live in ui/theme.py, which core may not import.
+THEME_NAMES = ("default", "mono", "high-contrast")
+
+
+def _theme_or_default(name) -> str:
+    return name if name in THEME_NAMES else "default"
+
+
 @dataclass
 class ShellConfig:
     """Runtime configuration for Sable."""
@@ -35,6 +43,7 @@ class ShellConfig:
     privacy_mode: bool                  # strip secrets before sending to model
     setup_complete: bool
     tasks_base_dir: str = "~/tasks"
+    theme: str = "default"  # G6; an unknown name loads as "default"
     # Per-role model overrides (A5). Empty means "use `model` for everything",
     # which is what every config written before Phase 1 says.
     models: dict[str, str] = field(default_factory=dict)
@@ -158,6 +167,7 @@ class ShellConfig:
             privacy_mode=bool(data.get("privacy_mode", False)),
             setup_complete=bool(data.get("setup_complete", False)),
             tasks_base_dir=data.get("tasks_base_dir", "~/tasks"),
+            theme=_theme_or_default(data.get("theme")),
             models=models,
             per_job_budget={k: v for k, v in per_job.items() if v is not None},
             breaker_consecutive_failures=failures,
@@ -181,6 +191,7 @@ class ShellConfig:
             "privacy_mode": self.privacy_mode,
             "setup_complete": self.setup_complete,
             "tasks_base_dir": self.tasks_base_dir,
+            "theme": self.theme,
             "models": dict(self.models),
             "per_job_budget": dict(self.per_job_budget),
             "breaker_consecutive_failures": self.breaker_consecutive_failures,
