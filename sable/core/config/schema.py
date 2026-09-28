@@ -58,6 +58,8 @@ class ShellConfig:
     # Per-tool budgets (J12). A tool name or prefix (`web` covers web.search)
     # to {max_calls_per_goal, max_bytes, max_cost}; empty is unlimited.
     tool_budgets: dict[str, dict[str, float]] = field(default_factory=dict)
+    # ntfy (E5): server, topic, reply_topic. The access token is keyring-only.
+    notify: dict[str, str] = field(default_factory=dict)
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -157,6 +159,12 @@ class ShellConfig:
                     kind = "positive int" if integer else "positive number"
                     raise ValueError(f"tool_budgets.{tool}.{key} must be a {kind} or null, got {limit!r}")
 
+        notify = data.get("notify") or {}
+        if not isinstance(notify, dict) or any(
+                k not in ("server", "topic", "reply_topic") or not isinstance(v, str)
+                for k, v in notify.items()):
+            raise ValueError(f"notify must map server/topic/reply_topic to strings, got {notify!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -174,6 +182,7 @@ class ShellConfig:
             tools=tools,
             tool_budgets={t: {k: v for k, v in spec.items() if v is not None}
                           for t, spec in tool_budgets.items()},
+            notify=dict(notify),
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -197,5 +206,6 @@ class ShellConfig:
             "breaker_consecutive_failures": self.breaker_consecutive_failures,
             "tools": dict(self.tools),
             "tool_budgets": {t: dict(spec) for t, spec in self.tool_budgets.items()},
+            "notify": dict(self.notify),
             "api_key": getattr(self, "api_key", ""),
         }
