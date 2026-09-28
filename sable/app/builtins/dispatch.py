@@ -50,7 +50,8 @@ _HELP_TEXT = (
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
-    "  /tools         Tools each agent role may call, and at which tier\n"
+    "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
+    "  /tools       Tools each agent role may call, and at which tier\n"
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
     "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
@@ -191,6 +192,25 @@ def _handle_breaker_builtin(argument: str, db) -> bool:
     for t in trips:
         _out(f"  #{t['id']}  {t['job']}: {t['reason']}")
     _out("/breaker reset to resume autonomous jobs")
+    return True
+
+
+def _handle_dash_builtin() -> bool:
+    """`/dash`: the full-screen command center, as a child process. Always True.
+
+    The child owns the terminal until it quits; the shell never imports
+    textual (tests/unit/test_ui_state.py holds it to that).
+    """
+    import importlib.util
+    import subprocess
+
+    if importlib.util.find_spec("textual") is None:
+        _out("/dash needs textual: pip install 'textual>=8.2,<8.3'")
+        return True
+    try:
+        subprocess.run([sys.executable, "-m", "sable.ui.dash"], check=False)
+    except OSError as e:
+        _out(f"/dash could not start: {e}")
     return True
 
 
@@ -373,6 +393,9 @@ def handle_builtin(
     if cmd == "/secret" or cmd.startswith("/secret "):
         from sable.app.builtins.secret import _handle_secret_builtin
         return _handle_secret_builtin(cmd[len("/secret"):].strip())
+
+    if cmd == "/dash":
+        return _handle_dash_builtin()
 
     if cmd == "/breaker" or cmd.startswith("/breaker "):
         return _handle_breaker_builtin(cmd[len("/breaker"):].strip(), db)

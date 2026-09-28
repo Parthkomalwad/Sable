@@ -975,3 +975,21 @@ any output containing `\x1b[?1049h`) gets no header and no stored output, only
 copy` prints the command and sends it to the terminal clipboard with OSC 52;
 `/block N rerun` passes the command through `gate()` and runs it in the
 block's cwd (the current one if that directory is gone), as a new block.
+
+---
+
+## 11. `/dash` (G1)
+
+`/dash` runs `python -m sable.ui.dash` as a child process; the shell never
+imports textual. The dashboard reads only through `sable/ui/state.py` (about
+once a second) and makes exactly two kinds of write, each on a read-write WAL
+connection opened for that one call and closed after:
+
+| Key | Write | Same as |
+|---|---|---|
+| `a` then `y` (approve), or `r` (reject), on a pending approval | `policy.queue.decide_request(conn, id, approve=...)` | `/approve <id>`, `/approve reject <id>` |
+| `x` then `y` | `policy.breaker.reset(conn)` (every open trip) | `/breaker reset` |
+
+Approve and reset open a confirm box (full command, agent, rule and reason
+for an approval); only `y` goes ahead, any other key cancels. Nothing else
+is written. `q` quits back to the prompt.
