@@ -78,5 +78,10 @@ def test_the_shell_never_imports_textual():
     """The case for textual rests on the shell not paying for it at start."""
     code = ("import sys, sable.app.main, sable.app.repl, sable.ui.state; "
             "print('textual' in sys.modules)")
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    import os
+    from pathlib import Path
+
+    root = str(Path(state.__file__).resolve().parents[2])
+    env = {**os.environ, "PYTHONPATH": root + os.pathsep + os.environ.get("PYTHONPATH", "")}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root, env=env)
     assert out.stdout.strip() == "False", out.stderr[-500:]
