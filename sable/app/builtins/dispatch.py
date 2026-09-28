@@ -49,6 +49,7 @@ _HELP_TEXT = (
     "  /alias \"phrase\" = <command>   Name a command in your own words\n"
     "  /route why \"<line>\"  Explain how a line would be routed\n"
     "  /why [agent]   What the model saw when it last decided\n"
+    "  /inbox [show|approve|reject N]  Everything waiting on you, in one list\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
     "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
     "  /tools       Tools each agent role may call, and at which tier\n"
@@ -406,6 +407,10 @@ def handle_builtin(
                 _out(f"  {t.signature():<40} {t.tier.value:<8} {t.description}")
         _out("policy files can raise a tool's tier: match `tool:<name>` in a [[rule]]")
         return True
+
+    if cmd == "/inbox" or cmd.startswith("/inbox "):
+        from sable.app.builtins.inbox import handle_inbox
+        return handle_inbox(cmd[len("/inbox"):], db)
 
     if cmd == "/approve" or cmd.startswith("/approve "):
         return _handle_approve_builtin(cmd[len("/approve"):].strip(), db)
