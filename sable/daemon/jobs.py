@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import time
 from typing import Callable
 
@@ -90,9 +91,31 @@ def _finish(conn, rid: int, job: str, status: str, step: int, output: str) -> st
     return status
 
 
+def _call(conn: sqlite3.Connection, background: bool, fn, *args) -> None:
+    """Call `fn(conn, *args)`, or in a thread on its own connection, so a
+    long job never stalls the daemon's other handlers (the Phase 5 gate
+    showed schedules, watchers and pushes all waiting behind one job)."""
+    if not background:
+        fn(conn, *args)
+        return
+    path = conn.execute("PRAGMA database_list").fetchone()[2]
+
+    def go() -> None:
+        c = sqlite3.connect(path, timeout=30)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA synchronous=NORMAL")
+        try:
+            fn(c, *args)
+        finally:
+            c.close()
+
+    threading.Thread(target=go, daemon=True).start()
+
+
 def run_plan(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: str,
-             run: Run = runtime.run_command) -> int:
-    """Start one run of `steps` and return its `job_runs` id."""
+             run: Run = runtime.run_command, background: bool = False) -> int:
+    """Start one run of `steps` and return its `job_runs` id. The row exists
+    before this returns, so a busy check sees it even when `background`."""
     ensure_table(conn)
     cur = conn.execute(
         "INSERT INTO job_runs (job, started_at, status, steps_json, cwd) VALUES (?, ?, 'running', ?, ?)",
@@ -100,7 +123,7 @@ def run_plan(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: str,
     )
     conn.commit()
     _publish("job.started", {"job": job, "run": cur.lastrowid})
-    _continue(conn, cur.lastrowid, job, steps, 0, cwd, run)
+    _call(conn, background, _continue, cur.lastrowid, job, steps, 0, cwd, run)
     return cur.lastrowid
 
 
@@ -119,7 +142,7 @@ def start_waiting(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: 
 
 
 def resume_waiting(conn: sqlite3.Connection, *, cwd: str | None = None,
-                   run: Run = runtime.run_command) -> None:
+                   run: Run = runtime.run_command, background: bool = False) -> None:
     """Resume each waiting run whose queued step has been approved (or rejected)."""
     ensure_table(conn)
     queue.ensure_table(conn)
@@ -140,7 +163,10 @@ def resume_waiting(conn: sqlite3.Connection, *, cwd: str | None = None,
         # Consume the approval here, so it covers exactly this step once and
         # never lingers for a later identical command.
         queue.take_approved(conn, _agent(job), steps[step])
-        _continue(conn, rid, job, steps, step, cwd or run_cwd, run, output, approved=step)
+        # Marked running now, not in the thread, so the next tick skips it.
+        _set(conn, rid, status="running")
+        _call(conn, background, lambda c: _continue(c, rid, job, steps, step, cwd or run_cwd, run,
+                                                    output, approved=step))
 
 
 def mark_lost(conn: sqlite3.Connection) -> int:

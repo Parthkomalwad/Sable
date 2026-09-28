@@ -110,3 +110,23 @@ class TestLoop:
         first = service.acquire_lock(tmp_path / "l")
         assert first is not None
         assert service.acquire_lock(tmp_path / "l") is None
+
+
+class TestBackground:
+    def test_a_background_run_returns_at_once_and_finishes_in_a_thread(self, conn, tmp_path):
+        import threading
+        gate, ran = threading.Event(), []
+
+        def slow(cmd, cwd, **kw):
+            gate.wait(5)
+            ran.append(cmd)
+            return "(no output; exit 0)"
+
+        rid = jobs.run_plan(conn, "slow", ["sleep 50"], cwd=str(tmp_path), run=slow, background=True)
+        assert _status(conn, rid) == ("running", 0) and ran == []   # the tick is not blocked
+        gate.set()
+        for _ in range(50):
+            if _status(conn, rid)[0] == "ok":
+                break
+            import time; time.sleep(0.05)
+        assert ran == ["sleep 50"] and _status(conn, rid) == ("ok", 1)

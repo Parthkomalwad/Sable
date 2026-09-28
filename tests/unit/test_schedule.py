@@ -61,7 +61,7 @@ def conn(tmp_path, monkeypatch):
 
 
 def _fake_run_plan(calls, status="ok"):
-    def run_plan(conn, job, steps, *, cwd):
+    def run_plan(conn, job, steps, *, cwd, **kw):
         calls.append((job, steps))
         jobs.ensure_table(conn)
         cur = conn.execute(

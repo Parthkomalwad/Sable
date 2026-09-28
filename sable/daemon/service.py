@@ -93,7 +93,7 @@ def run() -> int:
     lost = jobs.mark_lost(conn)
     if lost:
         log.warning("%d run(s) from a previous daemon marked lost", lost)
-    register(jobs.resume_waiting)
+    register(lambda c: jobs.resume_waiting(c, background=True))
     _load_handlers()
     stop = []
     signal.signal(signal.SIGTERM, lambda *a: stop.append(1))

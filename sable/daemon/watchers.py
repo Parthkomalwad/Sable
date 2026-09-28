@@ -178,7 +178,7 @@ def _fire(conn: sqlite3.Connection, w: dict, detail: str) -> None:
     _publish("watch.fired", {"watcher": w["id"], "kind": w["kind"], "tier": w["tier"], "detail": detail})
     agent = f"watch:{w['id']}"
     if w["tier"] == "run":
-        jobs.run_plan(conn, agent, w["steps"], cwd=os.path.expanduser("~"))
+        jobs.run_plan(conn, agent, w["steps"], cwd=os.path.expanduser("~"), background=True)
     elif w["tier"] == "approve":
         jobs.start_waiting(conn, agent, w["steps"], cwd=os.path.expanduser("~"))
 

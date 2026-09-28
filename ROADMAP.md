@@ -46,11 +46,11 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/
 - [x] Textual sidebar and full-screen `/dash` with agent lanes and approval inbox (`G1`)
 - [x] Streaming reasoning, `Ctrl+P` palette, themes (`G3 G5 G6`)
 - [x] Ghost-text suggestions as you type; `? explain  ! fix` after any failed command (`K1 K2`)
-## v0.9: Autonomy *(next)*
+## v0.9: Autonomy
 
-- [ ] `sabled` daemon, natural-language cron, watchers (`E1 E2 E3`)
-- [ ] Notifications and approvals from your phone (`E5 E6`)
-## v1.0: Ecosystem
+- [x] `sabled` daemon, natural-language cron, watchers (`E1 E2 E3`)
+- [x] Notifications and approvals from your phone (`E5 E6`)
+## v1.0: Ecosystem *(next)*
 
 - [ ] MCP client (spec 2026-07-28) and server mode (`D1 D2 D4`)
 - [ ] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
