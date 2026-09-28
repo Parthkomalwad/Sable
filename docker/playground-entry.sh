@@ -39,6 +39,11 @@ fi
 # nor the tasks bar could be seen at all.
 export PYTHONPATH=/app
 
+# sabled (Phase 5): no systemd in the container, so run it in the foreground
+# in the background. Its log is at ~/.sable/sabled.log.
+mkdir -p /root/.sable
+nohup python3 -m sable.app.main daemon run >> /root/.sable/sabled.log 2>&1 &
+
 # Size the session generously rather than from tput: a container reports 80x24
 # until a client attaches, and reading that here would leave the panes tiny.
 tmux new-session -d -s playground -x 200 -y 50

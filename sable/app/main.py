@@ -35,6 +35,7 @@ _CLI_USAGE = """sable - an agentic shell layer
   sable on           enable the agentic layer for new logins
   sable off          disable it; logins go straight to bash
   sable status       report which mode is active
+  sable daemon ...   run|install|status|stop the background daemon (sabled)
   sable --wrap       run inside the current bash, no chsh or /etc/shells
   sable --version    print the version
 """
@@ -59,6 +60,11 @@ def _handle_cli(argv: list[str]) -> bool:
 
         sys.stdout.write(f"sable {__version__}\n")
         return True
+
+    if command == "daemon":
+        from sable.daemon import service
+
+        sys.exit(service.main(argv[1:]))
 
     if command in ("on", "off", "status"):
         from sable.app import mode
