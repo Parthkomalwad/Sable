@@ -122,18 +122,31 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
     return path_seg + git_seg + time_seg + cursor + ' '
 
 
+#: Ctrl+B's request, taken by the REPL before it routes the next line. It
+#: lives here because the key binding runs here; it used to be a `global`
+#: that named this module's variable while the REPL read its own, so Ctrl+B
+#: printed "[bash mode]" and changed nothing.
+_bypass_requested = False
+
+
+def take_bypass() -> bool:
+    """True once after Ctrl+B was pressed, then False until pressed again."""
+    global _bypass_requested
+    requested, _bypass_requested = _bypass_requested, False
+    return requested
+
+
 def _make_key_bindings(db=None) -> KeyBindings:
     kb = KeyBindings()
 
     @kb.add("c-b")
     def _ctrl_b(event) -> None:
-        global _bypass_next
-        _bypass_next = True
-        # Whatever is already typed was misrouted by definition: the user
-        # reached for the bypass. Record it as a bash correction (I3).
-        pending = event.app.current_buffer.text.strip()
-        if pending:
-            _record_router_correction(pending, "bash", db=db)
+        # Only the request is recorded here. Recording the router correction
+        # (I3) is the REPL's job: this module is `ui` and may not import
+        # `app`, which is where `_record_router_correction` lives; calling it
+        # from here raised NameError whenever text was already typed.
+        global _bypass_requested
+        _bypass_requested = True
         _out("[bash mode] next command runs directly")
 
     @kb.add("c-t")
