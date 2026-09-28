@@ -71,7 +71,7 @@ def test_lanes_tree_and_queue_render(db):
     _run(go())
 
 
-def test_a_approves_the_focused_item(db):
+def test_a_then_y_approves_the_focused_item(db):
     async def go():
         app = dash.DashApp(db)
         async with app.run_test(size=(140, 40)) as pilot:
@@ -79,6 +79,9 @@ def test_a_approves_the_focused_item(db):
             with mock.patch("sable.policy.queue.decide_request",
                             wraps=__import__("sable.policy.queue", fromlist=["x"]).decide_request) as spy:
                 await pilot.press("a")
+                await pilot.pause()
+                spy.assert_not_called()          # one key is not enough
+                await pilot.press("y")
                 await pilot.pause()
             assert spy.call_args.kwargs == {"approve": True} and spy.call_args.args[1] == 1
             assert len(app.query_one("#queue").children) == 2
@@ -97,17 +100,43 @@ def test_r_rejects(db):
     assert _status(db, 1) == "pending" and _status(db, 2) == "rejected"
 
 
-def test_reset_clears_a_trip(db):
+def test_x_then_y_resets_the_breaker(db):
     async def go():
         app = dash.DashApp(db)
         async with app.run_test(size=(140, 40)) as pilot:
             await pilot.pause()
-            await pilot.press("down", "down", "x")
+            await pilot.press("down", "down", "x", "y")
             await pilot.pause()
             assert len(app.query_one("#queue").children) == 2
     _run(go())
     c = sqlite3.connect(db)
     assert c.execute("SELECT status FROM breaker_trips").fetchone()[0] == "reset"
+    c.close()
+
+
+@pytest.mark.parametrize("key", ["escape", "n", "a"])
+def test_a_then_anything_else_cancels(db, key):
+    async def go():
+        app = dash.DashApp(db)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("a", key)
+            await pilot.pause()
+            assert len(app.query_one("#queue").children) == 3
+    _run(go())
+    assert _status(db, 1) == "pending"
+
+
+def test_x_then_escape_leaves_the_trip(db):
+    async def go():
+        app = dash.DashApp(db)
+        async with app.run_test(size=(140, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("x", "escape")
+            await pilot.pause()
+    _run(go())
+    c = sqlite3.connect(db)
+    assert c.execute("SELECT status FROM breaker_trips").fetchone()[0] == "tripped"
     c.close()
 
 

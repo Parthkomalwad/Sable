@@ -14,6 +14,7 @@ from pathlib import Path
 
 from rich.markup import escape
 from textual.app import App, ComposeResult
+from textual.screen import ModalScreen
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, Tree
 
@@ -111,6 +112,17 @@ class DashApp(App):
         if item is None or item.kind != "approval":
             self.notify("select a pending approval first", severity="warning")
             return
+        if not approve:
+            self._decide(item, False)   # rejecting only makes things safer: one key
+            return
+        # An approval stands in for the typed YES a confirm-tier command needs,
+        # so it takes a second, deliberate key.
+        text = (f"Approve #{item.id} for agent {item.agent}?\n\n  {item.text}\n\n"
+                f"rule: {item.why}\n\ny approves, any other key cancels")
+        self.push_screen(Confirm(text), lambda yes: self._decide(item, True) if yes else
+                         self.notify(f"#{item.id} left pending"))
+
+    def _decide(self, item: state.InboxItem, approve: bool) -> None:
         from sable.policy import queue
 
         try:
@@ -124,6 +136,12 @@ class DashApp(App):
         self.refresh_data()
 
     def action_reset(self) -> None:
+        text = ("Reset the breaker?\n\nEvery open trip is cleared and every paused "
+                "sub-agent resumes.\n\ny resets, any other key cancels")
+        self.push_screen(Confirm(text), lambda yes: self._reset() if yes else
+                         self.notify("breaker left as is"))
+
+    def _reset(self) -> None:
         from sable.policy import breaker
 
         try:
@@ -134,6 +152,25 @@ class DashApp(App):
         self.notify(f"breaker reset ({n} trip{'s' if n != 1 else ''} cleared)")
         self.refresh_data()
 
+
+class Confirm(ModalScreen[bool]):
+    """A yes/no box: `y` is yes, any other key is no."""
+
+    DEFAULT_CSS = """
+    Confirm { align: center middle; }
+    Confirm > Static { width: 70%; height: auto; padding: 1 2; border: thick $warning; background: $surface; }
+    """
+
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self._text = text
+
+    def compose(self) -> ComposeResult:
+        yield Static(self._text, markup=False)
+
+    def on_key(self, event) -> None:
+        event.stop()
+        self.dismiss(event.key == "y")
 
 def main() -> None:
     DashApp(sys.argv[1] if len(sys.argv) > 1 else None).run()

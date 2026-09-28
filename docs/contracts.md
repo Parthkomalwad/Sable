@@ -987,7 +987,9 @@ connection opened for that one call and closed after:
 
 | Key | Write | Same as |
 |---|---|---|
-| `a` / `r` on a pending approval | `policy.queue.decide_request(conn, id, approve=...)` | `/approve <id>`, `/approve reject <id>` |
-| `x` | `policy.breaker.reset(conn)` (every open trip) | `/breaker reset` |
+| `a` then `y` (approve), or `r` (reject), on a pending approval | `policy.queue.decide_request(conn, id, approve=...)` | `/approve <id>`, `/approve reject <id>` |
+| `x` then `y` | `policy.breaker.reset(conn)` (every open trip) | `/breaker reset` |
 
-Nothing else is written. `q` quits back to the prompt.
+Approve and reset open a confirm box (full command, agent, rule and reason
+for an approval); only `y` goes ahead, any other key cancels. Nothing else
+is written. `q` quits back to the prompt.
