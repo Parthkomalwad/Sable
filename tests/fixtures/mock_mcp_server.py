@@ -7,6 +7,7 @@ crash           new-spec, exits on tools/call
 hang            new-spec, never answers tools/call
 """
 import json
+import os
 import sys
 
 MODE = sys.argv[1] if len(sys.argv) > 1 else "new-spec"
@@ -67,7 +68,9 @@ def main():
             if MODE == "hang":
                 continue
             name, args = params.get("name"), params.get("arguments") or {}
-            if name == "fail":
+            if name == "env":  # what a configured env var reached the child as
+                reply(mid, {"content": [{"type": "text", "text": os.environ.get("MCP_TEST", "")}]})
+            elif name == "fail":
                 reply(mid, error={"code": -32602, "message": "bad arguments"})
             elif name == "ask" and "inputResponses" not in params:
                 reply(mid, {"resultType": "input_required", "requestState": "s1",

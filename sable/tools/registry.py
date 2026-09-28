@@ -26,6 +26,10 @@ def _load_builtins() -> None:
     if not _loaded:
         _loaded = True
         from sable.tools import builtin  # noqa: F401  registers on import
+        # Configured MCP servers join here, on the first use by an agent,
+        # never at shell start (cold start stays under 300 ms).
+        from sable.mcp import servers
+        servers.load_all()
 
 
 def register(tool: Tool) -> None:
