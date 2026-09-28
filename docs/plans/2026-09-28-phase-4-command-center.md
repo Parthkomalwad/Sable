@@ -62,74 +62,78 @@ ghost text, true block collapse.
 
 ## Task 0: `textual` and the shared state layer (serial, first)
 
-- [ ] Pin `textual` in `pyproject.toml`, `requirements.txt`, and the approved
+- [x] Pin `textual` in `pyproject.toml`, `requirements.txt`, and the approved
       list in CLAUDE.md with a one-line reason.
-- [ ] `sable/ui/state.py`: `agents()`, `inbox()`, `cost_by_agent()`,
+- [x] `sable/ui/state.py`: `agents()`, `inbox()`, `cost_by_agent()`,
       `tail(agent, n)`, `tree()`: read-only, WAL, never raises on a missing
       table, tested against a temp DB.
-- [ ] A test that `python -m sable.app.main --version` does not import
+- [x] A test that `python -m sable.app.main --version` does not import
       `textual` (import-time guard, not a timing test).
 
 Tasks 1 to 5 then run in parallel.
 
 ## Task 1: Blocks in scrollback (G2)
 
-- [ ] Every command run from the REPL (typed bash and agent commands) prints a
+- [x] Every command run from the REPL (typed bash and agent commands) prints a
       header `#N  <cmd>` and a footer `exit · duration · cost` in a consistent
       style; blast colour on the header for agent commands.
-- [ ] A `blocks` table: number, cwd, command, exit, duration, cost, the last
+- [x] A `blocks` table: number, cwd, command, exit, duration, cost, the last
       200 lines of output (redacted with `redact_text`).
-- [ ] `/block N show|copy|rerun`; `rerun` goes through `gate()` like any
+- [x] `/block N show|copy|rerun`; `rerun` goes through `gate()` like any
       command. `/block` lists the last 20.
-- [ ] Full-screen programs (vim, htop, ssh) are not wrapped in a footer that
+- [x] Full-screen programs (vim, htop, ssh) are not wrapped in a footer that
       would scribble over them: detect alternate-screen use and print only the
       footer after.
 
 ## Task 2: Textual sidebar (G1, sidebar half)
 
-- [ ] Replace `ui/sidebar/watch.py` with a Textual app: AGENTS (status badges:
+- [x] Replace `ui/sidebar/watch.py` with a Textual app: AGENTS (status badges:
       thinking / running / blocked / awaiting approval / done), INBOX count,
       COST sparkline, GIT, SYSTEM. Reads `ui/state.py` on a timer; never blocks
       the REPL; separate process in the tmux layout.
-- [ ] Hides itself below 90 columns and comes back when widened.
-- [ ] `agents_panel.py` folded in or kept, whichever is simpler; say which.
+- [x] Hides itself below 90 columns and comes back when widened.
+- [x] `agents_panel.py` folded in or kept, whichever is simpler; say which.
 
 ## Task 3: `/dash` command center (G1, full-screen half)
 
-- [ ] `/dash` (and `Ctrl+D` if free) opens a full-screen Textual app as a child
+- [x] `/dash` (and `Ctrl+D` if free) opens a full-screen Textual app as a child
       process and returns to the prompt on quit.
-- [ ] Agent lanes with live log tails, the orchestrator to sub-agent tree,
+- [x] Agent lanes with live log tails, the orchestrator to sub-agent tree,
       token and cost per lane.
-- [ ] **Approval queue:** pending `policy_queue` items with rule and reason;
+- [x] **Approval queue:** pending `policy_queue` items with rule and reason;
       approve and reject call `queue.decide_request`; open breaker trips with
       reset calling `breaker.reset`. No other writes.
 
 ## Task 4: Streaming reasoning (G3)
 
-- [ ] `call_llm` accepts an optional token callback; the OpenAI, Anthropic and
+- [x] `call_llm` accepts an optional token callback; the OpenAI, Anthropic and
       Ollama backends already stream and call it as text arrives.
-- [ ] While the orchestrator thinks, its explanation streams as a dim line in
+- [x] While the orchestrator thinks, its explanation streams as a dim line in
       place of the spinner; the spinner remains when a backend cannot stream.
-- [ ] Only the explanation field is shown, not raw JSON; the parse chain is
+- [x] Only the explanation field is shown, not raw JSON; the parse chain is
       unchanged.
 
 ## Task 5: Palette, themes, ghost text, explain-last-error (G5, G6, K1, K2)
 
-- [ ] `Ctrl+P`: fuzzy search over builtins, skills, snippets and tasks; Enter
+- [x] `Ctrl+P`: fuzzy search over builtins, skills, snippets and tasks; Enter
       inserts or runs, as the item's kind says.
-- [ ] `/theme <name>` and layout presets (focus / fleet / minimal) applied to
+- [x] `/theme <name>` and layout presets (focus / fleet / minimal) applied to
       the tmux layout.
-- [ ] K1: an `AutoSuggest` that ranks history by same directory first, then
+- [x] K1: an `AutoSuggest` that ranks history by same directory first, then
       recency; returns within 150 ms or suggests nothing.
-- [ ] K2: after a non-zero exit, one dim line `? explain  ! fix`. `?` sends the
+- [x] K2: after a non-zero exit, one dim line `? explain  ! fix`. `?` sends the
       command, exit code and last 40 lines (redacted) and prints a short
       explanation block; `!` asks for a fix and shows it as a normal confirm
       block through `gate()`.
 
 ## Task 6: Docs and the live gate run
 
-- [ ] `docs/contracts.md` for blocks, `ui/state.py`, the dash's writes.
-- [ ] `scripts/gate_phase4.py`: the gate lines above on a pty in the playground
+- [x] `docs/contracts.md` for blocks, `ui/state.py`, the dash's writes.
+- [x] `scripts/gate_phase4.py`: the gate lines above on a pty in the playground
       against the live model; transcripts in `docs/history/`. Visual lines the
       harness cannot judge (badges, sparklines) are captured as screen dumps
       and marked for a human look rather than claimed.
+
+> **Gate run 2026-09-28, `openai/gpt-4o-mini`: all six lines passed on the first run.** Blocks and `/block N rerun`; ghost text in 52 ms; `? explain` and `! fix`; `/dash` approve with `a` then `y`; the sidebar's five sections at 120 columns and hidden at 80; cold start median 100 ms. Not covered: a real sub-agent continuing after a `/dash` approval (needs tmux), and badge colours and the sparkline, which need a human look. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`.
+>
+> **Finding, not yet fixed:** the `! fix` transcript shows the orchestrator re-proposing the same command after each `q` (cancel). A cancel appends `[user cancelled ...]` and the model tries the same thing again; the third-identical refusal only counts commands that ran. Two cancels in a row should end the goal.

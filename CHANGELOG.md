@@ -4,6 +4,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+- **Phase 4 gate run: all six lines pass, so v0.8 is complete.** `scripts/gate_phase4.py` checks blocks and `/block N rerun`, ghost text (52 ms), `? explain` and `! fix`, approving from `/dash`, the sidebar showing at 120 columns and hiding at 80, and cold start (median 100 ms). A sub-agent resuming after a `/dash` approval and the sidebar's colours were not checked by the harness. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`. `ROADMAP.md` ticks v0.8; v0.9 is next. One finding is recorded, not yet fixed: after `q` cancels a proposal the orchestrator proposes the same command again.
+
 ### Fixed
 - **Ctrl+B never worked.** The key binding set a `global _bypass_next` in the prompt module while the REPL read its own `_bypass_next`, so Ctrl+B printed "[bash mode]" and the next line was routed as usual. With text already typed it also called `_record_router_correction`, which the prompt module never imported, and raised `NameError`. The binding now only records the request (`session.take_bypass()`), and the REPL takes it before routing and records the correction itself, since `ui` may not import `app`. Checked live on a pty: after Ctrl+B, "show me the files" ran in bash. Found while reviewing Phase 4 Task 5. 3 tests.
 
