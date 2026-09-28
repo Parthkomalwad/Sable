@@ -3,18 +3,18 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sable-mark-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/sable-mark-light.svg">
-  <img src="docs/assets/sable-mark-dark.svg" alt="sable — the shell that asks first" width="380">
+  <img src="docs/assets/sable-mark-dark.svg" alt="sable, your server's AI operator" width="380">
 </picture>
 
 <br>
 
-### The Linux login shell that speaks plain English, shows you every command before it runs, and remembers how your server works.
+### Talk to your server in plain English. Sable runs the work, watches it while you sleep, and pings your phone before anything risky.
 
 [![CI](https://github.com/Parthkomalwad/sable/actions/workflows/ci.yml/badge.svg)](https://github.com/Parthkomalwad/sable/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-8B7CF6.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#quick-start)
-[![Status](https://img.shields.io/badge/status-v0.6%20alpha-E7B24B)](ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-v0.9%20alpha-E7B24B)](ROADMAP.md)
 
 **[Documentation](https://claude.ai/artifact/Vr4twSX8dcLQpcusj3RoyS)** ·
 [Quick start](#quick-start) ·
@@ -35,14 +35,17 @@
 
 You know the machine. You do not know the exact `find` invocation, the `journalctl` flag, or which `docker prune` keeps your volumes. So you leave the terminal, search, and paste back a command you have not fully read, onto production.
 
-Sable replaces `/bin/bash` on the server and removes that round trip without removing you from the loop. Type bash and it runs. Type plain English and a model proposes a command, shows it to you, and waits.
+Sable is an AI operator that lives in your server's shell. It replaces `/bin/bash` at login: type bash and it runs; type plain English and it works out the commands, runs the job, and remembers how this machine works. When you log off it keeps going: scheduled jobs, watchers on disk, logs and services, and a push to your phone when something needs you.
 
-> **Sable is the shell that asks first.** Nothing runs that you did not see. Anything destructive needs the literal word `YES`. And `scp`, `rsync` and `git push` never touch the model.
+> **You stay in command.** Every command it proposes is shown before it runs, anything risky waits for your approval (in the shell, in `/inbox`, or from your phone), and every action lands in an audit log. `scp`, `rsync` and `git push` never touch the model.
 
+- **Works while you're away.** `sabled` runs `/schedule "every night at 2am, back up postgres"` and `/watch` triggers, under the same policy as you.
+- **Your phone is the approve button.** ntfy pushes for finished jobs and waiting approvals; tap Approve, single-use and expiring.
 - **Previewed and gated.** Every proposed command is an editable preview; eleven destructive patterns need `YES`, and three (`rm -rf /`, a fork bomb, `chmod -R 777 /`) never run.
 - **Sandboxed sub-agents.** Long work runs in its own tmux window inside `bwrap`, and you keep your prompt.
 - **Skills that learn.** Work you repeat becomes a Markdown skill you approve, ranked by how often it succeeds.
-- **No hidden spend.** A live tmux sidebar shows cost, running agents and system state.
+- **No hidden spend.** A live sidebar and `/dash` show cost, running agents and everything waiting on you.
+- **Speaks MCP.** Plug in MCP servers with `/mcp add`, or let Claude Code drive the box through `sable --mcp-serve`, behind the same policy and audit.
 - **Offline if you want.** Ollama by default; OpenAI and Anthropic over direct `httpx`, no gateway.
 
 ## Quick start
@@ -80,7 +83,7 @@ The README artwork is generated: edit the templates in [scripts/assets/](scripts
 
 <div align="center">
 
-<sub>sable · the shell that asks first</sub>
+<sub>sable · your server's AI operator</sub>
 
 [MIT](LICENSE) © 2026 Parth Komalwad
 

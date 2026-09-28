@@ -9,7 +9,7 @@
   </defs>
   <rect x="4" y="4" width="248" height="248" rx="56" fill="url(#tile)" stroke="__RULE2__" stroke-width="2"/>
   <g transform="translate(28 28) scale(0.78125)">
-    <path d="M78.2 42.4 L177.8 99.9 L131.1 126.8 L131.1 157.4" fill="none" stroke="url(#ac)" stroke-width="36.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="94.3" y="189.6" width="73.6" height="34.5" rx="8" fill="__ACC__"/>
+    <path d="M62 60 L130 128 L62 196" fill="none" stroke="url(#ac)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="184" cy="178" r="26" fill="__OK__"/>
   </g>
 </svg>
