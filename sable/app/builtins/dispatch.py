@@ -54,6 +54,7 @@ _HELP_TEXT = (
     "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
     "  /tools       Tools each agent role may call, and at which tier\n"
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
+    "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
     "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
@@ -414,6 +415,10 @@ def handle_builtin(
 
     if cmd == "/approve" or cmd.startswith("/approve "):
         return _handle_approve_builtin(cmd[len("/approve"):].strip(), db)
+
+    if cmd == "/schedule" or cmd.startswith("/schedule "):
+        from sable.app.builtins.schedule import handle_schedule
+        return handle_schedule(cmd[len("/schedule"):].strip(), getattr(db, "_conn", None), config)
 
     if cmd == "/secret" or cmd.startswith("/secret "):
         from sable.app.builtins.secret import _handle_secret_builtin
