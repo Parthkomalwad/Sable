@@ -12,7 +12,7 @@ you about it. Nothing runs unattended that policy would not run unattended.
 
 ```
 /schedule "every 2 minutes write the date to ~/heartbeat.log" -> approve once; /exit; wait 5 min; cat shows >= 2 lines
-/schedule "nightly prune docker images" -> the plan has `docker image prune` (confirm tier) -> the job lands in /inbox, never runs on its own
+/schedule "nightly delete /tmp/old-builds" -> the plan has `rm -rf` (confirm tier; the default policy rates `docker image prune` allow) -> the job lands in /inbox, never runs on its own
 /inbox lists it; /inbox approve N runs that one step once
 /watch disk / 90 -> a fake full disk fires a notify-only event
 Kill the daemon mid-job -> restart -> reconcile marks the run lost, schedules resume
