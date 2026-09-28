@@ -19,7 +19,7 @@ ENV TERM=xterm-256color
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv bash tmux curl ca-certificates \
-    bubblewrap openssh-server git procps vim less locales \
+    bubblewrap openssh-server git procps vim less locales nodejs npm \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
@@ -28,6 +28,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt pytest \
     && python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base'); tiktoken.get_encoding('o200k_base')"
+
+# Phase 6: MCP servers are mostly npm packages. Install the filesystem server
+# once so `/mcp add` and the gate work without fetching it at run time.
+RUN npm install -g --no-fund --no-audit @modelcontextprotocol/server-filesystem
 
 # Runtime dirs + audit log
 RUN mkdir -p /root/.config/agentic-shell /root/.local/share/agentic-shell /var/log/agentic-shell /run/sshd \

@@ -56,8 +56,10 @@ def main():
                         "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "new", "version": "2"}}})
         elif method == "tools/list":
             start = int(params.get("cursor") or 0)
-            page = {"tools": TOOLS[start:start + 2]}
-            if start + 2 < len(TOOLS):
+            tools = TOOLS + ([{"name": "ask", "description": "asks the user a name, then greets them",
+                               "inputSchema": {"type": "object"}}] if MODE == "input-required" else [])
+            page = {"tools": tools[start:start + 2]}
+            if start + 2 < len(tools):
                 page["nextCursor"] = str(start + 2)
             reply(mid, page)
         elif method == "tools/call":
