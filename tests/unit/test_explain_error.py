@@ -28,7 +28,8 @@ def test_hint_only_after_non_zero(capsys):
     assert repl._last_failure is None
     _run(2, "boom")
     out = capsys.readouterr().out
-    assert "exit 2" in out and "? explain   ! fix" in out
+    # The block footer shows the exit code; no second `exit N` line.
+    assert "exit 2" not in out and "? explain   ! fix" in out
     assert repl._last_failure == explain.Failure("make build", 2, "boom", "/tmp")
 
 
