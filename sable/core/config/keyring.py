@@ -11,6 +11,8 @@ secret" and refuse on the first rather than run with nothing.
 """
 from __future__ import annotations
 
+from sable.core.config import passstore
+
 KEYRING_APP = "agentic-shell"
 
 # secretstorage raises its own SecretStorageException family, which is not an
@@ -48,6 +50,9 @@ def store_api_key(service: str, key: str) -> None:
             replace=True,
         )
     except _ERRORS as exc:
+        if service.startswith(BROKER_PREFIX):
+            _pass_or_refuse(exc, lambda: passstore.insert(service[len(BROKER_PREFIX):], key))
+            return
         # No secretstorage, no D-Bus session, or a locked collection that will
         # not unlock. The caller falls back to config.json.
         raise RuntimeError(
@@ -58,6 +63,31 @@ def store_api_key(service: str, key: str) -> None:
 class KeyringUnavailable(RuntimeError):
     """secretstorage or the D-Bus session it needs is not there."""
 
+
+# Broker secrets fall back to `pass` when the Secret Service is missing (a
+# headless server over SSH). API keys do not: they already fall back to
+# config.json, and adding a gpg prompt to backend startup is not worth it.
+BROKER_PREFIX = "secret:"
+PASS_HINT = "no Secret Service and no pass store; run `pass init <gpg-id>` to enable secrets on a headless server"
+
+
+def _pass_or_refuse(exc: BaseException, op):
+    """Run `op` against pass, or raise KeyringUnavailable naming the way out."""
+    if not passstore.available():
+        raise KeyringUnavailable(f"{exc}; {PASS_HINT}") from exc
+    try:
+        return op()
+    except passstore.PassError as perr:
+        raise KeyringUnavailable(str(perr)) from perr
+
+
+def backend() -> str:
+    """'secret-service', 'pass', or 'none': where broker secrets live now."""
+    try:
+        _collection()
+        return "secret-service"
+    except KeyringUnavailable:
+        return "pass" if passstore.available() else "none"
 
 
 def _collection():
@@ -75,6 +105,15 @@ def _collection():
 def lookup(service: str) -> str | None:
     """Value for `service`, None if absent. Raises KeyringUnavailable."""
     try:
+        return _lookup(service)
+    except KeyringUnavailable as exc:
+        if not service.startswith(BROKER_PREFIX):
+            raise
+        return _pass_or_refuse(exc, lambda: passstore.show(service[len(BROKER_PREFIX):]))
+
+
+def _lookup(service: str) -> str | None:
+    try:
         items = list(_collection().search_items(
             {"application": KEYRING_APP, "service": service}
         ))
@@ -87,6 +126,15 @@ def lookup(service: str) -> str | None:
 
 def delete(service: str) -> bool:
     """Remove `service`. True if something was removed. Raises KeyringUnavailable."""
+    try:
+        return _delete(service)
+    except KeyringUnavailable as exc:
+        if not service.startswith(BROKER_PREFIX):
+            raise
+        return _pass_or_refuse(exc, lambda: passstore.remove(service[len(BROKER_PREFIX):]))
+
+
+def _delete(service: str) -> bool:
     try:
         items = list(_collection().search_items(
             {"application": KEYRING_APP, "service": service}
@@ -102,6 +150,16 @@ def delete(service: str) -> bool:
 
 def services(prefix: str = "") -> list[str]:
     """Sorted service names starting with `prefix`. Raises KeyringUnavailable."""
+    try:
+        return _services(prefix)
+    except KeyringUnavailable as exc:
+        if not prefix.startswith(BROKER_PREFIX):
+            raise
+        names = _pass_or_refuse(exc, passstore.names)
+        return sorted(n for n in (BROKER_PREFIX + x for x in names) if n.startswith(prefix))
+
+
+def _services(prefix: str) -> list[str]:
     try:
         items = _collection().search_items({"application": KEYRING_APP})
         names = {i.get_attributes().get("service", "") for i in items}

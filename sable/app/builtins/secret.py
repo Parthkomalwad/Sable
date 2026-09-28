@@ -20,7 +20,8 @@ def _handle_secret_builtin(argument: str, prompt=getpass.getpass) -> bool:
     try:
         if sub == "list" and not rest:
             names = [s[len(SERVICE_PREFIX):] for s in keyring.services(SERVICE_PREFIX)]
-            _out("\n".join(f"  {n}" for n in names) if names else "no secrets stored")
+            body = "\n".join(f"  {n}" for n in names) if names else "no secrets stored"
+            _out(f"backend: {keyring.backend()}\n{body}")
         elif sub in ("add", "rm") and len(rest) == 1:
             name = rest[0]
             if not NAME.match(name):
