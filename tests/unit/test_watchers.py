@@ -107,7 +107,7 @@ class TestHandler:
         c, _ = conn
         calls = []
         monkeypatch.setattr(watchers.jobs, "run_plan",
-                            lambda conn, job, steps, cwd: calls.append((job, steps)))
+                            lambda conn, job, steps, cwd, **kw: calls.append((job, steps)))
         wid = watchers.add(c, "disk", "/", "90", tier="run", steps=["df -h"])
         watchers.run_due(c, now=1.0, readers=_r(**FULL))
         assert calls == [(f"watch:{wid}", ["df -h"])]
