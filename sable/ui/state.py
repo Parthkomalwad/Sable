@@ -3,6 +3,8 @@
 Phase 4, Task 0. Both UIs render the same answers, so they come from one
 place: agents and their status, the inbox (approvals a sub-agent is waiting
 on, and open breaker trips), cost per agent, and an agent's recent log lines.
+`/inbox` (Phase 5) adds one non-SQLite read: pending crystallised skills,
+which live in skills_index.json.
 
 Read-only by design. Each call opens a short-lived WAL connection, reads, and
 closes, so a UI process never holds a lock the shell or an agent needs. A
@@ -17,6 +19,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 #: Status badges, in the words the roadmap uses. `tasks.status` values map
@@ -46,11 +49,12 @@ class Agent:
 
 @dataclass(frozen=True)
 class InboxItem:
-    kind: str          # "approval" | "breaker"
+    kind: str          # "approval" | "breaker" | "skill"
     id: int
     agent: str
-    text: str          # the command waiting, or the trip reason
+    text: str          # the command waiting, the trip reason, or the skill name
     why: str
+    created_at: float = 0.0
 
 
 def _db(db_path: str | Path | None) -> Path:
@@ -116,6 +120,42 @@ def inbox(db_path=None) -> list[InboxItem]:
               for tid, job, reason in _rows(
                   db_path, "SELECT id, job, reason FROM breaker_trips WHERE status = 'tripped' ORDER BY id")]
     return items
+
+
+def _pending_skills() -> list[InboxItem]:
+    """Crystallised drafts from skills_index.json, read without SkillIndex's writes."""
+    path = Path.home() / "skills" / "skills_index.json"
+    try:
+        entries = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    items = []
+    for e in entries:
+        if not isinstance(e, dict) or e.get("status") != "pending":
+            continue
+        try:
+            at = datetime.fromisoformat(e.get("created_at") or "").timestamp()
+        except (TypeError, ValueError):
+            at = 0.0
+        items.append(InboxItem("skill", 0, "crystalliser", e.get("name", ""), "skill proposal", at))
+    return items
+
+
+def inbox_all(db_path=None) -> list[InboxItem]:
+    """Everything waiting on a human, oldest first; `/inbox` numbers them from 1.
+
+    Oldest first so a new arrival never renumbers what is already listed.
+    A daemon's queued step (agent `daemon:<job>`) reads as "scheduled job <job>".
+    """
+    items = [InboxItem("approval", qid, f"scheduled job {agent[7:]}" if agent.startswith("daemon:") else agent,
+                       command, f"{rule}: {why}" if rule else (why or ""), at)
+             for qid, at, agent, command, rule, why in _rows(
+                 db_path, "SELECT id, created_at, agent, command, rule, why FROM policy_queue "
+                          "WHERE status = 'pending'")]
+    items += [InboxItem("breaker", tid, job, reason, "circuit breaker", at)
+              for tid, at, job, reason in _rows(
+                  db_path, "SELECT id, created_at, job, reason FROM breaker_trips WHERE status = 'tripped'")]
+    return sorted(items + _pending_skills(), key=lambda i: i.created_at)
 
 
 def tail(agent: str, n: int = 20, db_path=None) -> list[str]:
