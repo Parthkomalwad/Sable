@@ -75,7 +75,9 @@ def main():
             elif name == "ask" and "inputResponses" not in params:
                 reply(mid, {"resultType": "input_required", "requestState": "s1",
                             "inputRequests": {"who": {"method": "elicitation/create",
-                                                      "params": {"message": "Name?"}}}})
+                                                      "params": {"message": "Name?", "requestedSchema": {
+                                                          "type": "object", "required": ["name"],
+                                                          "properties": {"name": {"type": "string"}}}}}}})
             elif name == "ask":
                 who = params["inputResponses"]["who"]["content"]["name"]
                 reply(mid, {"content": [{"type": "text",
