@@ -12,6 +12,7 @@ import re
 import sqlite3
 import sys
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -139,6 +140,8 @@ class OrchestratorAgent:
         self._seen_urls: set[str] = set()
         #: Pages `web.fetch` read this goal, listed when it finishes (J2).
         self._pages_read: list[str] = []
+        #: Cost of the latest model turn, for the footer of the block it ran.
+        self._last_turn_cost: float | None = None
 
         # Skills, injected rather than imported, for the same layering reason
         # as `corrections_db` above: `agents` sits below `skills`, and
@@ -313,11 +316,11 @@ class OrchestratorAgent:
             })
             return
 
+        t0 = time.monotonic()
         output = self._run_command(confirmed_cmd)
+        ms = int((time.monotonic() - t0) * 1000)
         self._guard.ran(runtime.action_key({"command": confirmed_cmd}))
-        if output.strip():
-            sys.stdout.write(f'\n{output.rstrip()}\n\n')
-            sys.stdout.flush()
+        self._show_block(confirmed_cmd, output, ms)
         output = self._verify(action, output)
         # A post_command hook's `context` is appended to what the model reads
         # of the output; its `message` is for the user only.
@@ -890,6 +893,7 @@ class OrchestratorAgent:
         prompt_tokens = getattr(response, "prompt_tokens", 0)
         completion_tokens = getattr(response, "completion_tokens", 0)
         cost_usd = getattr(response, "cost_usd", 0.0)
+        self._last_turn_cost = cost_usd  # shown on the block this turn runs (G2)
 
         record_turn(
             self._db_path,
@@ -1106,6 +1110,41 @@ class OrchestratorAgent:
         from sable.skills.corrections import KIND_EDIT, record_correction
 
         record_correction(self._corrections_db, proposed, corrected, kind=KIND_EDIT)
+
+    def _show_block(self, command: str, output: str, ms: int) -> None:
+        """Print a ran command as block N and record it (G2).
+
+        The confirm preview above already showed the command, so the header is
+        just the number in the blast colour, then the output, then the footer.
+        The cost is the model turn that proposed the command. A refused
+        command is not a block. Never raises: a block is telemetry.
+        """
+        from sable.core import blocks
+        from sable.policy import blast
+        from sable.policy.engine import redact_text
+
+        if output.startswith("[blocked:"):
+            return
+        code = runtime.exit_code_of(output)
+        number = None
+        try:
+            conn = sqlite3.connect(self._db_path, check_same_thread=False)
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+                number = blocks.start(conn, self._session_id, self._cwd, command)
+                blocks.finish(conn, number, code, ms, output,
+                              cost_usd=self._last_turn_cost, redact=redact_text)
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            pass
+        if number is not None:
+            colour = blast.COLOURS[blast.classify(command)]
+            sys.stdout.write(f"\n{colour}#{number}{blocks.RESET}\n")
+        if output.strip():
+            sys.stdout.write(f"{output.rstrip()}\n")
+        sys.stdout.write(blocks.footer(code, ms, self._last_turn_cost) + "\n\n")
+        sys.stdout.flush()
 
     def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
         """Run a command via ptyprocess in cwd. Returns output string.
