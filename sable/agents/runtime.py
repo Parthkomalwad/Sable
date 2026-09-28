@@ -316,6 +316,29 @@ def _local_url(url: str) -> bool:
     return parts.scheme in ("http", "https") and parts.hostname in ("localhost", "127.0.0.1")
 
 
+_VERIFY_EXIT = re.compile(r"^\s*exit\s*(?:==|=|:)\s*(\d+)\s*$", re.IGNORECASE)
+_VERIFY_KEYED = re.compile(r"^\s*(stdout_contains|file_exists)\s*:\s*(.+?)\s*$")
+
+
+def _structured_verify(verify):
+    """A string that spells a structured check, as the structured check.
+
+    The contract says `{"exit": 0}`, but a live gate run showed gpt-4o-mini
+    sending `"verify": "exit: 0"`. Run as a shell command that can never
+    pass (`exit:: command not found`), so a successful `fs.read` was marked
+    failed twice and the goal abandoned. `exit: N`, `exit == N`,
+    `stdout_contains: text` and `file_exists: path` now mean what they say;
+    any other string is still a shell command.
+    """
+    if not isinstance(verify, str):
+        return verify
+    if m := _VERIFY_EXIT.match(verify):
+        return {"exit": int(m.group(1))}
+    if m := _VERIFY_KEYED.match(verify):
+        return {m.group(1): m.group(2).strip("\"'")}
+    return verify
+
+
 def run_verify(verify, *, output: str, cwd: str, run: Callable[[str], str]) -> dict | None:
     """Check an action with its `verify`. None when it passed.
 
@@ -326,6 +349,7 @@ def run_verify(verify, *, output: str, cwd: str, run: Callable[[str], str]) -> d
     def fail(check, got) -> dict:
         return {"verify": "failed", "check": check, "got": got}
 
+    verify = _structured_verify(verify)
     if isinstance(verify, str):
         if not verify.strip():
             return None

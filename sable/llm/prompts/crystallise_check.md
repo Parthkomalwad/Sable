@@ -34,5 +34,10 @@ Guidance on the fields:
   command names.
 - Keep `body` concise. It is injected into a model's context every time the
   skill matches, so every line costs tokens on every future run.
+- Leave out the steps that only found the procedure: listing the directory,
+  reading a README or docs, `--help`, looking around. The skill replaces that
+  discovery; recording it makes the next run repeat it and saves nothing. Keep
+  the steps that do the work, in order, and any check that proves it worked.
+  If a found fact matters (a path, a port), put it in the steps instead.
 - Be sparing with `reusable: true`. A library full of one-off skills is worse
   than a small one, because every bad skill dilutes what matching returns.

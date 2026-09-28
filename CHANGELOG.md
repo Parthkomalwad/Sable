@@ -11,6 +11,19 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - **A retried plan step skipped policy and kept the wrong exit code in the audit ledger.** The `[r]etry` choice called the runner directly: no `gate()`, so a rule or hook added since the first attempt was not consulted, and no audit row, so `/audit` showed only the failed first attempt even when the retry succeeded. A retry is now gated and audited as its own run. 2 tests.
 
 ### Fixed
+- **Phase 2's owed gate line passes: run 2 of "deploy the api" took 3 actions after run 1 took 4**, using the skill run 1 drafted. `scripts/gate_phase2_turns.py` gives the agent a workspace whose README holds the procedure, so the goal is vague and discoverable at once. Every run is in `docs/history/phase-2-turns-2026-09-28.md`, including the ones that did not pass. Three bugs found on the way:
+- **Skills recorded their own discovery.** A drafted skill kept "list the directory, read the README" as steps, so the next run repeated them and saved nothing. The crystalliser prompt now leaves out steps that only found the procedure.
+- **A tool used as a shell command ran in bash.** `$ fs.tree .` came back `command not found`. Both agents now catch a `run` whose first word is a tool name, run nothing, and tell the model how to call the tool. 8 tests.
+- **The model acted before looking.** It installed docker-compose and ran `docker-compose up` in a directory with no compose file. The orchestrator prompt now says to follow a matching skill, or else list the directory and read any README first, and never to install or assume a tool before what it found says so.
+- **Phase 3.5 gate run: all five lines passed at least once, and three bugs the unit suite missed.** `scripts/gate_phase3_5.py` drives the real REPL against a live model; every run is recorded in `docs/history/phase-3.5-gate-2026-09-28.md`, including the recovery line that the final run did not reproduce.
+- **A tool named as the action became a silent "the model declined this goal".** Models send `{"action": "fs.read", "path": ...}` rather than `{"action": "tool", "name": ..., "args": ...}`. `registry.normalize_action` accepts both on the orchestrator and the worker, and an action that is neither ours nor a tool is now reported by name instead of becoming `done`.
+- **The model did not know when to use tools.** Asked about a CVE, it proposed `docker-compose down` to "inspect the nginx version safely". Both prompts now say when to use web, file and docs tools, and the orchestrator's says never to stop or remove things in order to inspect them. After the change the model reached for `web.search`, `web.fetch` and `fs.patch` on its own.
+- **`"verify": "exit: 0"` ran as a shell command** and could never pass, so a successful `fs.read` was retried away. String spellings of the structured checks (`exit: N`, `exit == N`, `stdout_contains: x`, `file_exists: path`) now mean the check. 17 tests.
+
+### Changed
+- `docs/THREAT_MODEL.md` covers the tools: the registry gate, SSRF, file confinement, `docs.help`, budgets and credential files as mitigations, and three new limits (an untainted sub-agent can put data in a URL, `verify` proves only what it checks, web content can still mislead what a model says). `docs/contracts.md` §9.1 lists every tool with its tier and taint. `ROADMAP.md` ticks agent tools: **v0.7 is complete**.
+
+### Fixed
 - **The daily budget undercounted every day east of UTC.** Token events are stored with UTC timestamps, but "today" was matched with the local date, so in IST the daily spend read zero from local midnight until 05:30 and spend in that window was counted on the wrong day. Spend is now counted from local midnight, converted to UTC. Found when a cost test started failing just after midnight.
 
 ### Added

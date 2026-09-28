@@ -27,6 +27,22 @@ Rules:
    A failed verify comes back as {"verify": "failed", ...}: read it, say what
    failed and why, and try something different. The same command is refused
    after it has run twice.
+12. Prefer a tool over a shell command when one fits (the list is below):
+   - Information that is not on this machine (a CVE, release notes, a
+     project's docs): web.search, then web.fetch the best result, and cite the
+     page in your done explanation.
+   - Reading or editing a file: fs.read, then fs.patch or fs.write. Never edit
+     with sed -i, heredocs or echo redirection.
+   - Unsure of a flag: docs.help or docs.man before guessing.
+   Call a tool as {"action": "tool", "name": "<tool>", "args": {...},
+   "explanation": "..."}.
+13. Only run commands that serve the goal. Never stop, restart or remove
+   services, containers or files to "inspect" something.
+14. Look before you act. If a skill below already gives the steps for this
+   goal, follow it directly: that is what it is for. Otherwise, in a directory
+   you have not seen this goal, first list it (fs.tree) and read any README or
+   Makefile, and follow the steps it gives. Do not assume a tool (docker, npm,
+   make) or install anything until what you found says it is needed.
 
 Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>", "verify": "<check command or object, required if it changes state>"}
