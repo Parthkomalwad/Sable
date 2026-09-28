@@ -148,7 +148,7 @@ def _runner(client: Client, mcp_name: str):
     def run(args: dict, ctx: ToolContext) -> ToolResult:
         try:
             r = client.call_tool(mcp_name, args, on_input=ON_INPUT)
-        except McpError as exc:
+        except (McpError, OSError) as exc:
             raise ToolError(str(exc)) from exc
         return ToolResult(ok=not r.is_error, output=r.text, taints=True)
     return run
