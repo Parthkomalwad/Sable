@@ -22,8 +22,34 @@ description = "Default destructive-command blocklist and secret formats"
 # ── Commands that require an explicit typed confirmation ────────────────────
 # Matching one of these does not block the command outright; it forces the
 # literal-YES confirm flow in policy/engine.py. `tier` is allow, confirm or
-# deny; a rule without one is confirm. None is deny yet, because the callers
-# cannot act on deny until Phase 3 Task 2 replaces is_destructive.
+# deny; a rule without one is confirm. Rules are tried in order and the first
+# match decides, so the deny rules come first.
+#
+# Deny is for commands with no legitimate use on a live server: they never
+# run, not even with approval. `dd` and `mkfs` stay confirm, because imaging a
+# USB stick is real work and a pattern cannot tell a spare disk from the one
+# mounted at /.
+
+[[destructive]]
+name = "rm-root"
+tier = "deny"
+category = "filesystem"
+pattern = '\brm\s+(-[^\s]*\s+)*-[^\s]*[rR][^\s]*\s+(-[^\s]*\s+)*/\*?(\s|$|[;&|])'
+why = "recursively deleting / or everything under it destroys the whole system"
+
+[[destructive]]
+name = "fork-bomb"
+tier = "deny"
+category = "system"
+pattern = ':\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:'
+why = "a fork bomb exhausts the process table until the machine is rebooted"
+
+[[destructive]]
+name = "chmod-root-777"
+tier = "deny"
+category = "filesystem"
+pattern = '\bchmod\s+(-[^\s]*\s+)*-[^\s]*R[^\s]*\s+(-[^\s]*\s+)*0?777\s+/(\s|$|[;&|])'
+why = "making every file on the system world-writable breaks ssh, sudo and every permission boundary"
 
 [[destructive]]
 name = "dd-to-device"

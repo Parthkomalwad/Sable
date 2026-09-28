@@ -23,8 +23,8 @@ from sable.policy.engine import DESTRUCTIVE_PATTERNS, SECRET_PATTERNS
 class TestShippedPolicyLoads:
     def test_destructive_rules_are_present(self):
         loaded = rules.destructive_rules()
-        assert len(loaded) == 11, (
-            f"expected the documented 11 destructive patterns, got {len(loaded)}. "
+        assert len(loaded) == 14, (
+            f"expected the documented 14 destructive patterns, got {len(loaded)}. "
             f"If a rule was added or removed deliberately, update docs/vision.md "
             f"§2.6 and README, which both cite this count."
         )
@@ -245,11 +245,12 @@ class TestTiers:
         assert Tier.DENY == "deny"
         assert json.dumps({"t": Tier.DENY}) == '{"t": "deny"}'
 
-    def test_every_shipped_rule_has_an_explicit_confirm_tier(self):
-        """None is `deny` yet: callers cannot express it until Task 2."""
+    def test_every_shipped_rule_has_an_explicit_tier_and_deny_comes_first(self):
+        """First match decides, so a deny rule after a confirm one would never fire."""
         raw = tomllib.loads(rules.POLICY_PATH.read_text(encoding="utf-8"))
-        for entry in raw["destructive"]:
-            assert entry.get("tier") == "confirm", entry["name"]
+        tiers = [entry.get("tier") for entry in raw["destructive"]]
+        assert set(tiers) <= {"confirm", "deny"}, tiers
+        assert tiers == sorted(tiers, key=lambda t: t != "deny")
 
     def test_decision_carries_rule_why_and_source(self):
         rule = rules.match_destructive("rm -rf /tmp/x")

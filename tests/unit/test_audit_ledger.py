@@ -67,9 +67,9 @@ def test_query_filters_by_agent_and_since(db_path):
 def test_gate_records_refusal_with_rule(db_path):
     from sable.policy.engine import gate
 
-    assert gate("rm -rf /", role="worker", agent="w9", model="m") is False
+    assert gate("rm -rf /tmp/x", role="worker", agent="w9", model="m") is False
     (row,) = _rows(db_path)
-    # No default rule is `deny`; a worker cannot type YES, so confirm refuses.
+    # A confirm rule; a worker cannot type YES, so confirm refuses.
     assert row["agent"] == "w9" and row["model"] == "m"
     assert row["tier"] == "confirm" and row["rule"] and row["why"]
     assert row["outcome"] == "unconfirmed"

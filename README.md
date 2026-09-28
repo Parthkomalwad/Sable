@@ -39,7 +39,7 @@ Sable replaces `/bin/bash` on the server and removes that round trip without rem
 
 > **Sable is the shell that asks first.** Nothing runs that you did not see. Anything destructive needs the literal word `YES`. And `scp`, `rsync` and `git push` never touch the model.
 
-- **Previewed and gated.** Every proposed command is an editable preview; eleven destructive patterns need `YES`.
+- **Previewed and gated.** Every proposed command is an editable preview; eleven destructive patterns need `YES`, and three (`rm -rf /`, a fork bomb, `chmod -R 777 /`) never run.
 - **Sandboxed sub-agents.** Long work runs in its own tmux window inside `bwrap`, and you keep your prompt.
 - **Skills that learn.** Work you repeat becomes a Markdown skill you approve, ranked by how often it succeeds.
 - **No hidden spend.** A live tmux sidebar shows cost, running agents and system state.
