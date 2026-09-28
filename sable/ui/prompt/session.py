@@ -88,36 +88,17 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
 
     hhmm = _time.strftime("%H:%M")
 
-    # Path segment soft blue bg (#005f87 = 24)
-    path_seg = (
-        '\033[48;5;24m\033[97m'   # blue bg, bright white fg
-        f' {display_cwd} '
-        '\033[0m'
-        '\033[38;5;24m\033[48;5;55m\ue0b0\033[0m'  # powerline arrow (Unicode or space fallback)
-    )
+    from sable.ui.theme import sgr
 
-    # Git segment soft purple bg (55)
+    # Colours come from the active G6 theme (ui/theme.py).
+    reset = '\033[0m'
+    path_seg = f"{sgr('path')} {display_cwd} {reset}{sgr('path_arrow')}\ue0b0{reset}"
     git_seg = ""
     if branch:
-        git_seg = (
-            '\033[48;5;55m\033[97m'
-            f'  {branch} '
-            '\033[0m'
-            '\033[38;5;55m\033[48;5;236m\ue0b0\033[0m'
-        )
-
-    # Time segment dark grey bg (236)
-    time_seg = (
-        '\033[48;5;236m\033[2;37m'
-        f' {hhmm} '
-        '\033[0m '
-    )
-
-    # Cursor white normally, red if last exit non-zero
-    if last_exit != 0:
-        cursor = '\033[38;5;203m❯\033[0m'
-    else:
-        cursor = '\033[0;37m❯\033[0m'
+        git_seg = f"{sgr('git')}  {branch} {reset}{sgr('git_arrow')}\ue0b0{reset}"
+    time_seg = f"{sgr('time')} {hhmm} {reset} "
+    # The cursor takes the theme's error colour after a non-zero exit
+    cursor = f"{sgr('err' if last_exit != 0 else 'ok')}\u276f{reset}"
 
     return path_seg + git_seg + time_seg + cursor + ' '
 
@@ -177,6 +158,14 @@ def _make_key_bindings(db=None) -> KeyBindings:
         from prompt_toolkit.document import Document
 
         event.app.current_buffer.set_document(Document("/task guide "))
+
+    @kb.add("c-p")
+    def _ctrl_p(event) -> None:
+        """G5 palette. Submitted as a line so it opens outside this prompt."""
+        from prompt_toolkit.document import Document
+
+        event.app.current_buffer.set_document(Document("/palette"))
+        event.app.current_buffer.validate_and_handle()
 
     @kb.add("c-x")
     def _ctrl_x(event) -> None:

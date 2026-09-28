@@ -59,6 +59,8 @@ _HELP_TEXT = (
     "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
     "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
     "  /tour           Guided walkthrough of what Sable does\n"
+    "  /theme <name>  Colours: default, mono, high-contrast\n"
+    "  /layout <name>  tmux panes: focus, fleet, minimal\n"
     "  /budget reset  Clear hard-stop budget flag\n"
     "  /memory                  View current context\n"
     "  /memory versions         List all saved snapshots\n"
@@ -68,6 +70,8 @@ _HELP_TEXT = (
     "  >> text        Force agentic (prefix mode)\n"
     "  Ctrl+B         Next command runs as raw bash\n"
     "  Ctrl+G         Steer a running agent\n"
+    "  Ctrl+P         Palette: builtins, skills, snippets, tasks\n"
+    "  ?  /  !        After a failed command: explain it / propose a fix\n"
     "  Ctrl+T         Toggle telemetry sidebar\n"
 )
 
@@ -305,6 +309,22 @@ def handle_builtin(
 
     if cmd == "/model":
         _out(f"backend: {config.backend}  model: {config.model}")
+        return True
+
+    if cmd == "/theme" or cmd.startswith("/theme "):
+        from sable.ui.theme import THEMES, persist, set_theme
+        name = cmd[len("/theme"):].strip()
+        if not set_theme(name):
+            _out(f"theme: {config.theme}   usage: /theme {'|'.join(THEMES)}")
+            return True
+        config.theme = name
+        saved = "" if persist(name) else " (not saved: config.json unwritable)"
+        _out(f"theme: {name}{saved}")
+        return True
+
+    if cmd == "/layout" or cmd.startswith("/layout "):
+        from sable.ui.tmux.layout import apply_preset
+        _out(apply_preset(cmd[len("/layout"):].strip()))
         return True
 
     if cmd == "/mode":
