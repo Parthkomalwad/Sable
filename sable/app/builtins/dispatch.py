@@ -55,6 +55,7 @@ _HELP_TEXT = (
     "  /tools       Tools each agent role may call, and at which tier\n"
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
     "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
+    "  /watch add|list|rm  Daemon watchers: disk, file, log, http\n"
     "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
@@ -419,6 +420,9 @@ def handle_builtin(
     if cmd == "/schedule" or cmd.startswith("/schedule "):
         from sable.app.builtins.schedule import handle_schedule
         return handle_schedule(cmd[len("/schedule"):].strip(), getattr(db, "_conn", None), config)
+    if cmd == "/watch" or cmd.startswith("/watch "):
+        from sable.app.builtins.watch import handle_watch
+        return handle_watch(cmd[len("/watch"):].strip(), db)
 
     if cmd == "/secret" or cmd.startswith("/secret "):
         from sable.app.builtins.secret import _handle_secret_builtin
