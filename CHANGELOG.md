@@ -7,6 +7,8 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ### Added
 - **Phase 4 plan** (`docs/plans/2026-09-28-phase-4-command-center.md`): blocks in normal scrollback with `/block N`, a Textual sidebar and a full-screen `/dash` with an approval queue, streaming reasoning, a `Ctrl+P` palette, themes, directory-aware ghost text and explain-last-error. It adds `textual` as a dependency, with the case for it written out; the shell itself never imports it.
 
+- **Phase 4 (Task 0): `textual` and one read-only state layer.** `textual>=8.2,<8.3` is approved for the sidebar and `/dash`, which run as their own processes; a test fails if the shell ever imports it, so cold start is unaffected. `sable/ui/state.py` answers what both UIs show: agents with status badges (thinking, running, blocked, awaiting approval, done, failed), the inbox (pending approvals and open breaker trips), cost and tokens per agent, and an agent's recent event lines. It only reads, over short-lived read-only connections, and a missing table is an empty answer rather than an error. 6 tests.
+
 ### Added
 - **Reading a credential file always needs `YES`.** A model that reads a private key has sent it to its provider, which is the leak. Any command or tool call that names one (`~/.ssh` private keys and `authorized_keys`, `~/.aws/credentials`, `~/.gnupg/`, `.netrc`, `.pgpass`, `.git-credentials`, docker and kube configs, Sable's own config file, `/etc/shadow`, `/etc/sudoers`) is at least `confirm`, from a built-in floor in `policy/privilege.py` beside the `sudo` one, so no policy file can relax it and a sub-agent is refused. `cat` and `fs.read` are covered by the same rule. Public keys and `known_hosts` are not affected. 24 tests.
 

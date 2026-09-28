@@ -177,8 +177,13 @@ conn.execute("PRAGMA synchronous=NORMAL")
 
 ```
 prompt_toolkit, pygments, ptyprocess, httpx, httpx-sse,
-rich, tiktoken==0.9.0, libtmux>=0.55<0.56, token-reducer, secretstorage
+rich, tiktoken==0.9.0, libtmux>=0.55<0.56, token-reducer, secretstorage,
+textual>=8.2<8.3
 ```
+
+`textual` is approved for the sidebar and `/dash` only (Phase 4, argued in
+`docs/plans/2026-09-28-phase-4-command-center.md` §0.1). Those run as their own
+processes; the shell must never import it, and `test_ui_state.py` checks that.
 
 Data files are read with `tomllib`, which is stdlib from Python 3.11 and so
 adds no dependency. Do not add a YAML parser for them: `sable/policy/defaults/
