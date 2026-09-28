@@ -101,6 +101,8 @@ def due(conn, now: datetime) -> None:
         conn.execute("UPDATE schedules SET last_run_minute = ? WHERE id = ?", (minute, row["id"]))
         conn.commit()
         if not _busy(conn, row["name"]):
+            # ponytail: runs inline, so a long job delays the other handlers
+            # (bounded by the per-step timeout); a worker thread if that bites.
             jobs.run_plan(conn, row["name"], row["steps"], cwd=row["cwd"])
 
 
