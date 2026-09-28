@@ -5,6 +5,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **`sabled`, the background daemon (Phase 5 Task 0, E1).** `sable daemon run|install|status|stop`. `install` writes a systemd user unit and prints the commands to enable it; it never runs `systemctl` itself. The loop ticks every 5 seconds and a failing handler is logged without stopping the others; a second daemon refuses to start (`flock`). `jobs.run_plan` runs an approved plan with no model call: `allow` steps run and are audited, a `confirm` step is queued to the inbox and the run waits until it is approved (or fails if rejected), a `deny` step fails the run. Runs left `running` by a dead daemon are marked `lost` at startup. The playground starts the daemon in the background. 11 tests.
 - **Phase 4 gate run: all six lines pass, so v0.8 is complete.** `scripts/gate_phase4.py` checks blocks and `/block N rerun`, ghost text (52 ms), `? explain` and `! fix`, approving from `/dash`, the sidebar showing at 120 columns and hiding at 80, and cold start (median 100 ms). A sub-agent resuming after a `/dash` approval and the sidebar's colours were not checked by the harness. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`. `ROADMAP.md` ticks v0.8; v0.9 is next. One finding is recorded, not yet fixed: after `q` cancels a proposal the orchestrator proposes the same command again.
 
 ### Fixed
