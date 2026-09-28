@@ -193,38 +193,23 @@ class TestPlaygroundLayout:
         assert main_h + 1 + tasks_h == HEIGHT
         assert side_h == HEIGHT
 
-    def test_sidebar_renders_the_session_panel_with_the_model(self, layout):
+    def test_sidebar_renders_the_agents_section(self, layout):
         """Geometry is not enough: a correctly sized blank pane is still a
-        broken sidebar. Assert the first Rich panel actually paints.
-
-        `_panel_session` in shell/telemetry/watch.py draws a "session" panel
-        whose first row is the configured model, so both strings appearing
-        means the watcher started, read config and rendered.
+        broken sidebar. The Textual sidebar (ui/sidebar/app.py) opens with
+        AGENTS and an INBOX count, so both appearing means it started, read
+        the database and rendered.
         """
-        rendered = _wait_for_content(layout["sidebar"], "session")
-        assert "Model" in rendered, (
-            f"sidebar rendered without the model row:\n{rendered}"
-        )
-        # The pane read the real config rather than printing a placeholder.
-        # Only asserted when this fixture wrote the config; inside a live
-        # playground the model is whatever the user configured.
-        import json
-        import pathlib
+        rendered = _wait_for_content(layout["sidebar"], "AGENTS")
+        assert "INBOX (" in rendered, f"sidebar rendered without the inbox:
+{rendered}"
 
-        configured = json.loads(
-            (pathlib.Path.home() / ".config" / "agentic-shell" / "config.json").read_text()
-        )["model"]
-        if configured == TEST_MODEL:
-            assert TEST_MODEL in rendered, (
-                f"sidebar shows a model other than the configured one:\n{rendered}"
-            )
-
-    def test_sidebar_renders_the_system_panel(self, layout):
-        """A second panel, so a partial render that stops after the first
+    def test_sidebar_renders_the_system_section(self, layout):
+        """A later section, so a partial render that stops after the first
         one does not pass.
         """
-        rendered = _wait_for_content(layout["sidebar"], "system")
-        assert "CPU" in rendered, f"system panel has no CPU row:\n{rendered}"
+        rendered = _wait_for_content(layout["sidebar"], "SYSTEM")
+        assert "load" in rendered, f"system section has no load row:
+{rendered}"
 
     def test_tasks_bar_renders_its_header(self, layout):
         """`shell/tasks/panel.py` draws a "TASKS" panel with a TASK/GOAL

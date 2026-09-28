@@ -242,11 +242,11 @@ class TestUpgradedSessionPanes:
             captured = ""
             while time.monotonic() < deadline:
                 captured = tmux("capture-pane", "-t", pane, "-p")
-                if "session" in captured:
+                if "AGENTS" in captured:
                     break
                 time.sleep(0.5)
 
-            assert "session" in captured, (
+            assert "AGENTS" in captured, (
                 "a pane started with the pre-upgrade command never rendered. "
                 f"An upgraded session would look like this:\n{captured}"
             )
