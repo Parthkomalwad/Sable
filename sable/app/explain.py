@@ -27,6 +27,12 @@ class Failure:
     command: str
     exit_code: int
     output: str
+    cwd: str = ""
+
+    @property
+    def tainting(self) -> bool:
+        from sable.policy.taint import is_tainting
+        return is_tainting(self.command, self.cwd or None)
 
 
 def hint() -> str:
@@ -37,12 +43,13 @@ def hint() -> str:
 def payload(failure: Failure) -> str:
     """The only text sent about a failure: command, exit, redacted tail."""
     from sable.policy.engine import redact_text
+    from sable.policy.taint import wrap_untrusted
 
     # Line by line: redact_text folds whitespace, newlines included.
     tail = "\n".join(redact_text(line) for line in failure.output.splitlines()[-TAIL_LINES:])
     return (f"Command: {redact_text(failure.command)}\n"
             f"Exit code: {failure.exit_code}\n"
-            f"Last {TAIL_LINES} lines of output:\n{tail}")
+            f"Last {TAIL_LINES} lines of output:\n{wrap_untrusted(tail)}")
 
 
 def _http_error() -> type:
@@ -86,5 +93,7 @@ def handle(line: str, failure: Failure | None, config, run_goal) -> bool:
     if line == "?":
         explain(failure, config)
     else:
-        run_goal(fix_goal(failure))
+        # Output from a tainting command is untrusted: the fixer starts
+        # tainted, as a worker spawned from a tainted turn does.
+        run_goal(fix_goal(failure), failure.tainting)
     return True
