@@ -60,6 +60,9 @@ class ShellConfig:
     tool_budgets: dict[str, dict[str, float]] = field(default_factory=dict)
     # ntfy (E5): server, topic, reply_topic. The access token is keyring-only.
     notify: dict[str, str] = field(default_factory=dict)
+    # MCP servers and trusted tools (Phase 6, sable/mcp/servers.py). Kept
+    # here so a settings-panel save does not drop it.
+    mcp: dict = field(default_factory=dict)
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -165,6 +168,10 @@ class ShellConfig:
                 for k, v in notify.items()):
             raise ValueError(f"notify must map server/topic/reply_topic to strings, got {notify!r}")
 
+        mcp = data.get("mcp") or {}
+        if not isinstance(mcp, dict):
+            raise ValueError(f"mcp must be an object, got {mcp!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -183,6 +190,7 @@ class ShellConfig:
             tool_budgets={t: {k: v for k, v in spec.items() if v is not None}
                           for t, spec in tool_budgets.items()},
             notify=dict(notify),
+            mcp=dict(mcp),
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -207,5 +215,6 @@ class ShellConfig:
             "tools": dict(self.tools),
             "tool_budgets": {t: dict(spec) for t, spec in self.tool_budgets.items()},
             "notify": dict(self.notify),
+            "mcp": dict(self.mcp),
             "api_key": getattr(self, "api_key", ""),
         }

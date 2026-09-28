@@ -2,7 +2,8 @@
 
 The schema is deliberately small, `{"arg": "type"}` with a trailing `?` for
 optional arguments and types `string`, `integer`, `number`, `boolean`,
-`object`, `array`. It is what a prompt can show a model in one line and what
+`object`, `array`, and `any` (an MCP argument whose JSON Schema type is a
+union or absent). It is what a prompt can show a model in one line and what
 validation can check without a JSON Schema dependency.
 """
 from __future__ import annotations
@@ -21,6 +22,7 @@ _TYPES: dict[str, type | tuple[type, ...]] = {
     "boolean": bool,
     "object": dict,
     "array": list,
+    "any": object,
 }
 
 

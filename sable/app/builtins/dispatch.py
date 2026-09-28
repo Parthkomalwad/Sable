@@ -52,6 +52,7 @@ _HELP_TEXT = (
     "  /inbox [show|approve|reject K]  Everything waiting on you, in one list\n"
     "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
     "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
+    "  /mcp add|list|remove|trust|untrust  MCP servers and their tools\n"
     "  /tools       Tools each agent role may call, and at which tier\n"
     "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
     "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
@@ -427,6 +428,10 @@ def handle_builtin(
     if cmd == "/secret" or cmd.startswith("/secret "):
         from sable.app.builtins.secret import _handle_secret_builtin
         return _handle_secret_builtin(cmd[len("/secret"):].strip())
+
+    if cmd == "/mcp" or cmd.startswith("/mcp "):
+        from sable.app.builtins.mcp import handle_mcp
+        return handle_mcp(cmd[len("/mcp"):])
 
     if cmd == "/dash":
         return _handle_dash_builtin()
