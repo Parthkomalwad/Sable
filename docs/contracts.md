@@ -589,8 +589,15 @@ command does not run and the model reads `[blocked: <reason>]`. No plaintext or
 env fallback. Resolved values in output are replaced by their placeholder
 before the model or memory sees it. Storage: keyring item attributes
 `{application: "agentic-shell", service: "secret:<name>"}`
-(`core/config/keyring.py`). `/secret add <name>` (no echo), `/secret list`
-(names only), `/secret rm <name>`. Raw bash lines typed by the user are not
+(`core/config/keyring.py`). When the Secret Service is unavailable, broker
+secrets (not API keys) fall back to `pass` if it is on PATH and the store is
+initialised (`$PASSWORD_STORE_DIR` or `~/.password-store` has `.gpg-id`):
+entry `sable/<name>`, written with `pass insert -m -f` from stdin, read as the
+first line of `pass show` (60 s timeout), removed with `pass rm -f`, listed from
+`sable/*.gpg` in the store dir (`core/config/passstore.py`). A `pass` failure or
+timeout is an unavailable keyring. With neither backend the refusal names
+`pass init <gpg-id>`. `/secret add <name>` (no echo), `/secret list`
+(names only, plus `backend: secret-service|pass|none`), `/secret rm <name>`. Raw bash lines typed by the user are not
 resolved.
 
 ### 7.9 Not implemented

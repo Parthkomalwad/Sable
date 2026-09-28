@@ -124,9 +124,13 @@ mitigations than they deliver.
    running as the user can edit. It records what happened; it does not prove it.
 9. **Lines the user types are not secret-resolved.** `$SECRET:` works in model
    and plan commands only.
-   The broker also needs a Secret Service on D-Bus. A headless server reached
-   over SSH usually has none, and there `/secret` refuses: the broker is
-   unavailable rather than falling back to plaintext.
+   Broker secrets live in the Secret Service on D-Bus when there is one. A
+   headless server reached over SSH usually has none; there the broker uses
+   `pass` (gpg-encrypted, entries `sable/<name>`) if the store was set up with
+   `pass init <gpg-id>`. With neither, `/secret` refuses and says to run
+   `pass init`; it never falls back to plaintext. The value reaches `pass` on
+   stdin only, and a `pass show` that waits more than 60 s on pinentry is a
+   refusal, not a hang.
 10. **Blast radius is a heuristic.** Unknown commands show as "unknown", never
     green, but a green can still be wrong for a program with a side effect the
     table does not know.
