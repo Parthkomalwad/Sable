@@ -37,6 +37,7 @@ _CLI_USAGE = """sable - an agentic shell layer
   sable status       report which mode is active
   sable daemon ...   run|install|status|stop the background daemon (sabled)
   sable --wrap       run inside the current bash, no chsh or /etc/shells
+  sable --mcp-serve  serve Sable's tools to an MCP client over stdio
   sable --version    print the version
 """
 
@@ -65,6 +66,18 @@ def _handle_cli(argv: list[str]) -> bool:
         from sable.daemon import service
 
         sys.exit(service.main(argv[1:]))
+
+    if command == "--mcp-serve":
+        # No REPL, no tmux, no banner: stdout belongs to the protocol.
+        from sable.policy.privilege import root_refusal
+
+        refusal = root_refusal()
+        if refusal:
+            sys.stderr.write(refusal + "\n")
+            sys.exit(1)
+        from sable.mcp import serve
+
+        sys.exit(serve.main())
 
     if command in ("on", "off", "status"):
         from sable.app import mode
