@@ -815,6 +815,14 @@ tool each further tool call or command asks for `YES` (a worker is refused).
 
 ### 9.2 web.search and web.fetch
 
+**Safe research.** Taint makes every call one tier stricter, except two a
+hostile page cannot turn into a channel out: `web.search` (the query goes to
+the search provider) and `web.fetch` of a URL this goal's `web.search`
+returned, exactly, fragment aside. The agent keeps those URLs per goal or
+task in `ToolContext.seen_urls`; a tool declares such calls with
+`Tool.taint_exempt`. A URL the model built, or one with anything appended, is
+still bumped.
+
 Module: `sable/tools/web.py` (HTML to text in `sable/tools/html_text.py`).
 Both are tier `allow` and both return `taints=True`, so the caller wraps the
 output as untrusted and the agent is tainted for the rest of the goal.

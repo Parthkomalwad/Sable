@@ -39,6 +39,10 @@ class ToolContext:
     #: J12: the agent's Breaker (`before_tool` / `after_tool`), or None for
     #: no per-tool budgets. The registry calls it and never sees its DB.
     budget: object | None = None
+    #: Safe research: URLs this goal's `web.search` returned. The agent owns
+    #: the set (one per goal or task); `web.search` adds to it and `web.fetch`
+    #: of a URL in it is exempt from the taint bump. None disables it.
+    seen_urls: set | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,9 @@ class Tool:
     #: Optional human preview for the confirm block (fs.write shows a diff).
     #: May raise ToolError; the caller then shows the error instead.
     preview: Callable[[dict, ToolContext], str] | None = None
+    #: True when this call is safe even from a tainted agent, so the taint bump
+    #: is skipped for it (and only it). Used by safe research in `web.py`.
+    taint_exempt: Callable[[dict, ToolContext], bool] | None = None
 
     def validate(self, args) -> str | None:
         """None if `args` fits the schema, else what is wrong, for the model."""
