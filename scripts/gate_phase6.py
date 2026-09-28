@@ -47,35 +47,38 @@ def _answer(r, line: str, until: str, reply: str, *, timeout: float = 150) -> st
         if "cancel" in tail and tail.rstrip().endswith("›"):
             r.sendline("")
             continue
+        if "type YES" in tail and tail.rstrip().endswith(":"):
+            r.sendline("YES")  # MCP tools are confirm tier: preview, then a typed YES
+            continue
         if time.monotonic() - quiet > 15:
             break
     return _clean(r.buffer)[mark:]
 
 
-@gate("/mcp add fs (filesystem server) lists its tools; a plain-English goal calls one")
+@gate("/mcp add files (filesystem server) lists its tools; a plain-English goal calls one")
 def g_fs(work):
     r = start(work)
-    added = drive(r, "/mcp add fs mcp-server-filesystem /app", quiet_s=6, timeout=60)
-    goal = drive(r, "use the filesystem MCP tools to count the markdown files directly in /app/docs",
-                 preview="", quiet_s=15, timeout=180, max_actions=6)
+    added = drive(r, "/mcp add files mcp-server-filesystem /app", quiet_s=6, timeout=60)
+    goal = drive(r, "use the tools of the files MCP server to count the markdown files directly in /app/docs",
+                 preview="", yes="YES", quiet_s=15, timeout=180, max_actions=6)
     r.close()
-    listed, called = "mcp.fs." in added, "mcp.fs." in goal
-    result("/mcp add fs (filesystem server) lists its tools; a plain-English goal calls one",
+    listed, called = "mcp.files." in added, "mcp.files." in goal
+    result("/mcp add files (filesystem server) lists its tools; a plain-English goal calls one",
            "PASS" if listed and called else "FAIL",
            f"tools listed={listed} tool called={called}\n--- add ---\n{added}\n--- goal ---\n{goal}")
 
 
-@gate("/mcp trust fs.list_directory -> /mcp list shows it allow, the rest confirm")
+@gate("/mcp trust files.list_directory -> /mcp list shows it allow, the rest confirm")
 def g_trust(work):
     r = start(work)
-    drive(r, "/mcp add fs mcp-server-filesystem /app", quiet_s=6, timeout=60)
-    trusted = drive(r, "/mcp trust fs.list_directory", quiet_s=3)
+    drive(r, "/mcp add files mcp-server-filesystem /app", quiet_s=6, timeout=60)
+    trusted = drive(r, "/mcp trust files.list_directory", quiet_s=3)
     listing = drive(r, "/mcp list", quiet_s=5)
     r.close()
     row = next((ln for ln in listing.splitlines()
                 if "list_directory" in ln and "list_directory_" not in ln), "")
     ok = "allow" in row and "confirm" in listing
-    result("/mcp trust fs.list_directory -> /mcp list shows it allow, the rest confirm",
+    result("/mcp trust files.list_directory -> /mcp list shows it allow, the rest confirm",
            "PASS" if ok else "FAIL", f"row: {row}\n--- trust ---\n{trusted}\n--- list ---\n{listing}")
 
 

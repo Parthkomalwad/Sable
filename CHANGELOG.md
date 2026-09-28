@@ -5,6 +5,15 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 6 gate run: all six lines pass, so the MCP part of v1.0 is done.** `scripts/gate_phase6.py` covers:
+  - the filesystem server added with `/mcp add` and called from a plain-English goal;
+  - `/mcp trust`;
+  - a server question answered in the shell;
+  - `/mcp search`;
+  - `sable --mcp-serve` driven by an MCP client (`ls` runs and is audited, `rm -rf` is queued, not run);
+  - the missing-Node hint.
+
+  The playground image now has Node and `@modelcontextprotocol/server-filesystem`. Three runs are recorded in `docs/history/phase-6-gate-2026-09-29.md`. `docs/mcp.md` is the user guide.
 - **MCP servers can ask you a question (Phase 6 Task 2, MRTR).** When a tool call comes back `input_required`, the shell shows the server's message and asks each field of its schema at a prompt: text, numbers, yes/no, or a numbered choice for an enum; `q` declines. The answers go back once, are audited redacted as `mcp.elicit`, and the server's text is stripped of control characters. Only the orchestrator at an interactive terminal is asked; a worker or the daemon fails the call with "needs input; run it from the shell". 7 tests.
 - **A logo and a new pitch: "your server's AI operator".** The symbol is `>.`, a prompt chevron and a green status light: where you talk to the machine, and the operator still on duty after you log off. It replaces the chevron in the README lockup and ships as an app icon (`docs/assets/sable-logo-dark.svg`, `-light.svg`), both built from templates. The README now leads with what Sable does (schedules, watchers, phone approvals, MCP) and keeps the safety model as "you stay in command"; the status badge says v0.9. The unused `docs/assets/sable-mark.svg` and `sable-hero.svg` are removed. Notes in `docs/brand.md`.
 - **Three built-in deny rules.** `rm -rf /` (and `/*`, any flag order), a fork bomb, and `chmod -R 777 /` now never run, not even with approval; before, the default policy had no deny rule and even `rm -rf /` was only confirm. They come first in `policy.toml`, since the first match decides. `dd` and `mkfs` stay confirm: imaging a USB stick is real work and a pattern cannot tell a spare disk from the root one. 15 tests.
@@ -22,6 +31,8 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - **Phase 4 gate run: all six lines pass, so v0.8 is complete.** `scripts/gate_phase4.py` checks blocks and `/block N rerun`, ghost text (52 ms), `? explain` and `! fix`, approving from `/dash`, the sidebar showing at 120 columns and hiding at 80, and cold start (median 100 ms). A sub-agent resuming after a `/dash` approval and the sidebar's colours were not checked by the harness. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`. `ROADMAP.md` ticks v0.8; v0.9 is next. One finding is recorded, not yet fixed: after `q` cancels a proposal the orchestrator proposes the same command again.
 
 ### Fixed
+- **A tool written as a call reached bash.** `mcp.mock.t0()` as a shell command slipped past the tool-as-command check, which cut the name at a space only; it now also cuts at `(`. Found by the Phase 6 gate. 1 test.
+- **The model picked a builtin over the MCP server the user named.** MCP tools were one flat list with the builtins, so "use the files MCP server" got the builtin `fs.tree`. The tool prompt now lists them under their own heading, with a note to use a named server's tools. 1 test.
 - **One long daemon job stalled everything else.** Scheduled and watcher jobs ran inline in the daemon tick, so a long job held up other schedules, watchers and phone pushes (found by the Phase 5 gate). They now run in their own thread on their own connection; the run row is written first, so a job is still never started twice. 1 test.
 - **A cancelled proposal came straight back.** After `q` the orchestrator only told the model the command was cancelled, and the model proposed it again (three times in the Phase 4 gate `! fix` transcript). Two cancels in a row, of a command or a tool call, now end the goal with "cancelled twice in a row, stopping this goal"; running anything in between resets the count. 2 tests.
 - **Ctrl+B never worked.** The key binding set a `global _bypass_next` in the prompt module while the REPL read its own `_bypass_next`, so Ctrl+B printed "[bash mode]" and the next line was routed as usual. With text already typed it also called `_record_router_correction`, which the prompt module never imported, and raised `NameError`. The binding now only records the request (`session.take_bypass()`), and the REPL takes it before routing and records the correction itself, since `ui` may not import `app`. Checked live on a pty: after Ctrl+B, "show me the files" ran in bash. Found while reviewing Phase 4 Task 5. 3 tests.

@@ -130,3 +130,27 @@ def test_cold_start_does_not_import_mcp():
     env = {**os.environ, "PYTHONPATH": str(ROOT) + os.pathsep + os.environ.get("PYTHONPATH", "")}
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=ROOT, env=env)
     assert out.stdout.strip() == "False", out.stderr[-500:]
+
+
+def test_a_tool_written_as_a_call_is_caught(monkeypatch):
+    from sable.tools import registry
+    from sable.tools.base import Tool, ToolResult
+    from sable.policy.tiers import Tier
+    monkeypatch.setitem(registry._TOOLS, "mcp.x.t0", Tool(
+        name="mcp.x.t0", description="d", schema={}, tier=Tier.CONFIRM, run=lambda a, c: ToolResult(True, "")))
+    assert registry.tool_as_command("mcp.x.t0()") == "mcp.x.t0"
+    assert registry.tool_as_command('mcp.x.t0({"a": 1})') == "mcp.x.t0"
+
+
+def test_mcp_tools_are_listed_under_their_own_heading(monkeypatch):
+    from sable.tools import registry
+    from sable.tools.base import Tool, ToolResult
+    from sable.policy.tiers import Tier
+    monkeypatch.setitem(registry._TOOLS, "mcp.files.read", Tool(
+        name="mcp.files.read", description="read a file", schema={}, tier=Tier.CONFIRM,
+        run=lambda a, c: ToolResult(True, "")))
+    text = registry.describe("orchestrator")
+    head = text.index("From MCP servers")
+    assert text.index("mcp.files.read") > head
+    assert all(text.index(f"- {t.signature()}") < head
+               for t in registry.for_role("orchestrator") if not t.name.startswith("mcp."))
