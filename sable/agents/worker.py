@@ -669,6 +669,23 @@ class TaskAgent:
                 continue
 
             if command:
+                from sable.tools import registry
+
+                if tool := registry.tool_as_command(command):
+                    # A tool sent as a shell command; see registry.tool_as_command.
+                    reply = registry.tool_as_command_reply(tool)
+                    print(f"[agent] {reply}", flush=True)
+                    self._memory.add_turns([
+                        {"role": "assistant", "content": json.dumps(parsed)},
+                        {"role": "user", "content": reply},
+                    ])
+                    self._breaker.record(
+                        tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
+                        usd=getattr(response, "cost_usd", 0.0),
+                    )
+                    continue
+
+            if command:
                 from sable.policy import queue as policy_queue
                 from sable.policy.engine import decide, gate
                 from sable.policy.tiers import Tier

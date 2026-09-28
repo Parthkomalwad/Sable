@@ -84,3 +84,22 @@ def test_exit_colon_zero_passes_on_a_successful_action():
     assert runtime.run_verify("exit: 0", output="services:\n  web: {}\n", cwd=".",
                               run=lambda c: ran.append(c) or "") is None
     assert ran == []   # never sent to a shell
+
+
+@pytest.mark.parametrize("command,tool", [
+    ("fs.tree .", "fs.tree"),
+    ("web.search nginx cve", "web.search"),
+    ("docs.help curl", "docs.help"),
+    ("ls -la", None),
+    ("python3 -m http.server", None),       # a dotted word that is not a tool
+    ("echo hi", None),                      # `echo` is a tool name but also a real program
+])
+def test_a_tool_used_as_a_shell_command_is_caught(command, tool):
+    """Found by the Phase 2 turns run: `{"action": "run", "command": "fs.tree ."}`
+    went to bash and came back `command not found`."""
+    assert registry.tool_as_command(command) == tool
+
+
+def test_the_reply_says_how_to_call_it():
+    text = registry.tool_as_command_reply("fs.tree")
+    assert '"action": "tool"' in text and "fs.tree(" in text and "nothing was run" in text

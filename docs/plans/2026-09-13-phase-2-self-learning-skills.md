@@ -370,6 +370,11 @@ create `tests/unit/test_skill_announcement.py`
       feature, which is why the phase is being closed without it rather than
       on it.
 
+      > **Paid, 2026-09-28: PASS** (4 actions, then 3 with the approved skill).
+      > Getting there found three bugs: skills recorded their own discovery
+      > steps, the model ran a tool as a shell command, and it acted before
+      > looking. See `docs/history/phase-2-turns-2026-09-28.md`.
+
       Three further findings, recorded rather than fixed here:
 
       - **Validators do not run on the orchestrator path**, by choice. The

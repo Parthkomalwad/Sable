@@ -294,6 +294,14 @@ class OrchestratorAgent:
         explanation = action.get("explanation", "")
         if not command or self._refused(action):
             return
+        from sable.tools import registry
+
+        if tool := registry.tool_as_command(command):
+            reply = registry.tool_as_command_reply(tool)
+            _out(f"  [orchestrator] {reply}")
+            self._history.append({"role": "assistant", "content": json.dumps(action)})
+            self._history.append({"role": "user", "content": reply})
+            return
 
         confirmed_cmd = self._confirm_command(command, explanation)
         if confirmed_cmd is None:

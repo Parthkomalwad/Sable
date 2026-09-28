@@ -85,6 +85,24 @@ def normalize_action(body: dict) -> dict | None:
     return out
 
 
+def tool_as_command(command: str) -> str | None:
+    """The tool's name when a shell command starts with one, else None.
+
+    A live run showed the model sending `{"action": "run", "command":
+    "fs.tree ."}`: a tool used as a shell command, which bash can only answer
+    with `command not found`. The agents catch it before running anything and
+    tell the model how to call the tool instead.
+    """
+    first = command.strip().split(None, 1)[0] if command.strip() else ""
+    return first if "." in first and get(first) is not None else None
+
+
+def tool_as_command_reply(name: str) -> str:
+    tool = get(name)
+    return (f"`{name}` is a tool, not a shell command, so nothing was run. Call it as "
+            f'{{"action": "tool", "name": "{name}", "args": {{...}}}}: {tool.signature()}.')
+
+
 def as_command(name: str, args) -> str:
     """The text policy rules match and the audit ledger stores for a call."""
     return f"tool:{name} {json.dumps(args, sort_keys=True)}"
