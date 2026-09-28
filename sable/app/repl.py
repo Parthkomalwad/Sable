@@ -209,7 +209,7 @@ def _save_turns_if_needed(
 def start(config: ShellConfig, session_id: str, session_context: str = "") -> None:
     global _bypass_next, _last_exit
 
-    from sable.core.executor import execute_bash
+    from sable.app.builtins.block import run_block
     from sable.agents.router import classify, Route
     from sable.policy.engine import gate
 
@@ -281,20 +281,16 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = execute_bash(line, cwd)
+                exit_code, _ = run_block(line, cwd, db, session_id)
                 _post_command(line, exit_code, cwd)
-                if exit_code != 0:
-                    _out(f"exit {exit_code}")
                 continue
 
             if _offline_mode:
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = execute_bash(line, cwd)
+                exit_code, _ = run_block(line, cwd, db, session_id)
                 _post_command(line, exit_code, cwd)
-                if exit_code != 0:
-                    _out(f"exit {exit_code}")
                 continue
 
             # K4: an alias resolves before the router is consulted. This is
@@ -309,13 +305,11 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(resolved, role="user"):
                     _audit_log("destructive_blocked", resolved)
                     continue
-                exit_code, _ = execute_bash(resolved, cwd)
+                exit_code, _ = run_block(resolved, cwd, db, session_id)
                 _post_command(resolved, exit_code, cwd)
                 _last_exit = exit_code
                 _audit_log("alias", resolved, exit_code)
                 _write_audit_log(session_id, cwd, resolved)
-                if exit_code != 0:
-                    _out(f"exit {exit_code}")
                 _after_alias_use(db, alias_hit)
                 continue
 
@@ -336,23 +330,19 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = execute_bash(line, cwd)
+                exit_code, _ = run_block(line, cwd, db, session_id)
                 _post_command(line, exit_code, cwd)
                 _last_exit = exit_code
                 _audit_log("bash", line, exit_code)
                 _write_audit_log(session_id, cwd, line)
-                if exit_code != 0:
-                    _out(f"exit {exit_code}")
                 continue
 
             if not budget.check_and_enforce(db, config, session_id):
                 if not gate(line, role="user"):
                     _audit_log("destructive_blocked", line)
                     continue
-                exit_code, _ = execute_bash(line, cwd)
+                exit_code, _ = run_block(line, cwd, db, session_id)
                 _post_command(line, exit_code, cwd)
-                if exit_code != 0:
-                    _out(f"exit {exit_code}")
                 continue
 
             # NL path: hand off to OrchestratorAgent reasoning loop

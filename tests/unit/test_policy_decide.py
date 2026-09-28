@@ -96,9 +96,10 @@ def test_every_repl_bash_path_is_gated():
         seen_gate = False
         for stmt in body:
             text = ast.unparse(stmt)
-            if "gate(" in text and "execute_bash(" not in text:
+            runs = "execute_bash(" in text or "run_block(" in text
+            if "gate(" in text and not runs:
                 seen_gate = True
-            elif "execute_bash(" in text and not isinstance(stmt, (ast.If, ast.For, ast.While, ast.Try, ast.With, ast.FunctionDef)):
+            elif runs and not isinstance(stmt, (ast.If, ast.For, ast.While, ast.Try, ast.With, ast.FunctionDef)):
                 if not seen_gate:
                     ungated.append(stmt.lineno)
     assert not ungated, f"execute_bash with no gate() before it at repl.py lines {ungated}"

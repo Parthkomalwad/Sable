@@ -936,3 +936,36 @@ metacharacters or leading `-` or `.`. `docs.help` also refuses a program not on
 PATH. A bad name, a missing binary (including `tldr` not installed), a timeout
 or an empty lookup returns `ok=False` with a message for the model, never an
 exception.
+
+---
+
+## 10. Blocks
+
+Every command the REPL runs is a numbered block (Phase 4, G2), stored in the
+`blocks` table of `~/.sable/sable.db` by `sable/core/blocks.py`, which creates
+the table on first use.
+
+| Column | Meaning |
+|---|---|
+| `id` | The block number. Global across sessions, so `#N` always names one block. |
+| `created_at` | Unix time the block opened. |
+| `session_id`, `cwd`, `command` | Where and what. |
+| `exit_code` | NULL while running, or when the status is unknown. |
+| `duration_ms` | Wall time of the command. |
+| `cost_usd` | Agent commands only: the model turn that proposed it. NULL for typed commands. |
+| `output` | Last 200 lines, ANSI stripped, run through `redact_text`. Empty for full-screen programs. |
+
+Typed commands (bash route, Ctrl+B, offline, alias, budget fallback) print
+`#N  <command>` before the output and `exit · duration` after. Agent commands
+print only `#N` in the blast colour, since the confirm preview already showed
+the command, then the output and `exit · duration · $cost`. Refused commands
+and `verify` checks are not blocks.
+
+A full-screen program (a known list: vim, htop, less, man, ssh and so on, or
+any output containing `\x1b[?1049h`) gets no header and no stored output, only
+`#N exit · duration` after it exits.
+
+`/block` lists the last 20. `/block N show` prints the stored output; `/block N
+copy` prints the command and sends it to the terminal clipboard with OSC 52;
+`/block N rerun` passes the command through `gate()` and runs it in the
+block's cwd (the current one if that directory is gone), as a new block.

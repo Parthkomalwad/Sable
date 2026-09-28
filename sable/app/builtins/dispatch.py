@@ -346,6 +346,10 @@ def handle_builtin(
         parts = cmd[len("/task"):].strip().split()
         return _handle_task_builtin(parts, config, db, turns=turns)
 
+    if cmd == "/block" or cmd.startswith("/block "):
+        from sable.app.builtins.block import handle_block
+        return handle_block(cmd[len("/block"):].strip(), db, session_id)
+
     if cmd == "/alias" or cmd.startswith("/alias "):
         return _handle_alias_builtin(cmd[len("/alias"):].strip(), db)
 
