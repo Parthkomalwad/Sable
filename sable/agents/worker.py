@@ -199,6 +199,8 @@ class TaskAgent:
         # included, so starting clean would launder the taint through a
         # delegation. Found by the Phase 3 gate run.
         self._tainted = (Path(task_dir) / ".agentic" / "tainted").exists()
+        # Safe research: URLs this task's web.search returned (tools/web.py).
+        self._seen_urls: set[str] = set()
 
         if memory is None:
             # Fallback for callers that did not inject one. Kept as a deferred
@@ -426,6 +428,7 @@ class TaskAgent:
         result = registry.call(name, args, ToolContext(
             role="worker", cwd=self._workspace, agent=self._name, goal=self._goal,
             model=self._config.model_for("worker"), tainted=self._tainted, budget=self._breaker,
+            seen_urls=self._seen_urls,
         ), publish=lambda kind, payload: self._publish(kind, **payload))
         if result.taints:
             self._tainted = True

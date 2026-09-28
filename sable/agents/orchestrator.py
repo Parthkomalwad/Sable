@@ -135,6 +135,8 @@ class OrchestratorAgent:
         # (policy/taint.py). Sticky for this goal; a new goal is a new
         # OrchestratorAgent, so the next thing the user types starts clean.
         self._tainted = False
+        # Safe research: URLs this goal's web.search returned (tools/web.py).
+        self._seen_urls: set[str] = set()
         #: Pages `web.fetch` read this goal, listed when it finishes (J2).
         self._pages_read: list[str] = []
 
@@ -376,6 +378,7 @@ class OrchestratorAgent:
         ctx = ToolContext(
             role="orchestrator", cwd=self._cwd, agent="orchestrator", goal=self._goal,
             model=self._config.model_for("orchestrator"), tainted=self._tainted, budget=self._breaker,
+            seen_urls=self._seen_urls,
         )
         if not self._confirm_tool(name, args, explanation, ctx):
             self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})

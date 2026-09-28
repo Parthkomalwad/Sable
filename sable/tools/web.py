@@ -270,8 +270,41 @@ def _format(results: list[dict]) -> str:
                        for i, r in enumerate(results, 1))
 
 
+# ---------------------------------------------------------------------------
+# Safe research
+# ---------------------------------------------------------------------------
+#
+# Taint makes every call one tier stricter, so after the first search each
+# fetch asked for YES. Two calls are safe from a tainted agent, and only these:
+#
+# - `web.search`: the query goes to the search provider, which an attacker
+#   cannot read, so it is no channel out.
+# - `web.fetch` of a URL this goal's search returned, exactly: the search
+#   engine chose that URL, so a hostile page cannot make the agent fetch an
+#   address with data smuggled into it. A URL the model built or copied from
+#   a page is not in the set and still needs YES.
+#
+# Everything else a tainted agent does (commands, writes, other fetches) is
+# still bumped.
+
+
+def _url_key(url: str) -> str:
+    return url.split("#", 1)[0].strip()
+
+
+def _search_exempt(args: dict, ctx: ToolContext) -> bool:
+    return True
+
+
+def _fetch_exempt(args: dict, ctx: ToolContext) -> bool:
+    return ctx.seen_urls is not None and _url_key(str(args.get("url", ""))) in ctx.seen_urls
+
+
 def _run_search(args: dict, ctx: ToolContext) -> ToolResult:
-    return ToolResult(ok=True, output=_format(search(args["query"], args.get("k", 5))), taints=True)
+    results = search(args["query"], args.get("k", 5))
+    if ctx.seen_urls is not None:
+        ctx.seen_urls.update(_url_key(r["url"]) for r in results if r.get("url"))
+    return ToolResult(ok=True, output=_format(results), taints=True)
 
 
 def _run_fetch(args: dict, ctx: ToolContext) -> ToolResult:
@@ -285,6 +318,7 @@ register(Tool(
     schema={"query": "string", "k?": "integer"},
     tier=Tier.ALLOW,
     run=_run_search,
+    taint_exempt=_search_exempt,
 ))
 register(Tool(
     name="web.fetch",
@@ -292,4 +326,5 @@ register(Tool(
     schema={"url": "string", "max_bytes?": "integer"},
     tier=Tier.ALLOW,
     run=_run_fetch,
+    taint_exempt=_fetch_exempt,
 ))

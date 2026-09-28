@@ -84,7 +84,10 @@ def call(name: str, args, ctx: ToolContext, *, publish=None) -> ToolResult:
             return ToolResult(ok=False, output=refused)
 
     command = as_command(name, args)
-    if not engine.gate(command, role=ctx.role, tainted=ctx.tainted, agent=ctx.agent,
+    # Taint bumps every tier one step, except for a call its tool declares
+    # safe to make while tainted (safe research, `web.py`).
+    tainted = ctx.tainted and not (tool.taint_exempt and tool.taint_exempt(args, ctx))
+    if not engine.gate(command, role=ctx.role, tainted=tainted, agent=ctx.agent,
                        model=ctx.model, goal=ctx.goal, floor=tool.tier):
         return ToolResult(ok=False, output="[blocked: refused by policy or not confirmed by the user]")
 
