@@ -57,7 +57,8 @@ sable/
   ui/            everything a human sees
     console.py     shared out() helper
     prompt/        completer, powerline prompt, key bindings
-    sidebar/       watch.py (telemetry pane), agents_panel.py (tasks bar)
+    sidebar/       app.py (Textual sidebar), watch.py (its entry point + Rich
+                   fallback), agents_panel.py (tasks bar)
     tmux/          layout.py
     clipboard/     manager.py
     settings_panel.py

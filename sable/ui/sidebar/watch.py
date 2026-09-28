@@ -527,5 +527,15 @@ def run():
     finally:
         db.close()
 
+def main():
+    """The sidebar pane's entry point: the Textual app, or this Rich loop without textual."""
+    try:
+        from sable.ui.sidebar.app import main as textual_main
+    except ImportError:
+        run()
+        return
+    textual_main()
+
+
 if __name__ == "__main__":
-    run()
+    main()
