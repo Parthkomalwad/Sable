@@ -21,6 +21,7 @@ import httpx
 
 from sable import data
 from sable.agents import context, runtime
+from sable.core import otel
 from sable.core.events.types import EventKind
 from sable.llm import prompts
 from sable.llm.base import ExplanationStream
@@ -255,86 +256,95 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
 
     def run(self) -> None:
-        """Run the orchestrator reasoning loop until done or max turns."""
+        """Run the orchestrator reasoning loop until done or max turns.
+
+        One goal is one trace (H4): a `goal` span, a `turn` span per model
+        turn, and model, command and tool spans beneath those.
+        """
+        with otel.span("goal", goal=self._goal, agent="orchestrator", role="orchestrator"):
+            self._run_turns()
+
+    def _run_turns(self) -> None:
         _MAX_TURNS = 20
         self._announce_skills()
         for _turn in range(1, _MAX_TURNS + 1):
-            from sable.policy.breaker import block
+            with otel.span("turn", turn=_turn, agent="orchestrator", role="orchestrator"):
+                from sable.policy.breaker import block
 
-            reason = self._breaker.check()
-            if reason:
-                _out(block(self._slug, reason))
-                break
-            messages = self._build_messages()
-            spinner = _Spinner()
-            self._spinner = spinner
-            spinner.start()
-            try:
-                response = self._call_llm(messages)
-            except (runtime.AgentError, httpx.HTTPError, ValueError, OSError) as exc:
-                # AgentError covers the timeout, httpx the transport, ValueError
-                # the parse chain's final give-up. Anything else is a bug in the
-                # runtime rather than a model or network problem, and should
-                # surface as a traceback instead of a one-line message.
-                spinner.stop()
-                # I7: say what is reduced and what still works, rather than
-                # printing an exception and leaving the user to infer it.
-                #
-                # A ValueError here means the model answered and the answer was
-                # unusable, which is NOT the network being down. Labelling it
-                # "LLM unreachable" sent a real user to check their backend
-                # while the API was responding fine.
-                from sable.core.health import llm_unparseable, llm_unreachable
-
-                if isinstance(exc, ValueError) and not isinstance(exc, runtime.AgentError):
-                    degradation = llm_unparseable(str(exc))
-                else:
-                    degradation = llm_unreachable(str(exc))
-                _out(f"[orchestrator] {degradation.line()}")
-                _out(f"  {degradation.hint}")
-                break
-            spinner.stop()
-
-            raw = self._extract_raw(response)
-            self._record_turn(_turn, messages, raw, response)
-            action = self._parse_action(raw)
-
-            action_type = action.get("action", "")
-            self._turn = _turn
-            self._show_reflection(action.get("explanation", ""))
-            steps_before = len(self._steps)
-            try:
-                if action_type == "run":
-                    self._handle_run(action)
-                elif action_type == "spawn":
-                    self._handle_spawn(action)
-                elif action_type == "tool":
-                    self._handle_tool(action)
-                elif action_type == "graph":
-                    self._handle_graph(action)
-                elif action_type == "done":
-                    outcome = self._review(action)
-                    if outcome == "done":
-                        self._handle_done(action)
-                        break
-                    if outcome == "failed":
-                        break
-                    # "retry": the reviewer's reason went back to the model.
-                else:
-                    _out(f"[orchestrator] unknown action '{action_type}' stopping")
+                reason = self._breaker.check()
+                if reason:
+                    _out(block(self._slug, reason))
                     break
-            except _TimeoutDelegated:
-                break
-            if self._cancels >= 2:
-                _out("[orchestrator] cancelled twice in a row, stopping this goal. Rephrase it to try again.")
-                break
-            new_steps = self._steps[steps_before:]
-            self._breaker.record(
-                tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
-                usd=getattr(response, "cost_usd", 0.0),
-                # Non-zero, or None (error, timeout, unknown status), is a failure.
-                failed=any(runtime.exit_code_of(s.get("output", "")) != 0 for s in new_steps),
-            )
+                messages = self._build_messages()
+                spinner = _Spinner()
+                self._spinner = spinner
+                spinner.start()
+                try:
+                    response = self._call_llm(messages)
+                except (runtime.AgentError, httpx.HTTPError, ValueError, OSError) as exc:
+                    # AgentError covers the timeout, httpx the transport, ValueError
+                    # the parse chain's final give-up. Anything else is a bug in the
+                    # runtime rather than a model or network problem, and should
+                    # surface as a traceback instead of a one-line message.
+                    spinner.stop()
+                    # I7: say what is reduced and what still works, rather than
+                    # printing an exception and leaving the user to infer it.
+                    #
+                    # A ValueError here means the model answered and the answer was
+                    # unusable, which is NOT the network being down. Labelling it
+                    # "LLM unreachable" sent a real user to check their backend
+                    # while the API was responding fine.
+                    from sable.core.health import llm_unparseable, llm_unreachable
+
+                    if isinstance(exc, ValueError) and not isinstance(exc, runtime.AgentError):
+                        degradation = llm_unparseable(str(exc))
+                    else:
+                        degradation = llm_unreachable(str(exc))
+                    _out(f"[orchestrator] {degradation.line()}")
+                    _out(f"  {degradation.hint}")
+                    break
+                spinner.stop()
+
+                raw = self._extract_raw(response)
+                self._record_turn(_turn, messages, raw, response)
+                action = self._parse_action(raw)
+
+                action_type = action.get("action", "")
+                self._turn = _turn
+                self._show_reflection(action.get("explanation", ""))
+                steps_before = len(self._steps)
+                try:
+                    if action_type == "run":
+                        self._handle_run(action)
+                    elif action_type == "spawn":
+                        self._handle_spawn(action)
+                    elif action_type == "tool":
+                        self._handle_tool(action)
+                    elif action_type == "graph":
+                        self._handle_graph(action)
+                    elif action_type == "done":
+                        outcome = self._review(action)
+                        if outcome == "done":
+                            self._handle_done(action)
+                            break
+                        if outcome == "failed":
+                            break
+                        # "retry": the reviewer's reason went back to the model.
+                    else:
+                        _out(f"[orchestrator] unknown action '{action_type}' stopping")
+                        break
+                except _TimeoutDelegated:
+                    break
+                if self._cancels >= 2:
+                    _out("[orchestrator] cancelled twice in a row, stopping this goal. Rephrase it to try again.")
+                    break
+                new_steps = self._steps[steps_before:]
+                self._breaker.record(
+                    tokens=getattr(response, "prompt_tokens", 0) + getattr(response, "completion_tokens", 0),
+                    usd=getattr(response, "cost_usd", 0.0),
+                    # Non-zero, or None (error, timeout, unknown status), is a failure.
+                    failed=any(runtime.exit_code_of(s.get("output", "")) != 0 for s in new_steps),
+                )
         else:
             _out(f"[orchestrator] reached {_MAX_TURNS} turn limit stopping")
 

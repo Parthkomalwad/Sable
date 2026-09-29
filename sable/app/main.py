@@ -247,6 +247,11 @@ def main(argv: list[str] | None = None) -> None:
         except (OSError, json.JSONDecodeError, ValueError, KeyError):
             config = ShellConfig.defaults()
 
+    # H4: traces to otel.endpoint; with no endpoint this starts nothing.
+    from sable.core import otel
+    from sable.policy.engine import redact_text
+    otel.configure(config.otel, redact=redact_text)
+
     # Reconcile: mark tasks whose tmux window is gone as lost
     try:
         from sable.agents.reconcile import reconcile

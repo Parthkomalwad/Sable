@@ -1045,4 +1045,9 @@ if __name__ == "__main__":
         skill_loader=TaskSkillLoader(args.task, _tasks_base),
         limits=_worker_limits(args.limits_file, config),
     )
-    agent.run()
+    from sable.core import otel
+    from sable.policy.engine import redact_text
+
+    otel.configure(config.otel, redact=redact_text)
+    with otel.span("goal", goal=goal, agent=args.task, role="worker"):
+        agent.run()

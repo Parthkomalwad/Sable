@@ -39,6 +39,8 @@ import tempfile
 import time
 from typing import Any, Callable
 
+from sable.core import otel
+
 #: Longest a single `backend.complete()` may take. Distinct from the per-command
 #: timeout below: this bounds thinking, that bounds doing.
 LLM_TIMEOUT = 120.0
@@ -137,6 +139,13 @@ def run_command(
     """
     if not command.strip():
         return "(empty command)"
+    with otel.span("command", command=command) as attrs:
+        output = _run_command(command, cwd, timeout, wrap, on_timeout, prefix)
+        attrs["exit_code"] = exit_code_of(output)
+    return output
+
+
+def _run_command(command, cwd, timeout, wrap, on_timeout, prefix) -> str:
 
     from ptyprocess import PtyProcessUnicode
 
@@ -264,9 +273,17 @@ def call_llm(backend, messages: list[dict], system: str, timeout: float = LLM_TI
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(
-            asyncio.wait_for(backend.complete(messages, system, **kwargs), timeout=timeout)
-        )
+        with otel.span("model.call") as attrs:
+            response = loop.run_until_complete(
+                asyncio.wait_for(backend.complete(messages, system, **kwargs), timeout=timeout)
+            )
+            attrs.update(
+                model=getattr(response, "model", None),
+                tokens_in=getattr(response, "prompt_tokens", None),
+                tokens_out=getattr(response, "completion_tokens", None),
+                cost_usd=getattr(response, "cost_usd", None),
+            )
+        return response
     except asyncio.TimeoutError as exc:
         raise LLMUnavailable(f"LLM call timed out after {timeout:g}s") from exc
     finally:

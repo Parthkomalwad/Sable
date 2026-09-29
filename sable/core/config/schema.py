@@ -34,6 +34,9 @@ def _theme_or_default(name) -> str:
     return name if name in THEME_NAMES else "default"
 
 
+OTEL_DEFAULTS = {"endpoint": None, "headers": {}, "service_name": "sable"}
+
+
 @dataclass
 class ShellConfig:
     """Runtime configuration for Sable."""
@@ -76,6 +79,9 @@ class ShellConfig:
     # Rehearse a plan on a copy first (Phase 8, F2 K5): auto (2+ changing
     # steps, and every daemon job), always, or off.
     rehearse: str = "auto"
+    # OpenTelemetry export (Phase 9, H4, sable/core/otel.py). Off while
+    # endpoint is None; header values may be `$SECRET:name`.
+    otel: dict = field(default_factory=lambda: {**OTEL_DEFAULTS, "headers": {}})
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -205,6 +211,13 @@ class ShellConfig:
         if rehearse not in ("auto", "always", "off"):
             raise ValueError(f"rehearse must be auto, always or off, got {rehearse!r}")
 
+        otel = {**OTEL_DEFAULTS, **(data.get("otel") or {})}
+        if (otel["endpoint"] is not None and not isinstance(otel["endpoint"], str)
+                or not isinstance(otel["headers"], dict)
+                or not all(isinstance(v, str) for v in otel["headers"].values())
+                or not isinstance(otel["service_name"], str)):
+            raise ValueError(f"otel must be {{endpoint: str|null, headers: {{str: str}}, service_name: str}}, got {otel!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -228,6 +241,7 @@ class ShellConfig:
             limits=dict(raw_limits),
             review=review,
             rehearse=rehearse,
+            otel={**otel, "headers": dict(otel["headers"])},
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -258,5 +272,6 @@ class ShellConfig:
             "limits": dict(self.limits),
             "review": self.review,
             "rehearse": self.rehearse,
+            "otel": {**self.otel, "headers": dict(self.otel.get("headers") or {})},
             "api_key": getattr(self, "api_key", ""),
         }
