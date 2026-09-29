@@ -85,11 +85,33 @@ def changing(steps: list[str]) -> list[str]:
     return [s for s in steps if blast.classify(s) is not blast.Level.READ_ONLY]
 
 
+def parts(command: str) -> list[str]:
+    """The commands in a chain (`a && b; c`), quotes respected. A model often
+    sends a multi-step change as one chained command (Phase 8 gate)."""
+    import shlex
+    lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    out, cur = [], []
+    try:
+        for tok in lex:
+            if tok in ("&&", "||", ";", "\n", "&"):
+                if cur:
+                    out.append(" ".join(cur))
+                cur = []
+            else:
+                cur.append(tok)
+    except ValueError:   # unbalanced quotes: treat as one command
+        return [command]
+    if cur:
+        out.append(" ".join(cur))
+    return out or [command]
+
+
 def wanted(steps: list[str], how: str | None = None) -> bool:
     how = how or mode()
     if how == "off":
         return False
-    n = len(changing(steps))
+    n = sum(len(changing(parts(s))) for s in steps)
     return n >= 1 if how == "always" else n >= 2
 
 

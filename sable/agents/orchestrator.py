@@ -351,6 +351,11 @@ class OrchestratorAgent:
         if len(plan) >= 2:
             self._handle_plan(action, plan)
             return
+        from sable.agents import rehearse
+        if rehearse.wanted([command]):
+            # `a && b` changing two things is a plan too: rehearse it first.
+            self._handle_plan(action, [command])
+            return
         from sable.tools import registry
 
         if tool := registry.tool_as_command(command):

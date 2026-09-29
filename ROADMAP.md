@@ -55,10 +55,10 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/
 - [x] MCP client (spec 2026-07-28) and server mode (`D1 D2 D4`)
 - [x] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
 - [x] Export / import / sync of skills and knowledge; upgrade migrations and `sable doctor` (`I8 I6`)
+- [x] Plan graphs, a reviewer agent, rehearsal on a copy, undo across sessions, sub-agent limits, step-up approval (TOTP or phone), signed skills (`A3 A4 A8 F2 F5 K5 K6 K7 K8`)
 - [ ] Eval harness, plugin system, OpenTelemetry (`H3 H2 H4`)
 - [ ] Incident → runbook drafts, nightly self-evaluation, session sharing with approve-only links (`K9 K10 K12`)
 ## Later
 
-- [ ] Rehearsal mode: plans run against a snapshot first, show the filesystem diff, then `apply` (`K5`)
-- [ ] Filesystem undo across sessions; step-up approval (TOTP / FIDO2 / phone) for deny-tier; signed skills (`K6 K7 K8`)
-- [ ] DAG plans and reviewer agents (`A3 A4`), git-snapshot undo per agent step (`A8`), skill doctor (`B4`), semantic skill search (`B6`), self-healing runbooks (`E4`), multi-host (`H5`), web companion (`G9`)
+- [ ] FIDO2 step-up, public-key skill signatures
+- [ ] Skill doctor (`B4`), semantic skill search (`B6`), self-healing runbooks (`E4`), multi-host (`H5`), web companion (`G9`)
