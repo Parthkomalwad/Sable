@@ -189,3 +189,22 @@ def lanes(db_path=None) -> list[tuple[str, str]]:
         if data.get("graph") == graph:
             latest[data.get("id", "?")] = data.get("status", "?")
     return list(latest.items())
+
+
+@dataclass(frozen=True)
+class EvalRun:
+    run_id: str
+    backend: str
+    passed: int
+    total: int
+
+
+def latest_eval(db_path=None) -> EvalRun | None:
+    """The newest `sable eval` run (Phase 9, H3), or None if none has run."""
+    rows = _rows(db_path, "SELECT run_id, backend, SUM(passed), COUNT(*) FROM eval_runs "
+                          "WHERE run_id = (SELECT run_id FROM eval_runs ORDER BY id DESC LIMIT 1) "
+                          "GROUP BY run_id, backend")
+    if not rows:
+        return None
+    run_id, backend, passed, total = rows[0]
+    return EvalRun(run_id, backend, int(passed), int(total))

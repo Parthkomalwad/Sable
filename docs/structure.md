@@ -147,7 +147,7 @@ install.sh  uninstall.sh  pyproject.toml  LICENSE  CONTRIBUTING.md  CHANGELOG.md
 ```
 
 ### Dependency rule (enforced by a unit test)
-`core` → `llm` → `policy` → `agents` → `skills` / `memory` / `mcp` / `daemon` → `ui` → `app`.
+`core` → `llm` → `policy` → `agents` → `skills` / `memory` / `mcp` / `daemon` / `evals` → `ui` → `app`.
 Lower layers never import higher ones. `agents` never imports `ui`; it **publishes events** and `ui` renders them. This single rule is what removes the current `tasks → loop` circular import and what lets the daemon run agents with no terminal attached.
 
 ---

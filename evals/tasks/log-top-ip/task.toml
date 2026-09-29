@@ -1,0 +1,3 @@
+goal = "Find the IP address with the most requests in logs/access.log and write it to top_ip.txt"
+timeout_s = 60
+tags = ["logs"]

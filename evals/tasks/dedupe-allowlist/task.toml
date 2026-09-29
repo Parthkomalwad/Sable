@@ -1,0 +1,3 @@
+goal = "Remove duplicate lines from allowlist.txt"
+timeout_s = 60
+tags = ["config"]

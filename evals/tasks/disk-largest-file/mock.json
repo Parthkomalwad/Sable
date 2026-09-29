@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "ls -S data | head -1 > largest.txt",
+    "explanation": "List by size, keep the first."
+  },
+  {
+    "action": "done",
+    "explanation": "The largest file is named in largest.txt."
+  }
+]

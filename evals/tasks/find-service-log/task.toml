@@ -1,0 +1,3 @@
+goal = "Find where the web service writes its log according to services/web.conf and write that path to log_path.txt"
+timeout_s = 60
+tags = ["services", "config"]

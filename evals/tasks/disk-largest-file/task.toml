@@ -1,0 +1,3 @@
+goal = "Write the name of the largest file in data/ to largest.txt"
+timeout_s = 60
+tags = ["disk"]

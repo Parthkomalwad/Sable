@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "echo '0 2 * * * /usr/local/bin/backup.sh' >> cron/backup.cron",
+    "explanation": "Append the daily 02:00 job."
+  },
+  {
+    "action": "done",
+    "explanation": "Added the nightly backup entry."
+  }
+]

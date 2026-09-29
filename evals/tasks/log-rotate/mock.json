@@ -1,0 +1,16 @@
+[
+  {
+    "action": "run",
+    "command": "mv logs/app.log logs/app.log.1",
+    "explanation": "Move the current log aside."
+  },
+  {
+    "action": "run",
+    "command": "touch logs/app.log",
+    "explanation": "Create a fresh empty log."
+  },
+  {
+    "action": "done",
+    "explanation": "Rotated logs/app.log."
+  }
+]

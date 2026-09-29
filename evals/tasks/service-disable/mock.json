@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "sed -i 's/^Enabled=yes$/Enabled=no/' services/nginx.service",
+    "explanation": "Flip Enabled to no."
+  },
+  {
+    "action": "done",
+    "explanation": "nginx is disabled."
+  }
+]

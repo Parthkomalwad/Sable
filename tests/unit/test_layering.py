@@ -37,7 +37,7 @@ LAYERS: list[tuple[str, ...]] = [
     ("policy",),
     ("tools",),
     ("agents",),
-    ("skills", "memory", "mcp", "daemon"),
+    ("skills", "memory", "mcp", "daemon", "evals"),
     ("ui",),
     ("app",),
 ]

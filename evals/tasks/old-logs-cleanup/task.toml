@@ -1,0 +1,3 @@
+goal = "Delete the .log files in logs/old that are older than 7 days and keep the newer ones"
+timeout_s = 60
+tags = ["logs", "disk"]

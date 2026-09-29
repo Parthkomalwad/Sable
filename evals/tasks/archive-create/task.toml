@@ -1,0 +1,3 @@
+goal = "Create a gzip tar archive of the site directory named site-backup.tar.gz"
+timeout_s = 60
+tags = ["archives"]

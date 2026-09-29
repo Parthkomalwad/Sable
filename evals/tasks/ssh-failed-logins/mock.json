@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "grep -c 'Failed password' logs/auth.log > failed.txt",
+    "explanation": "Count failed password lines."
+  },
+  {
+    "action": "done",
+    "explanation": "Three failed attempts, written to failed.txt."
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "find logs -type f -size +1M > big_logs.txt",
+    "explanation": "Find files over 1 MB."
+  },
+  {
+    "action": "done",
+    "explanation": "Listed the large logs."
+  }
+]

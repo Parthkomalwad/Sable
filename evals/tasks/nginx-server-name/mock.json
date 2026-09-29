@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "sed -i 's/server_name example\\.com;/server_name sable.example.org;/' sites/default.conf",
+    "explanation": "Replace the server name."
+  },
+  {
+    "action": "done",
+    "explanation": "server_name updated."
+  }
+]

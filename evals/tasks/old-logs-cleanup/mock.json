@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "find logs/old -name '*.log' -mtime +7 -delete",
+    "explanation": "Delete only old .log files."
+  },
+  {
+    "action": "done",
+    "explanation": "Cleaned up the old logs."
+  }
+]

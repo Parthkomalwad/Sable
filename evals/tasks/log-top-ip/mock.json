@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "awk '{print $1}' logs/access.log | sort | uniq -c | sort -rn | head -1 | awk '{print $2}' > top_ip.txt",
+    "explanation": "Count requests per IP and keep the busiest."
+  },
+  {
+    "action": "done",
+    "explanation": "The busiest IP is in top_ip.txt."
+  }
+]

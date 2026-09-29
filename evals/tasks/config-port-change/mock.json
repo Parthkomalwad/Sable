@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "sed -i 's/^port=8080$/port=9090/' config/app.conf",
+    "explanation": "Edit the port line in place."
+  },
+  {
+    "action": "done",
+    "explanation": "The app now listens on 9090."
+  }
+]

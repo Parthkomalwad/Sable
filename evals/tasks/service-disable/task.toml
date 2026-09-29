@@ -1,0 +1,3 @@
+goal = "Disable the nginx service by setting Enabled=no in services/nginx.service"
+timeout_s = 60
+tags = ["services"]

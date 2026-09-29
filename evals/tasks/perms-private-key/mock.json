@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "chmod 600 keys/id_app",
+    "explanation": "Owner read and write only."
+  },
+  {
+    "action": "done",
+    "explanation": "keys/id_app is now 600."
+  }
+]

@@ -1,0 +1,3 @@
+goal = "Turn off debug mode in settings.ini"
+timeout_s = 60
+tags = ["config"]

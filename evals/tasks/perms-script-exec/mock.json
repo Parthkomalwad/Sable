@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "chmod +x scripts/*.sh",
+    "explanation": "Add the execute bit to the scripts."
+  },
+  {
+    "action": "done",
+    "explanation": "The scripts are executable."
+  }
+]
