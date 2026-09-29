@@ -14,7 +14,7 @@ import json
 import re
 import time
 
-from sable.core import audit
+from sable.core import audit, otel
 from sable.policy import engine
 from sable.tools.base import Tool, ToolContext, ToolError, ToolResult
 
@@ -153,10 +153,13 @@ def call(name: str, args, ctx: ToolContext, *, publish=None) -> ToolResult:
         return ToolResult(ok=False, output="[blocked: refused by policy or not confirmed by the user]")
 
     started = time.monotonic()
-    try:
-        result = tool.run(args, ctx)
-    except ToolError as exc:
-        result = ToolResult(ok=False, output=f"{name} failed: {exc}")
+    with otel.span("tool.call", tool=name, args=command, agent=ctx.agent, role=ctx.role,
+                   tier=getattr(tool.tier, "name", str(tool.tier))) as span_attrs:
+        try:
+            result = tool.run(args, ctx)
+        except ToolError as exc:
+            result = ToolResult(ok=False, output=f"{name} failed: {exc}")
+        span_attrs.update(ok=result.ok, cost_usd=result.cost_usd)
     duration_ms = int((time.monotonic() - started) * 1000)
     audit.finish(0 if result.ok else 1)
     if ctx.budget is not None:
