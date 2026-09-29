@@ -167,6 +167,9 @@ class OrchestratorAgent:
         self._pages_read: list[str] = []
         #: Cost of the latest model turn, for the footer of the block it ran.
         self._last_turn_cost: float | None = None
+        #: C6: the palace's notes for this goal, fetched once on the first
+        #: turn so the block is identical every turn. False until fetched.
+        self._recall: dict | None | bool = False
 
         # Skills, injected rather than imported, for the same layering reason
         # as `corrections_db` above: `agents` sits below `skills`, and
@@ -693,6 +696,12 @@ class OrchestratorAgent:
 
     def _handle_done(self, action: dict) -> None:
         explanation = action.get("explanation", "")
+        self._save_facts(action.get("facts"))
+
+        if self._commands_run == 0 and self._recall and explanation:
+            # C6: answered from memory, which is allowed to run nothing.
+            _out(f"\n  ✦ {explanation}\n")
+            return
 
         if self._commands_run == 0:
             # Nothing ran and nothing was spawned, so the model declined the
@@ -759,6 +768,18 @@ class OrchestratorAgent:
             except (OSError, ValueError, sqlite3.Error) as exc:
                 _out(f"[orchestrator] could not record confidence for {name}: {exc}")
 
+    def _save_facts(self, facts) -> None:
+        """C1: remember what a `done` said it learned, and say so."""
+        if not facts:
+            return
+        saved = context.save_facts(
+            facts, session=self._session_id, goal=self._goal,
+            commands=[s["command"] for s in self._steps],
+            agent="orchestrator", tainted=self._tainted,
+        )
+        for text, fact_id in saved:
+            _out(f"  \x1b[2mremembered: {text} ({fact_id})\x1b[0m")
+
     def _build_messages(self) -> list[dict]:
         messages: list[dict] = []
         messages.append({
@@ -774,6 +795,17 @@ class OrchestratorAgent:
             "role": "assistant",
             "content": "Understood. I will accomplish this goal step by step.",
         })
+
+        # C6: notes from the palace, framed as data (plan 0.1). Right after
+        # the goal, fetched once, so every turn carries the same block.
+        if self._recall is False:
+            self._recall = context.build_recall_message(self._goal)
+        if self._recall:
+            messages.append(self._recall)
+            messages.append({
+                "role": "assistant",
+                "content": "Noted. I will verify these notes before relying on them.",
+            })
 
         # K11: if the cwd is inside a repo that ships CLAUDE.md / AGENTS.md /
         # .sable.toml, those conventions go in as untrusted project
@@ -1055,12 +1087,15 @@ class OrchestratorAgent:
                     "goal": spawn.get("goal", ""),
                     "explanation": explanation,
                 })
-            if action == "done":
-                return json.dumps({"action": "done", "explanation": explanation})
+        if action == "done" or done:
+            finished = {"action": "done", "explanation": explanation}
+            # C1: `facts` is not a typed field either; take it from `raw`.
+            facts = runtime.parse_json_action(getattr(response, "raw", "") or "", {}).get("facts")
+            if facts:
+                finished["facts"] = facts
+            return json.dumps(finished)
 
         # Fallback: infer from other fields
-        if done:
-            return json.dumps({"action": "done", "explanation": explanation})
         if spawn and isinstance(spawn, dict):
             return json.dumps({
                 "action": "spawn",
