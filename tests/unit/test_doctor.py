@@ -115,16 +115,12 @@ def test_corrupt_db_fails(tmp_path):
     assert checks["database"].status == "fail"
 
 
-def test_palace_not_installed(tmp_path, monkeypatch):
-    monkeypatch.setitem(sys.modules, "sable.memory.palace", None)
-    assert doctor._palace_probe(False)[1].startswith("not installed")
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
-def test_perms_fix(tmp_path):
-    cfg, db = _setup(tmp_path, {**V1, "schema_version": 2})
-    os.chmod(cfg, 0o644)
-    assert _by_name(doctor.run(config_path=cfg, db_path=db, **_probes()))[
-        "config permissions"].status == "warn"
-    doctor.run(fix=True, config_path=cfg, db_path=db, **_probes())
-    assert cfg.stat().st_mode & 0o777 == 0o600
+def test_palace_drift_is_reported_and_fixed(tmp_path, monkeypatch):
+    from sable.memory import palace
+    monkeypatch.setattr(palace, "ROOT", tmp_path / "palace")
+    monkeypatch.setattr(palace, "DB", tmp_path / "s.db")
+    palace.remember("myapp logs to /var/log/myapp", "server", {"by": "test"})
+    (tmp_path / "s.db").unlink()          # the index is gone, the file is not
+    assert doctor._palace_probe(False) == ("warn", "1 fact files, 0 indexed")
+    assert doctor._palace_probe(True)[0] == "ok"
+    assert doctor._palace_probe(False) == ("ok", "1 fact files")

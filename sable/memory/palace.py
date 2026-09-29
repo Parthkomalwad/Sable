@@ -207,6 +207,12 @@ def rooms() -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def index_count() -> int:
+    """Rows in the search index; `sable doctor` compares it with the files."""
+    with _db() as conn:
+        return conn.execute("SELECT count(*) FROM palace_fts").fetchone()[0]
+
+
 def reindex() -> int:
     """Rebuild the index from the files; returns how many facts it holds."""
     facts = all_facts()

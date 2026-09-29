@@ -47,19 +47,15 @@ def _stale_probe(db_path: Path) -> Callable[[bool], list[str]]:
 
 def _palace_probe(fix: bool) -> tuple[str, str]:
     """Compare the palace's fact files with its index; reindex on --fix."""
-    try:
-        from sable.memory import palace
-    except ImportError:
-        return "ok", "not installed yet"
-    files = sum(1 for _ in (SABLE_HOME / "palace").rglob("*.md"))
+    from sable.memory import palace
+
+    files = len(palace.all_facts())
     if fix:
         palace.reindex()
         return "ok", f"reindexed {files} fact files"
-    rooms = palace.rooms()
-    if isinstance(rooms, dict):
-        indexed = sum(rooms.values())
-        if indexed != files:
-            return "warn", f"{files} fact files, {indexed} indexed"
+    indexed = palace.index_count()
+    if indexed != files:
+        return "warn", f"{files} fact files, {indexed} indexed"
     return "ok", f"{files} fact files"
 
 
