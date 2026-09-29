@@ -38,6 +38,9 @@ _CLI_USAGE = """sable - an agentic shell layer
   sable daemon ...   run|install|status|stop the background daemon (sabled)
   sable --wrap       run inside the current bash, no chsh or /etc/shells
   sable --mcp-serve  serve Sable's tools to an MCP client over stdio
+  sable export [file]          archive skills, palace, policy and hooks
+  sable import <file> [--yes]  restore such an archive (backs up overwrites)
+  sable sync <remote> [--yes]  the same set through a git remote
   sable --version    print the version
 """
 
@@ -79,6 +82,9 @@ def _handle_cli(argv: list[str]) -> bool:
 
         sys.exit(serve.main())
 
+    if command in ("export", "import", "sync"):
+        sys.exit(_portable(command, argv[1:]))
+
     if command in ("on", "off", "status"):
         from sable.app import mode
 
@@ -88,6 +94,42 @@ def _handle_cli(argv: list[str]) -> bool:
         return True
 
     return False
+
+
+def _portable(command: str, args: list[str]) -> int:
+    """`sable export|import|sync` (I8); the logic is in core/portable.py."""
+    from pathlib import Path as _Path
+
+    from sable.core import portable
+    from sable.policy.rules import match_secret
+    from sable.ui.console import out
+
+    yes = "--yes" in args
+    rest = [a for a in args if a != "--yes"]
+
+    def confirm(prompt: str) -> bool:
+        try:
+            return input(prompt).strip().lower() in ("y", "yes")
+        except EOFError:
+            return False
+
+    def reindex() -> None:
+        try:
+            from sable.memory import palace
+        except ImportError:  # the palace ships in a parallel task
+            return
+        if hasattr(palace, "reindex"):
+            palace.reindex()
+
+    if command == "export":
+        dest = _Path(rest[0]) if rest else None
+        return portable.export(dest, out, match_secret)
+    if len(rest) != 1:
+        out(f"usage: sable {command} <{'file' if command == 'import' else 'git-remote'}> [--yes]")
+        return 2
+    if command == "import":
+        return portable.import_archive(_Path(rest[0]), out, confirm, yes, reindex)
+    return portable.sync(rest[0], out, confirm, yes, match_secret, reindex)
 
 
 def _report_degradations() -> None:
