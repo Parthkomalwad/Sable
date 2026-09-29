@@ -114,6 +114,30 @@ def _check_db(path: Path) -> Check:
     return Check("database", "ok", "integrity ok")
 
 
+def _check_limits(bwrap: Callable[[], bool], config_path: Path,
+                  rlimits: Callable[[], bool] | None) -> Check:
+    """F5: which sub-agent limits this host enforces, under the config defaults.
+
+    `rlimits` overrides the setrlimit probe (tests); network follows `bwrap`.
+    """
+    from sable.agents import limits
+
+    support = limits.supported(bwrap())
+    if rlimits is not None:
+        support.update(dict.fromkeys(limits.INT_KEYS, rlimits()))
+    try:
+        data = json.loads(config_path.read_text()).get("limits") if config_path.exists() else None
+        applied = limits.enforced(limits.parse(None, data), support)
+    except (OSError, ValueError, AttributeError) as exc:
+        return Check("agent limits", "warn", f"config limits unreadable: {exc}", "fix `limits` in config")
+    detail = ", ".join(f"{k}={v}" for k, v in applied.items())
+    missing = [k for k, ok in support.items() if not ok]
+    if missing:
+        return Check("agent limits", "warn", f"{detail}; host cannot enforce: {', '.join(missing)}",
+                     "network off needs bwrap with user namespaces" if "network" in missing else "")
+    return Check("agent limits", "ok", detail)
+
+
 def run(
     fix: bool = False,
     *,
@@ -123,6 +147,7 @@ def run(
     bwrap: Callable[[], bool] = health.bwrap_available,
     stale: Callable[[bool], list[str]] | None = None,
     palace: Callable[[bool], tuple[str, str]] = _palace_probe,
+    rlimits: Callable[[], bool] | None = None,
 ) -> list[Check]:
     """Every check, in order. Probes are injectable so tests touch no real tools."""
     db_path = Path(db_path)
@@ -141,6 +166,7 @@ def run(
         checks.append(Check("sandbox", "warn", "bwrap missing or user namespaces blocked",
                             "install bubblewrap and enable user namespaces"))
 
+    checks.append(_check_limits(bwrap, Path(config_path), rlimits))
     checks.append(_check_db(db_path))
     checks.extend(_check_config(Path(config_path), fix))
 

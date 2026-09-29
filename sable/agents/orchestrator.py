@@ -606,8 +606,13 @@ class OrchestratorAgent:
                 goal=goal,
                 context="",  # already written to handoff.txt above
                 task_base_dir=str(self._task_dir),
+                limits=action.get("limits"),
             )
             self._spawned.append(name)
+        except ValueError as exc:
+            # F5: a bad `limits` object from the model. Tell it, do not start.
+            _out(f"[orchestrator] spawn of {name} refused: {exc}")
+            self._history.append({"role": "user", "content": f"[spawn refused: {exc}]"})
         except (RuntimeError, OSError) as exc:
             # RuntimeError is TaskManager's "Not inside a tmux session"; OSError
             # covers the process and filesystem failures under it.
@@ -1170,12 +1175,18 @@ class OrchestratorAgent:
                     run["verify"] = verify
                 return json.dumps(run)
             if action == "spawn" and isinstance(spawn, dict):
-                return json.dumps({
+                out = {
                     "action": "spawn",
                     "name": spawn.get("name", ""),
                     "goal": spawn.get("goal", ""),
                     "explanation": explanation,
-                })
+                }
+                # F5: `limits` is not a typed field; take it from `raw`.
+                limits = spawn.get("limits") or runtime.parse_json_action(
+                    getattr(response, "raw", "") or "", {}).get("limits")
+                if limits is not None:
+                    out["limits"] = limits
+                return json.dumps(out)
         if action == "done" or done:
             finished = {"action": "done", "explanation": explanation}
             # C1: `facts` is not a typed field either; take it from `raw`.

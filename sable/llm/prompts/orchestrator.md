@@ -66,5 +66,6 @@ Rules:
 Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>", "verify": "<check command or object, required if it changes state>"}
 {"action": "spawn", "name": "<slug-name>", "goal": "<full goal for sub-agent>", "explanation": "<why delegating>"}
+Optional on spawn: "limits": {"mem_mb": 2048, "cpu_s": 600, "procs": 256, "network": false} (network false when the sub-agent needs no internet).
 {"action": "done", "explanation": "<summary of what was accomplished>", "facts": ["<optional durable fact>"]}
 {"action": "graph", "lanes": [{"id": "<lane-id>", "goal": "<full goal>", "needs": ["<lane-id>"]}], "explanation": "<why parallel>"}

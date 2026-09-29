@@ -176,7 +176,7 @@ class TaskAgent:
 
     def __init__(self, task_name: str, goal: str, config, db_path: str,
                  shared_read_dir: str | None = None,
-                 memory=None, skill_loader=None) -> None:
+                 memory=None, skill_loader=None, limits=None) -> None:
         """A worker's collaborators are injected, not constructed here.
 
         `memory` and `skill_loader` are the TaskMemory and TaskSkillLoader this
@@ -248,7 +248,8 @@ class TaskAgent:
                 extra_write_dirs.append(cwd_path)
 
         self._sandbox = Sandbox(task_dir=workspace, shared_read_dir=shared_read_dir,
-                                extra_write_dirs=extra_write_dirs or None)
+                                extra_write_dirs=extra_write_dirs or None,
+                                limits=limits)
         if skill_loader is None:
             from sable.skills.loader import TaskSkillLoader
 
@@ -567,6 +568,10 @@ class TaskAgent:
         print(f"[agent] goal: {self._goal}", flush=True)
         print(f"[agent] workspace: {self._workspace}", flush=True)
         print(f"[agent] sandbox: {'bwrap (kernel namespace)' if self._sandbox.use_bwrap else 'bash-wrapper (writes blocked outside workspace)'}", flush=True)
+        from sable.agents import limits as _limits
+        applied = _limits.enforced(self._sandbox.limits, _limits.supported(self._sandbox.use_bwrap))
+        sys.stdout.write("[agent] limits: " + ", ".join(f"{k}={v}" for k, v in applied.items()) + "\n")
+        sys.stdout.flush()
         self._update_task_status("running")
         self._publish(
             EventKind.STARTED,
@@ -944,7 +949,23 @@ if __name__ == "__main__":
     parser.add_argument("--goal-file", default=None, help="Path to file containing goal text")
     parser.add_argument("--shared-read-dir", default=None,
                         help="Parent task dir to mount read-only for sub-agent")
+    parser.add_argument("--limits-file", default=None,
+                        help="JSON of the effective limits, written by TaskManager.spawn")
     args = parser.parse_args()
+
+    def _worker_limits(path, cfg):
+        """The spawn's limits.json, else config defaults. Validated either way."""
+        from sable.core.limits import parse as _parse
+        raw = None
+        if path:
+            try:
+                raw = _json.loads(_Path(path).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                raw = None
+        try:
+            return _parse(raw, cfg.limits)
+        except ValueError:
+            return _parse(None, cfg.limits)
 
     if args.goal_file:
         goal = _Path(args.goal_file).read_text(encoding="utf-8").strip()
@@ -994,5 +1015,6 @@ if __name__ == "__main__":
         shared_read_dir=args.shared_read_dir,
         memory=TaskMemory(args.task, _tasks_base, db=_WorkerDB(str(DB_PATH))),
         skill_loader=TaskSkillLoader(args.task, _tasks_base),
+        limits=_worker_limits(args.limits_file, config),
     )
     agent.run()

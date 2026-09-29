@@ -124,6 +124,12 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
         elif sub == "stats":
             s = manager.stats(name)
             _out(f"  tokens: {s['prompt_tokens']}p / {s['completion_tokens']}c  cost: ${s['cost_usd']:.4f}")
+            if s.get("limits"):
+                from sable.agents import limits as _limits
+                applied = _limits.enforced(_limits.parse(s["limits"]), _limits.supported())
+                _out("  limits: " + ", ".join(f"{k}={v}" for k, v in applied.items()))
+            else:
+                _out("  limits: none recorded (spawned before limits existed)")
         elif sub == "replay":
             from sable.app.builtins.why import handle_replay
             handle_replay(name)

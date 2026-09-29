@@ -4,6 +4,7 @@ All operations go through SQLite and libtmux.
 """
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import signal
@@ -66,17 +67,21 @@ class TaskManager:
         return None
 
     def spawn(self, name: str, goal: str, context: str = "",
-              task_base_dir: str | None = None) -> None:
+              task_base_dir: str | None = None, limits: dict | None = None) -> None:
         """Spawn a new task agent in a dedicated tmux window.
 
         Args:
             name: Task name (used as tmux window name and directory).
             goal: Natural language goal for the agent.
             context: Optional orchestrator context summary to seed the agent's memory.
+            limits: Per-task overrides of config `limits` (F5). Validated here,
+                    so a bad value raises ValueError before anything starts.
             task_base_dir: If set, use this as the parent dir instead of global tasks_base.
                            Sub-agent's workspace = task_base_dir/name/workspace/
                            shared_read_dir passed to Sandbox = task_base_dir/
         """
+        from sable.core.limits import parse as _parse_limits
+        effective = _parse_limits(limits, getattr(self._config, "limits", None))
         if task_base_dir:
             task_dir = Path(task_base_dir) / name
         else:
@@ -120,6 +125,8 @@ class TaskManager:
         goal_file = task_dir / ".agentic" / "goal.txt"
         goal_file.parent.mkdir(parents=True, exist_ok=True)
         goal_file.write_text(goal, encoding="utf-8")
+        limits_file = task_dir / ".agentic" / "limits.json"
+        limits_file.write_text(json.dumps(effective.to_dict()), encoding="utf-8")
 
         # Pass shared_read_dir if spawned under a task_base_dir
         shared_arg = ""
@@ -128,7 +135,8 @@ class TaskManager:
 
         window.active_pane.send_keys(
             f"PYTHONPATH={pythonpath} {python_bin} -m sable.agents.worker"
-            f" --task {shlex.quote(name)} --goal-file {shlex.quote(str(goal_file))}{shared_arg}",
+            f" --task {shlex.quote(name)} --goal-file {shlex.quote(str(goal_file))}{shared_arg}"
+            f" --limits-file {shlex.quote(str(limits_file))}",
             enter=True,
         )
 
@@ -281,7 +289,19 @@ class TaskManager:
             "completion_tokens": row[1] or 0,
             "cost_usd": row[2] or 0.0,
             "turns": row[3] or 0,
+            "limits": self._limits_of(name),
         }
+
+    def _limits_of(self, name: str) -> dict | None:
+        """The limits this task was spawned with, from its limits.json."""
+        # Orchestrator sub-agents sit one level down, under the goal's slug.
+        rel = f"{name}/.agentic/limits.json"
+        for path in [self._tasks_base / rel, *self._tasks_base.glob(f"*/{rel}")]:
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+        return None
 
     def history(self, name: str) -> list[dict]:
         rows = self._db._conn.execute(
