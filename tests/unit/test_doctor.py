@@ -51,7 +51,8 @@ def test_shellconfig_round_trips_schema_version():
 
 def _probes(**over):
     base = dict(which=lambda name: "/usr/bin/" + name, bwrap=lambda: True,
-                stale=lambda fix: [], palace=lambda fix: ("ok", "fine"))
+                stale=lambda fix: [], palace=lambda fix: ("ok", "fine"),
+                rlimits=lambda: True)
     base.update(over)
     return base
 
@@ -85,6 +86,7 @@ def test_missing_tools_and_stale_reported(tmp_path):
                   stale=lambda fix: ["t1"])))
     assert checks["tmux"].status == "warn"
     assert checks["sandbox"].status == "warn"
+    assert "network" in checks["agent limits"].detail and checks["agent limits"].status == "warn"
     assert checks["stale tasks"].status == "warn" and "t1" in checks["stale tasks"].detail
     assert checks["config version"].status == "warn"
     assert checks["config version"].fix_hint

@@ -68,6 +68,9 @@ class ShellConfig:
     mcp: dict = field(default_factory=dict)
     # Local HH:MM the daemon runs palace consolidation (Phase 7, C3).
     maintenance_time: str = "02:30"
+    # Sub-agent resource limits (Phase 8, F5, sable/agents/limits.py).
+    # Empty means limits.DEFAULTS; a spawn action may override per task.
+    limits: dict = field(default_factory=dict)
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -181,6 +184,10 @@ class ShellConfig:
         if not isinstance(maintenance_time, str) or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", maintenance_time):
             raise ValueError(f"maintenance_time must be HH:MM, got {maintenance_time!r}")
 
+        raw_limits = data.get("limits") or {}
+        from sable.core.limits import parse as _parse_limits
+        _parse_limits(raw_limits)  # raises ValueError
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -201,6 +208,7 @@ class ShellConfig:
             notify=dict(notify),
             mcp=dict(mcp),
             maintenance_time=maintenance_time,
+            limits=dict(raw_limits),
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -228,5 +236,6 @@ class ShellConfig:
             "mcp": dict(self.mcp),
             "schema_version": CURRENT,
             "maintenance_time": self.maintenance_time,
+            "limits": dict(self.limits),
             "api_key": getattr(self, "api_key", ""),
         }

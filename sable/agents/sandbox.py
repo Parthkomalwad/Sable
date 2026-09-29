@@ -127,7 +127,9 @@ export -f _resolve _inside _guard cp mv rm rmdir mkdir touch ln chmod chown tee 
 
 class Sandbox:
     def __init__(self, task_dir: str, shared_read_dir: str | None = None,
-                 extra_write_dirs: list[str] | None = None) -> None:
+                 extra_write_dirs: list[str] | None = None, limits=None) -> None:
+        from sable.agents.limits import Limits
+        self.limits = limits or Limits()
         self._task_dir = os.path.realpath(task_dir)
         self._shared_read_dir = os.path.realpath(shared_read_dir) if shared_read_dir else None
         self._extra_write_dirs = [os.path.realpath(d) for d in (extra_write_dirs or [])]
@@ -159,7 +161,11 @@ class Sandbox:
         return False
 
     def wrap_command(self, command: str) -> str:
-        """Return the command wrapped with sandbox enforcement."""
+        """Return the command wrapped with sandbox enforcement and limits (F5)."""
+        from sable.agents.limits import ulimit_prefix
+        return ulimit_prefix(self.limits) + self._wrap(command)
+
+    def _wrap(self, command: str) -> str:
         if self.use_bwrap:
             ro_bind = ""
             if self._shared_read_dir:
@@ -177,6 +183,7 @@ class Sandbox:
                 f"{ro_bind}"
                 f"--ro-bind / / "
                 f"--unshare-pid "
+                f"{'' if self.limits.network else '--unshare-net '}"
                 f"-- /bin/bash -c {shlex.quote(command)}"
             )
         # Bash-wrapper fallback: reads already allowed everywhere, writes blocked outside task_dir
