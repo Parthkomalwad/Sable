@@ -72,6 +72,9 @@ class DashApp(App):
         if ev:
             lanes = [f"[b]eval[/b]  {ev.passed}/{ev.total} passed  ({escape(ev.backend)}, "
                      f"{escape(ev.run_id[:10])})", ""] + lanes
+        check = state.latest_selfcheck(self.db_path)
+        if check:
+            lanes = ["[b]self-check[/b]", escape(check), ""] + lanes
         self.query_one("#lanes", Static).update("\n".join(lanes) or "no agents yet")
 
         tree = self.query_one("#tree", Tree)

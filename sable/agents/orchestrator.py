@@ -192,6 +192,9 @@ class OrchestratorAgent:
         #: commands", and a count is not a procedure.
         self._steps: list[dict] = []
         self._skills: list[dict] = []
+        #: K10: this goal's model spend, for the goal_done event.
+        self._spent_tokens = 0
+        self._spent_usd = 0.0
         if skill_loader is not None:
             try:
                 self._skills = skill_loader.load_relevant(goal)
@@ -946,6 +949,12 @@ class OrchestratorAgent:
         self._grade_skills()
         self._maybe_draft_skill()
         self._maybe_draft_runbook()
+        # K10: one event per completed goal, so the self-check can compare
+        # goals with and without a matched skill. Nothing recorded this before.
+        self._bus.publish("orchestrator", EventKind.GOAL_DONE, {
+            "steps": len(self._steps), "tokens": self._spent_tokens,
+            "usd": round(self._spent_usd, 6),
+            "skills": list(dict.fromkeys(s["name"] for s in self._skills))})
         if self._task_dir:
             try:
                 result_path = self._task_dir / ".agentic" / "result.md"
@@ -1204,6 +1213,8 @@ class OrchestratorAgent:
             completion_tokens=completion_tokens,
             cost_usd=cost_usd,
         )
+        self._spent_tokens += prompt_tokens + completion_tokens
+        self._spent_usd += cost_usd
         self._record_cost(model, prompt_tokens, completion_tokens, cost_usd)
 
     def _record_cost(

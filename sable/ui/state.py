@@ -213,3 +213,15 @@ def latest_eval(db_path=None) -> EvalRun | None:
         return None
     run_id, backend, passed, total = rows[0]
     return EvalRun(run_id, backend, int(passed), int(total))
+
+
+def latest_selfcheck(db_path=None) -> str:
+    """The newest self-check report text (Phase 9, K10), or "" if none."""
+    rows = _rows(db_path, "SELECT payload_json FROM agent_events WHERE kind = 'selfcheck' "
+                          "ORDER BY id DESC LIMIT 1")
+    if not rows:
+        return ""
+    try:
+        return str(json.loads(rows[0][0]).get("text", ""))
+    except ValueError:
+        return ""
