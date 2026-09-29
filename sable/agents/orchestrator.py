@@ -246,6 +246,9 @@ class OrchestratorAgent:
         self._failures = 0
         self._turn = 0
         self._pending_reflection: dict | None = None
+        #: A4: plan graph reports for the reviewer, and its `fail` count.
+        self._graph_reports: list[str] = []
+        self._review_fails = 0
 
     # ------------------------------------------------------------------
     # Public
@@ -310,8 +313,13 @@ class OrchestratorAgent:
                 elif action_type == "graph":
                     self._handle_graph(action)
                 elif action_type == "done":
-                    self._handle_done(action)
-                    break
+                    outcome = self._review(action)
+                    if outcome == "done":
+                        self._handle_done(action)
+                        break
+                    if outcome == "failed":
+                        break
+                    # "retry": the reviewer's reason went back to the model.
                 else:
                     _out(f"[orchestrator] unknown action '{action_type}' stopping")
                     break
@@ -724,6 +732,7 @@ class OrchestratorAgent:
             lines.append(f"{i}: {status}" + (f"\n  {results[i]}" if results.get(i) else ""))
         _out("  \u25c8 plan graph finished: " + ", ".join(line.split("\n")[0] for line in lines))
         del self._history[mark:]
+        self._graph_reports.append("\n".join(lines))
         self._history.append({"role": "user", "content": "[graph report]\n" + "\n".join(lines)})
 
     #: A step's output that says the step did not work. Matched against the
@@ -819,6 +828,49 @@ class OrchestratorAgent:
         name = Path(path).parent.name
         _out(f"\n  [skill] draft saved: {name} "
              f"(/skill list to review, /skill approve {name} to enable)")
+
+    def _review(self, action: dict) -> str:
+        """A4: the reviewer's say before `done`. Returns done, retry or failed.
+
+        Skipped when nothing state-changing ran (per policy/blast.py and no
+        plan graph) or `review: off`. A first `fail` goes back to the model;
+        a second asks the user in a tty and fails the goal otherwise.
+        """
+        from sable.policy import blast
+
+        changed = any(blast.classify(s["command"]) != blast.Level.READ_ONLY for s in self._steps)
+        if (self._commands_run == 0 or not (changed or self._graph_reports)
+                or getattr(self._config, "review", "on") == "off"):
+            return "done"
+        from sable.agents import reviewer
+        from sable.core import audit
+        from sable.llm.registry import build_backend
+
+        steps = list(self._steps) + [{"command": "[plan graph report]", "output": r}
+                                     for r in self._graph_reports]
+        verdict = reviewer.review(build_backend(self._config, role="reviewer"), self._goal, steps)
+        _out(f"  reviewer: {verdict.verdict}  {verdict.why}")
+        self._bus.publish("orchestrator", EventKind.REVIEW,
+                          {"goal": self._goal, "verdict": verdict.verdict, "why": verdict.why})
+        audit.write_action("review", f"{verdict.verdict}: {verdict.why}")
+        if verdict.verdict != "fail":
+            return "done"
+        self._review_fails += 1
+        if self._review_fails == 1:
+            self._history.append({"role": "assistant", "content": json.dumps(action)})
+            self._history.append({"role": "user", "content":
+                                  f"[reviewer: fail] {verdict.why}\nFix this if you can, then send done again."})
+            return "retry"
+        if sys.stdin.isatty():
+            sys.stdout.write("  the reviewer failed this goal twice. accept anyway? [y/N] ")
+            sys.stdout.flush()
+            try:
+                if input("").strip().lower() in ("y", "yes"):
+                    return "done"
+            except (EOFError, KeyboardInterrupt):
+                pass
+        _out("  [orchestrator] the reviewer failed this goal twice; reporting it failed.")
+        return "failed"
 
     def _handle_done(self, action: dict) -> None:
         explanation = action.get("explanation", "")

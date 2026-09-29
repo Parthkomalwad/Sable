@@ -23,7 +23,7 @@ VALID_ROUTING_MODES = {"auto", "prefix"}
 #: is pure heuristics and makes no LLM call. It is listed here because the
 #: roadmap names it and a model-backed router is a later phase; documenting it
 #: as unread is better than silently dropping a key a user set.
-MODEL_ROLES = ("router", "orchestrator", "worker", "summariser")
+MODEL_ROLES = ("router", "orchestrator", "worker", "summariser", "reviewer")
 
 
 #: G6 palettes; the colours live in ui/theme.py, which core may not import.
@@ -71,6 +71,8 @@ class ShellConfig:
     # Sub-agent resource limits (Phase 8, F5, sable/agents/limits.py).
     # Empty means limits.DEFAULTS; a spawn action may override per task.
     limits: dict = field(default_factory=dict)
+    # A4: a reviewer model checks a goal's work before done. "on" | "off".
+    review: str = "on"
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -79,6 +81,9 @@ class ShellConfig:
         exist both resolve to the single configured model rather than to an
         empty string that a backend would send as its model name.
         """
+        if role == "reviewer":
+            # A4: the reviewer defaults to the orchestrator's model, not `model`.
+            return self.models.get("reviewer") or self.model_for("orchestrator")
         return self.models.get(role) or self.model
 
     @staticmethod
@@ -187,6 +192,11 @@ class ShellConfig:
         raw_limits = data.get("limits") or {}
         from sable.core.limits import parse as _parse_limits
         _parse_limits(raw_limits)  # raises ValueError
+        review = data.get("review", "on")
+        if isinstance(review, bool):
+            review = "on" if review else "off"
+        if review not in ("on", "off"):
+            raise ValueError(f"review must be on or off, got {review!r}")
 
         cfg = ShellConfig(
             backend=backend,
@@ -209,6 +219,7 @@ class ShellConfig:
             mcp=dict(mcp),
             maintenance_time=maintenance_time,
             limits=dict(raw_limits),
+            review=review,
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -237,5 +248,6 @@ class ShellConfig:
             "schema_version": CURRENT,
             "maintenance_time": self.maintenance_time,
             "limits": dict(self.limits),
+            "review": self.review,
             "api_key": getattr(self, "api_key", ""),
         }
