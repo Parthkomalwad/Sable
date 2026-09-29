@@ -42,6 +42,12 @@ def _inside(real: str, root: str) -> bool:
         return False
 
 
+# A live run (Phase 7 gate) showed a model retrying fs tools on /etc until it
+# gave up: say what works instead.
+OUTSIDE_HINT = ("fs tools only work inside the working directory; for system paths such as "
+                "/etc or /var/log, run a shell command instead, e.g. cat /etc/app.conf or ls /etc/app")
+
+
 def _resolve(path: str, ctx: ToolContext, *, read: bool = False) -> tuple[str, bool]:
     """(real path, outside root). Raises ToolError when outside is not allowed."""
     root = _root(ctx)
@@ -50,7 +56,7 @@ def _resolve(path: str, ctx: ToolContext, *, read: bool = False) -> tuple[str, b
         return real, False
     if read and ctx.role == "orchestrator":
         return real, True
-    raise ToolError(f"{path!r} resolves outside {root}; refused")
+    raise ToolError(f"{path!r} resolves outside {root}; refused. {OUTSIDE_HINT}")
 
 
 def _cap(text: str) -> str:
@@ -194,6 +200,8 @@ def _search(args: dict, ctx: ToolContext) -> ToolResult:
         raise ToolError(f"bad regex: {exc}") from exc
     hits: list[str] = []
     try:
+        if os.path.isabs(args["glob"]) or args["glob"].startswith("~"):
+            raise ToolError(f"the glob must be relative to the working directory. {OUTSIDE_HINT}")
         matches = Path(root).glob(args["glob"])
         for p in matches:
             real = os.path.realpath(p)

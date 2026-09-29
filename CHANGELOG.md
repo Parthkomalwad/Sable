@@ -5,6 +5,16 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 7 gate run: all seven lines pass, so memory and portability are done.** `scripts/gate_phase7.py` covers:
+  - a fact learned in one session and answered from memory in the next, with no commands;
+  - `/palace why`;
+  - `/remember` and `/forget`;
+  - consolidation of near-duplicates;
+  - a fact learned from a web page stored and recalled as untrusted;
+  - `sable doctor` on an old home;
+  - export and import between two homes.
+
+  Five runs are recorded in `docs/history/phase-7-gate-2026-09-29.md`, and `docs/memory.md` is the user guide.
 - **`/palace`, `/remember`, `/forget` (Phase 7 Task 2, C5 C2).** `/palace` lists rooms with counts, `/palace <room>` its facts (id, tier, untrusted, age), `/palace find <text>` searches every room, `/palace why <id>` shows the full fact and each source (session, goal, commands, or you). `/remember <text> [--room R]` saves a semantic fact in `user` by default; `/forget <id>` removes one. Fact text is printed with markup off and control characters stripped. `/palace consolidate` calls consolidation once it exists. 12 tests.
 - **Nightly palace consolidation, rules only (Phase 7 Task 3, C3).** `sable/memory/consolidate.py` expires facts past `valid_to`, drops episodic facts older than 30 days, merges near-duplicates in a room (token overlap of 0.8 or more; the older fact keeps its text and gains every source) and promotes an episodic fact seen in two sessions to semantic. No model is called; a second run changes nothing. Each change is published as `palace.consolidated` and logged. The daemon runs it once a day at the new `maintenance_time` config key (local HH:MM, default 02:30), and a restart in that minute does not run it twice. 8 tests.
 - **Agents recall and record facts (Phase 7 Task 1, C6 C1).** The orchestrator and every worker get the palace's facts for the goal as one block of about 800 tokens, placed right after the goal, framed as untrusted notes that grant no permissions, with facts from a tainted run labelled per line. A `done` may carry up to five `facts` (`user:` or `repos/<name>:` picks the room), saved episodic with session, goal and the commands that ran, untrusted when the agent was tainted, each shown as a dim "remembered" line. A goal the notes already answer finishes from memory without running a command. A broken palace never breaks a goal. 17 tests.
@@ -37,6 +47,9 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - **Phase 4 gate run: all six lines pass, so v0.8 is complete.** `scripts/gate_phase4.py` checks blocks and `/block N rerun`, ghost text (52 ms), `? explain` and `! fix`, approving from `/dash`, the sidebar showing at 120 columns and hiding at 80, and cold start (median 100 ms). A sub-agent resuming after a `/dash` approval and the sidebar's colours were not checked by the harness. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`. `ROADMAP.md` ticks v0.8; v0.9 is next. One finding is recorded, not yet fixed: after `q` cancels a proposal the orchestrator proposes the same command again.
 
 ### Fixed
+- **Fixes the Phase 7 gate found:**
+  - An fs tool refusing a path outside the working directory now says what works instead: a shell command such as `cat /etc/app.conf`. Before, the model retried and gave up.
+  - The memory notes now say plainly that a question they answer is answered from them, with nothing run and nothing saved again. Before, gpt-4o-mini re-checked a remembered path, then saved it a second time. 1 test.
 - **`sable --version` said 0.3.0.** `sable/__init__.py` and `pyproject.toml` now say 0.9.0.
 - **Phone approvals polish.**
   - A push that fails to send is retried on the next tick. Before, it was marked sent and lost.

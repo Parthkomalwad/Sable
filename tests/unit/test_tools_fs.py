@@ -162,3 +162,12 @@ def test_blast_levels():
     rm = registry.as_command("fs.patch", {"path": "x", "diff": "@@ -1,2 +1 @@\n a\n-b\n"})
     assert blast.classify(add) is blast.Level.WRITES
     assert blast.classify(rm) is blast.Level.DESTRUCTIVE
+
+
+def test_outside_paths_say_what_to_use_instead(tmp_path):
+    from sable.tools import fs
+    from sable.tools.base import ToolContext, ToolError
+    ctx = ToolContext(role="worker", cwd=str(tmp_path), agent="w")
+    import pytest
+    with pytest.raises(ToolError, match="run a shell command instead"):
+        fs._resolve("/etc/passwd", ctx)
