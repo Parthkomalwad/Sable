@@ -347,6 +347,10 @@ class OrchestratorAgent:
         explanation = action.get("explanation", "")
         if not command or self._refused(action):
             return
+        plan = [str(c).strip() for c in (action.get("plan") or []) if str(c).strip()]
+        if len(plan) >= 2:
+            self._handle_plan(action, plan)
+            return
         from sable.tools import registry
 
         if tool := registry.tool_as_command(command):
@@ -423,6 +427,19 @@ class OrchestratorAgent:
                 "explanation": f"Command '{confirmed_cmd}' timed out handing off full goal to sub-agent",
             })
             raise _TimeoutDelegated()
+
+    def _handle_plan(self, action: dict, plan: list[str]) -> None:
+        """A known multi-step change: rehearsed on a copy first (K5), then
+        run step by step with each step gated and undo points taken."""
+        from sable.agents import planner
+
+        code = planner.execute_plan(plan, self._cwd, action.get("explanation", ""))
+        self._commands_run += len(plan)
+        summary = "; ".join(plan)
+        output = f"(plan of {len(plan)} steps finished; exit {code})"
+        self._record_step(f"plan: {summary}", output + (f"\n[exit {code}]" if code else ""))
+        self._history.append({"role": "assistant", "content": json.dumps(action)})
+        self._history.append({"role": "user", "content": output})
 
     def _handle_tool(self, action: dict) -> None:
         """One tool call (J1): preview, registry, then the result to the model.

@@ -162,11 +162,22 @@ class TestDaemon:
         assert status == "waiting" and "rehearsal failed" in output and ran == []
         assert queue.pending(conn)
 
-    def test_unavailable_rehearsal_queues_the_run(self, conn, tmp_path, monkeypatch):
+    def test_unavailable_rehearsal_waits_only_in_always_mode(self, conn, tmp_path, monkeypatch):
         monkeypatch.setattr(rehearse, "rehearse", lambda steps, cwd: rehearse.Rehearsal(False, "no bwrap"))
+        monkeypatch.setattr(rehearse, "mode", lambda: "always")
         rid = jobs.run_plan(conn, "j", ["touch a"], cwd=str(tmp_path), run=lambda c, w, **k: "")
         status, output = conn.execute("SELECT status, output FROM job_runs WHERE id = ?", (rid,)).fetchone()
         assert status == "waiting" and "no bwrap" in output
+
+    def test_unavailable_rehearsal_runs_as_before_in_auto_mode(self, conn, tmp_path, monkeypatch):
+        """A host without working bwrap keeps its schedules running (policy still gates)."""
+        monkeypatch.setattr(rehearse, "rehearse", lambda steps, cwd: rehearse.Rehearsal(False, "no bwrap"))
+        monkeypatch.setattr(rehearse, "mode", lambda: "auto")
+        ran = []
+        rid = jobs.run_plan(conn, "j", ["touch a"], cwd=str(tmp_path),
+                            run=lambda c, w, **k: ran.append(c) or "(no output; exit 0)")
+        assert conn.execute("SELECT status FROM job_runs WHERE id = ?", (rid,)).fetchone()[0] == "ok"
+        assert ran == ["touch a"]
 
     def test_passing_rehearsal_runs(self, conn, tmp_path, monkeypatch):
         monkeypatch.setattr(rehearse, "rehearse", lambda steps, cwd: rehearse.Rehearsal(True, "", [
@@ -196,3 +207,19 @@ def test_real_rehearsal_leaves_the_file_alone(tmp_path):
     assert not (d / "new.txt").exists()
     assert "-a line" in r.diff and "+b line" in r.diff
     assert f"added {d / 'new.txt'}" in r.changes
+
+
+def test_orchestrator_routes_a_plan_through_execute_plan(tmp_path, monkeypatch):
+    pytest.importorskip("ptyprocess")
+    from unittest.mock import MagicMock
+    from sable.agents import planner
+    from sable.agents.orchestrator import OrchestratorAgent
+    cfg = MagicMock(); cfg.tasks_base_dir = str(tmp_path); cfg.model_for.return_value = "m"
+    agent = OrchestratorAgent(goal="g", cwd=str(tmp_path), config=cfg,
+                              db_path=str(tmp_path / "s.db"), task_manager=MagicMock())
+    seen = []
+    monkeypatch.setattr(planner, "execute_plan", lambda plan, cwd, d="": seen.append(plan) or 0)
+    agent._handle_run({"action": "run", "command": "a", "plan": ["sed -i s/a/b/ f", "touch g"],
+                       "explanation": "e"})
+    assert seen == [["sed -i s/a/b/ f", "touch g"]]
+    assert "plan of 2 steps finished; exit 0" in agent._history[-1]["content"]

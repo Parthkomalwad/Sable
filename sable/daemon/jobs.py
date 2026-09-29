@@ -7,6 +7,7 @@ inbox and the run waits there, a `never` step fails the run.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 import time
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS job_runs (
 )
 """
 
+log = logging.getLogger("sabled")
 Run = Callable[..., str]
 
 
@@ -138,6 +140,11 @@ def _rehearsal_block(steps: list[str], cwd: str) -> str:
         return ""
     r = rehearse.rehearse(steps, cwd)
     if not r.available:
+        # `auto` keeps a host without working bwrap running its schedules as
+        # before (policy still gates every step); `always` makes it wait.
+        if rehearse.mode() != "always":
+            log.warning("job rehearsal unavailable, running without it: %s", r.reason)
+            return ""
         return f"rehearsal unavailable: {r.reason}"
     failed = next((s for s in r.steps if s.status == "failed"), None)
     if failed:
