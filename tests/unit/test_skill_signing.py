@@ -51,7 +51,9 @@ def test_added_file_is_tampered(tmp_path, key):
 
 
 def test_keyring_unavailable_is_unsigned_not_a_crash(tmp_path, monkeypatch):
+    """No keyring and no way to write a key file: unsigned, never a crash."""
     monkeypatch.setattr(signing, "_key", _REAL_KEY)
+    monkeypatch.setattr(signing, "_file_key", lambda create: None)
 
     def boom(service):
         raise keyring.KeyringUnavailable("no dbus")
@@ -65,6 +67,7 @@ def test_keyring_unavailable_is_unsigned_not_a_crash(tmp_path, monkeypatch):
 
 def test_key_created_on_first_use(tmp_path, monkeypatch):
     monkeypatch.setattr(signing, "_key", _REAL_KEY)
+    monkeypatch.setattr(signing, "_key_file", lambda: tmp_path / "skill-signing.key")
     store = {}
     monkeypatch.setattr(keyring, "lookup", lambda s: store.get(s))
     monkeypatch.setattr(keyring, "store_api_key", lambda s, v: store.__setitem__(s, v))
@@ -139,3 +142,21 @@ def test_import_drops_signatures_and_labels_source(tmp_path, monkeypatch):
     assert rc == 0
     assert not (old / signing.SIGNATURE_FILE).exists()
     assert seen == {"n": {"deploy"}, "o": "box1"}
+
+
+def test_signing_works_without_a_keyring(tmp_path, monkeypatch):
+    """Headless servers have no keyring: the key lives in a 0600 file instead."""
+    import os
+    import sys
+    monkeypatch.setattr(signing, "_key", _REAL_KEY)
+
+    def boom(service):
+        raise keyring.KeyringUnavailable("no dbus")
+
+    monkeypatch.setattr(keyring, "lookup", boom)
+    monkeypatch.setattr(signing, "_key_file", lambda: tmp_path / "skill-signing.key")
+    folder = _skill(tmp_path)
+    assert signing.sign(folder)
+    assert signing.verify(folder) == "signed"
+    if sys.platform != "win32":
+        assert oct(os.stat(tmp_path / "skill-signing.key").st_mode)[-3:] == "600"

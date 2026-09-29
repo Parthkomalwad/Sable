@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 import secrets
 from pathlib import Path
 
@@ -33,23 +34,52 @@ SERVICE = "skill-signing"
 SIGNATURE_FILE = ".sable-signature"
 
 
+def _key_file() -> Path:
+    from sable.core.paths import SABLE_HOME
+    return SABLE_HOME / "skill-signing.key"
+
+
+def _file_key(create: bool) -> bytes | None:
+    """The key in a 0600 file, for servers with no keyring (the Phase 8 gate
+    found signing impossible on a headless host). Same trust boundary: only
+    this user can read it, as only this user can write their skills."""
+    path = _key_file()
+    try:
+        return bytes.fromhex(path.read_text().strip())
+    except (OSError, ValueError):
+        pass
+    if not create:
+        return None
+    key = secrets.token_bytes(32)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(key.hex())
+    except OSError:
+        return None
+    return key
+
+
 def _key(create: bool) -> bytes | None:
     try:
         stored = keyring.lookup(SERVICE)
     except keyring.KeyringUnavailable:
-        return None
+        return _file_key(create)
     if stored:
         try:
             return bytes.fromhex(stored)
         except ValueError:
             return None
+    if _key_file().exists():
+        return _file_key(False)
     if not create:
         return None
     key = secrets.token_bytes(32)
     try:
         keyring.store_api_key(SERVICE, key.hex())
     except RuntimeError:
-        return None
+        return _file_key(True)
     return key
 
 

@@ -36,11 +36,15 @@ def _no_real_audit_ledger(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
-def _no_real_signing_key(monkeypatch):
+def _no_real_signing_key(monkeypatch, tmp_path_factory):
     """Skill signing (K8) must never read or create a key in the real keyring."""
     from sable.skills import signing
 
     monkeypatch.setattr(signing, "_key", lambda create: None)
+    monkeypatch.setattr(signing, "_key_file", lambda: tmp_path_factory.mktemp("signing") / "skill-signing.key")
+
+
+@pytest.fixture(autouse=True)
 def _no_real_snapshots(monkeypatch, tmp_path_factory):
     """Undo points taken by agent tests go to a temp dir, not ~/.sable."""
     from sable.core import snapshots

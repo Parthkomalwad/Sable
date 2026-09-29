@@ -223,3 +223,11 @@ def test_orchestrator_routes_a_plan_through_execute_plan(tmp_path, monkeypatch):
                        "explanation": "e"})
     assert seen == [["sed -i s/a/b/ f", "touch g"]]
     assert "plan of 2 steps finished; exit 0" in agent._history[-1]["content"]
+
+
+def test_a_chain_of_changes_counts_as_a_plan():
+    assert rehearse.parts("sed -i s/a/b/ f && cp f g; ls") == ["sed -i s/a/b/ f", "cp f g", "ls"]
+    assert rehearse.parts("echo 'a && b'") == ["echo a && b"]
+    assert rehearse.wanted(["sed -i s/a/b/ f && cp f g"], how="auto")
+    assert not rehearse.wanted(["ls && cat f"], how="auto")
+    assert not rehearse.wanted(["sed -i s/a/b/ f"], how="auto")

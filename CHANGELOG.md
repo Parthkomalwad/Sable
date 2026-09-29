@@ -5,6 +5,15 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 8 gate run: all six lines pass, so orchestration and safety are done.** `scripts/gate_phase8.py` covers:
+  - a plan graph with a join and the reviewer's verdict;
+  - a three-step config change rehearsed on a copy, then applied;
+  - `/undo` restoring it byte for byte;
+  - step-up approval;
+  - network-off and memory limits for sub-agents;
+  - signed skills.
+
+  Seven runs are recorded in `docs/history/phase-8-gate-2026-09-29.md`, and `docs/orchestration.md` is the user guide.
 - **Reviewer agent (Phase 8 Task 1, A4).** Before a goal that ran a state-changing step (per `policy/blast.py`) or a plan graph is reported done, `sable/agents/reviewer.py` makes one model call (`models.reviewer`, default the orchestrator's model; prompt `llm/prompts/reviewer.md`) with the goal and each step's command and output tail, redacted, framed as untrusted data and capped at 6000 characters. The verdict `pass | concerns | fail` goes through the JSON fallback chain (unreadable is `concerns`), is shown as `reviewer: <verdict>  <why>`, published as a `review` event and written to the audit. A first `fail` goes back to the model; a second asks you in a tty and fails the goal otherwise. The reviewer has no tools and runs nothing. `review: off` in config turns it off. 19 tests.
 - **Rehearsal: a plan runs on a copy first (Phase 8 Task 3, F2 K5).** `sable/agents/rehearse.py` copies the footprint of every state-changing step (snapshot limits and refusals) to a temp dir and runs the steps inside bwrap with a read-only root, a private /tmp and no network, each copy bound over its real path. It shows per step ok / failed / not rehearsed, the diff and the added, removed and changed files, then `a apply  q abort`; apply runs the plan for real, now with an undo point per step. Steps acting outside the filesystem (systemctl, docker, curl, package installs, kill, reboot) are "not rehearsable" and a changing step with no footprint is "unknown footprint"; both are shown and not run. Without working bwrap it says unavailable and never falls back to running for real. Config `rehearse: auto|always|off` (auto: plans with 2+ changing steps). Daemon jobs with a changing step are rehearsed first; a failed or unavailable rehearsal leaves the run waiting in /inbox with the reason. In the shell, a `run` action with a `plan` of two or more commands is rehearsed before anything real changes. For daemon jobs, `auto` runs as before when rehearsal is unavailable on the host, and only `rehearse: always` makes the job wait in `/inbox`.
 - **Signed skills and source trust (Phase 8 Task 6, K8).** `sable/skills/signing.py` signs a skill folder with HMAC-SHA256 under a local key in the keyring (`skill-signing`, made on first use) and stores it in `.sable-signature`. Skills created in Sable or approved are signed; each index entry records its `source` (`user`, `crystallised`, `imported:<origin>`), and `sable import` / `sync` drop incoming signatures so imported skills arrive unsigned. While an agent follows an unsigned skill its commands get a `confirm` floor; a tampered skill is not injected. `/skill list` shows trust and source and warns on tampering; `/skill sign <name>` lists the files and asks before signing. No keyring means unsigned, never a crash.
@@ -55,6 +64,10 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - **Phase 4 gate run: all six lines pass, so v0.8 is complete.** `scripts/gate_phase4.py` checks blocks and `/block N rerun`, ghost text (52 ms), `? explain` and `! fix`, approving from `/dash`, the sidebar showing at 120 columns and hiding at 80, and cold start (median 100 ms). A sub-agent resuming after a `/dash` approval and the sidebar's colours were not checked by the harness. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`. `ROADMAP.md` ticks v0.8; v0.9 is next. One finding is recorded, not yet fixed: after `q` cancels a proposal the orchestrator proposes the same command again.
 
 ### Fixed
+- **Fixes the Phase 8 gate found:**
+  - **Signing on headless servers.** Skill signing had no key where there is no keyring. It now uses a 0600 key file.
+  - **Chained changes skipped rehearsal.** A command chaining two or more changes with `&&` or `;` now counts as a plan and is rehearsed.
+  - **Unit tests wrote to the real `~/.sable`.** A merge had dropped the decorator that sends their snapshots to a temp folder. Restored.
 - **Fixes the Phase 7 gate found:**
   - An fs tool refusing a path outside the working directory now says what works instead: a shell command such as `cat /etc/app.conf`. Before, the model retried and gave up.
   - The memory notes now say plainly that a question they answer is answered from them, with nothing run and nothing saved again. Before, gpt-4o-mini re-checked a remembered path, then saved it a second time. 1 test.
