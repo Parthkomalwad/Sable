@@ -29,7 +29,10 @@ from sable.policy import hooks, taint
 #: The actions this role may emit. `wait` and `ask` are specified in
 #: docs/contracts.md and not yet implemented; `mcp` is reserved for Phase 6.
 #: Anything outside this set stops the loop rather than being guessed at.
-ORCHESTRATOR_ACTIONS = frozenset({"run", "spawn", "done", "tool"})
+ORCHESTRATOR_ACTIONS = frozenset({"run", "spawn", "done", "tool", "graph"})
+
+#: How long a plan graph may run before unfinished lanes count as failed.
+_GRAPH_TIMEOUT = 3600.0
 
 # Loaded from sable/data/spinner_verbs.txt (Phase 0.5 step 4): 187 lines of
 # list literal in the middle of this module made it harder to read for no
@@ -304,6 +307,8 @@ class OrchestratorAgent:
                     self._handle_spawn(action)
                 elif action_type == "tool":
                     self._handle_tool(action)
+                elif action_type == "graph":
+                    self._handle_graph(action)
                 elif action_type == "done":
                     self._handle_done(action)
                     break
@@ -625,6 +630,86 @@ class OrchestratorAgent:
         self._commands_run += 1
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": f"[agent '{name}' spawned]"})
+
+    def _handle_graph(self, action: dict) -> None:
+        """A3: start ready lanes as sub-agents, wait on the bus, start the next.
+
+        Each lane goes through `_handle_spawn`, so hooks, handoff and taint
+        apply unchanged. Its per-spawn history lines are replaced by one
+        report at the end: done / failed / blocked per lane.
+        """
+        from sable.agents import graph
+        from sable.core.events.types import EventKind
+
+        lanes = action.get("lanes")
+        problems = graph.validate(lanes)
+        self._history.append({"role": "assistant", "content": json.dumps(action)})
+        if problems:
+            _out("[orchestrator] invalid plan graph: " + "; ".join(problems))
+            self._history.append({"role": "user", "content": "[invalid graph]\n" + "\n".join(problems)})
+            return
+        _out("  \u25c8 plan graph")
+        _out(graph.tree(lanes))
+        mark = len(self._history)
+        goals = {lane["id"]: lane["goal"] for lane in lanes}
+        done: set[str] = set()
+        failed: set[str] = set()
+        running: set[str] = set()
+        results: dict[str, str] = {}
+
+        def lane_state(i: str, status: str) -> None:
+            self._bus.publish("orchestrator", "graph.lane", {"graph": self._slug, "id": i, "status": status})
+
+        for lane in lanes:
+            lane_state(lane["id"], "waiting")
+        deadline = time.monotonic() + _GRAPH_TIMEOUT
+        while True:
+            for i in graph.ready(lanes, done, failed):
+                if i in running:
+                    continue
+                self._handle_spawn({"name": i, "goal": goals[i]})
+                if i in self._spawned:
+                    running.add(i)
+                    lane_state(i, "running")
+                else:
+                    failed.add(i)
+                    results[i] = "could not be started"
+                    lane_state(i, "failed")
+            if not running:
+                if not graph.ready(lanes, done, failed):
+                    break
+                continue
+            for event in self._bus.since(self._bus_cursor):
+                self._bus_cursor = event.id or self._bus_cursor
+                if event.agent not in running or event.kind not in EventKind.TERMINAL:
+                    continue
+                running.discard(event.agent)
+                self._spawned.remove(event.agent)
+                ok = event.kind == EventKind.COMPLETED
+                (done if ok else failed).add(event.agent)
+                results[event.agent] = str(event.payload.get("result") or event.payload.get("reason")
+                                           or event.payload.get("explanation", ""))[:500]
+                lane_state(event.agent, "done" if ok else "failed")
+            if running and time.monotonic() > deadline:
+                for i in running:
+                    failed.add(i)
+                    results[i] = f"no result after {int(_GRAPH_TIMEOUT)}s"
+                    lane_state(i, "failed")
+                break
+            if running:
+                time.sleep(0.5)
+
+        blocked = graph.blocked_by_failure(lanes, failed)
+        for i in blocked:
+            lane_state(i, "blocked")
+        lines = []
+        for lane in lanes:
+            i = lane["id"]
+            status = "done" if i in done else "failed" if i in failed else "blocked"
+            lines.append(f"{i}: {status}" + (f"\n  {results[i]}" if results.get(i) else ""))
+        _out("  \u25c8 plan graph finished: " + ", ".join(line.split("\n")[0] for line in lines))
+        del self._history[mark:]
+        self._history.append({"role": "user", "content": "[graph report]\n" + "\n".join(lines)})
 
     #: A step's output that says the step did not work. Matched against the
     #: markers the runtime and the policy check produce, never against the
@@ -1059,6 +1144,10 @@ class OrchestratorAgent:
         # Models also send the tool's name as the action (see
         # registry.normalize_action), so any action that is not one of ours
         # is checked against the registry before anything else.
+        if action == "graph":
+            # Lanes are not a typed field; the whole body is in `raw`.
+            body = runtime.parse_json_action(getattr(response, "raw", "") or "", {})
+            return json.dumps({**body, "action": "graph"})
         if action not in ("run", "spawn", "done"):
             from sable.tools import registry
 

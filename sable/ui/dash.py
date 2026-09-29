@@ -61,7 +61,8 @@ class DashApp(App):
 
     def refresh_data(self) -> None:
         agents = state.agents(self.db_path)
-        lanes = []
+        graph = state.lanes(self.db_path)
+        lanes = ["[b]plan graph[/b]  " + "  ".join(f"{escape(i)} ({s})" for i, s in graph), ""] if graph else []
         for a in agents:
             lanes.append(f"[b]{escape(a.name)}[/b]  ({escape(a.badge)})  steps {a.steps}  "
                          f"${a.cost_usd:.4f}  {a.tokens} tok\n  {escape(a.goal)}")

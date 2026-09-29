@@ -171,3 +171,21 @@ def tail(agent: str, n: int = 20, db_path=None) -> list[str]:
         text = data.get("command") or data.get("reason") or data.get("explanation") or data.get("name") or ""
         lines.append(f"{kind}: {text}".rstrip(": ").strip())
     return lines
+
+
+def lanes(db_path=None) -> list[tuple[str, str]]:
+    """The newest plan graph's lanes (A3) as (id, status), in the order declared."""
+    rows = _rows(db_path, "SELECT payload_json FROM agent_events WHERE kind = 'graph.lane' "
+                          "ORDER BY id DESC LIMIT 200")
+    events = []
+    for (payload,) in reversed(rows):
+        try:
+            events.append(json.loads(payload or "{}"))
+        except json.JSONDecodeError:
+            continue
+    graph = events[-1].get("graph") if events else None
+    latest: dict[str, str] = {}
+    for data in events:
+        if data.get("graph") == graph:
+            latest[data.get("id", "?")] = data.get("status", "?")
+    return list(latest.items())
