@@ -5,6 +5,16 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Phase 9 gate run: all seven lines pass, so v1.0 is complete.** `scripts/gate_phase9.py` covers:
+  - `sable eval`, 25/25 on the mock backend with no API key in reach;
+  - `/skill doctor`;
+  - `/plugin add` and `/plugin remove`;
+  - OpenTelemetry traces at a local collector;
+  - `@b df -h` over SSH, with a risky command queued on the other host;
+  - a runbook drafted from an incident and offered again;
+  - an approve-only share link approving one item, with the approver in the audit.
+
+  Three runs are recorded in `docs/history/phase-9-gate-2026-09-29.md`, and `docs/ecosystem.md` is the user guide.
 - **Weekly self-check, no model calls (Phase 9 Task 7, K10).** `sable/daemon/selfcheck.py` reports from data Sable already keeps: goals completed, and steps, tokens and USD per goal with and without a matched skill; skills the doctor flags as failing, and which are newly failing since the last report ("see /skill doctor"); the latest `sable eval` run. The orchestrator now publishes a `goal_done` event per completed goal (steps, tokens, usd, skills), since nothing recorded skill matches per goal before. The daemon runs it on Sunday at `maintenance_time`, once per week; `sable selfcheck` and `/selfcheck` run it on demand. Each run publishes `selfcheck` on the bus, shows in `/dash`, and sends one push if ntfy is set up. 6 tests.
 - **Plugins (Phase 9 Task 3, H2).** `/plugin add <folder>` reads a `plugin.toml` (an MCP server by command or https url, requested trusted tools, optional `skills/` and `hooks/`), shows everything, and asks. The server is registered like `/mcp add`; each requested trusted tool needs its own yes; skills install as `imported:plugin:<name>`, unsigned; each hook is shown and confirmed and never overwrites an existing one. `/plugin list` and `/plugin remove <name>` take back exactly what was installed. 11 tests.
 - **Multi-host (Phase 9 Task 5, H5).** `/host add NAME user@host [--port N] [--sable PATH]`, `/host list`, `/host rm`, `/host test`; `@NAME <command>` and `@all <command>` preview the command, then send it over `ssh -o BatchMode=yes` to that host's own `sable --mcp-serve`, so the remote policy, audit and inbox decide. A confirm-tier command comes back as "queued on NAME as aN; approve it on that host". Names and targets are validated before they reach the ssh argv (no leading `-`, no shell metacharacters), each call is written to the local audit ledger with secrets redacted, and remote goals are refused for now (commands only).
