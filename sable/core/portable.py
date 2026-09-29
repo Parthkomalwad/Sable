@@ -50,7 +50,7 @@ def roots() -> dict[str, Path]:
     }
 
 
-def _sha(data: bytes) -> str:
+def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
@@ -101,30 +101,39 @@ def export(dest: Path | None, say: Say, secret_check: SecretCheck) -> int:
         "version": FORMAT_VERSION,
         "host": host,
         "created": now.isoformat(),
-        "files": [{"path": n, "sha256": _sha(b)} for n, b in blobs.items()],
+        "files": [{"path": n, "sha256": sha256(b)} for n, b in blobs.items()],
     }
     with tarfile.open(dest, "w:gz") as tar:
-        _add(tar, MANIFEST, json.dumps(manifest, indent=2).encode(), 0o644)
+        add_member(tar, MANIFEST, json.dumps(manifest, indent=2).encode(), 0o644)
         for name, data in blobs.items():
-            _add(tar, name, data, files[name].stat().st_mode & 0o755)
+            add_member(tar, name, data, files[name].stat().st_mode & 0o755)
     say(f"exported {len(blobs)} files to {dest}")
     return 0
 
 
-def _add(tar: tarfile.TarFile, name: str, data: bytes, mode: int) -> None:
+def add_member(tar: tarfile.TarFile, name: str, data: bytes, mode: int) -> None:
     info = tarfile.TarInfo(name)
     info.size = len(data)
     info.mode = mode
     tar.addfile(info, io.BytesIO(data))
 
 
-def _check_name(name: str) -> str | None:
-    """Why `name` is not allowed in an archive, or None if it is."""
+def check_path(name: str) -> str | None:
+    """Why `name` is not a safe relative posix path, or None if it is."""
     if name.startswith(("/", "\\")) or ":" in name or "\\" in name:
         return "absolute or non-posix path"
     parts = PurePosixPath(name).parts
     if not parts or any(p in ("..", ".", "") for p in parts):
         return "path traversal"
+    return None
+
+
+def _check_name(name: str) -> str | None:
+    """Why `name` is not allowed in an archive, or None if it is."""
+    why = check_path(name)
+    if why:
+        return why
+    parts = PurePosixPath(name).parts
     top = parts[0]
     if top not in roots():
         return "outside the portable set"
@@ -141,8 +150,15 @@ MAX_FILES = 20_000
 MAX_TOTAL = 200 * 2**20
 
 
-def read_archive(path: Path, say: Say) -> dict[str, bytes] | None:
-    """Validate and stage an archive; the verified contents, or None."""
+def read_archive(path: Path, say: Say,
+                 check_name: Callable[[str], str | None] = _check_name,
+                 max_total: int | None = None) -> dict[str, bytes] | None:
+    """Validate and stage an archive; the verified contents, or None.
+
+    `check_name` and `max_total` let `/skill install` reuse every other
+    check with its own allowed names and a smaller size cap."""
+    if max_total is None:
+        max_total = MAX_TOTAL
     try:
         tar = tarfile.open(path, "r:gz")
     except (OSError, tarfile.TarError) as exc:
@@ -155,8 +171,8 @@ def read_archive(path: Path, say: Say) -> dict[str, bytes] | None:
         if len(members) > MAX_FILES:
             return _reject(say, [f"{len(members)} entries; the limit is {MAX_FILES}"])
         total = sum(m.size for m in members)
-        if total > MAX_TOTAL:
-            return _reject(say, [f"{total // 2**20} MB unpacked; the limit is {MAX_TOTAL // 2**20} MB"])
+        if total > max_total:
+            return _reject(say, [f"{total // 2**20} MB unpacked; the limit is {max_total // 2**20} MB"])
         for m in members:
             if not m.isfile():
                 problems.append(f"{m.name}: not a regular file")
@@ -165,7 +181,7 @@ def read_archive(path: Path, say: Say) -> dict[str, bytes] | None:
                 problems.append(f"{m.name}: duplicate entry")
             names.add(m.name)
             if m.name != MANIFEST:
-                why = _check_name(m.name)
+                why = check_name(m.name)
                 if why:
                     problems.append(f"{m.name}: {why}")
         if MANIFEST not in names:
@@ -188,7 +204,7 @@ def read_archive(path: Path, say: Say) -> dict[str, bytes] | None:
             out: dict[str, bytes] = {}
             for name, digest in expected.items():
                 data = (Path(staging) / name).read_bytes()
-                if _sha(data) != digest:
+                if sha256(data) != digest:
                     problems.append(f"{name}: sha256 does not match the manifest")
                 out[name] = data
     if problems:

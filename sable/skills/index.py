@@ -76,7 +76,7 @@ class SkillIndex:
 
     def add(self, name: str, file: str, keywords: list[str],
             auto_generated: bool, status: str = _DEFAULT_STATUS,
-            source: str = "user") -> None:
+            source: str = "user", sign: bool = True) -> None:
         if status not in STATUSES:
             raise ValueError(
                 f"unknown status {status!r}; expected one of {sorted(STATUSES)}"
@@ -97,8 +97,10 @@ class SkillIndex:
             "created_at": now,
         }
         # K8: a skill made in Sable is signed. An imported one never comes
-        # through here (`mark_imported` below), so it stays unsigned.
-        _sign_file(file)
+        # through here (`mark_imported` below) or passes `sign=False`
+        # (`/skill install`), so it stays unsigned.
+        if sign:
+            _sign_file(file)
         for i, e in enumerate(self._data):
             if e["name"] == name:
                 self._data[i] = entry
