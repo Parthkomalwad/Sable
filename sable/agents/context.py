@@ -195,7 +195,10 @@ def build_recall_message(goal: str) -> dict | None:
     lines: list[str] = []
     used = 0
     for f in facts:
-        line = f"- [{f.room}, {f.tier}, id {f.id}] {f.text}"
+        # No angle brackets from a fact: a stored "</memory>" must not be
+        # able to close the untrusted frame and speak as instructions.
+        text = f.text.replace("<", "(").replace(">", ")")
+        line = f"- [{f.room}, {f.tier}, id {f.id}] {text}"
         if f.untrusted:
             line += " (untrusted source)"
         if used + len(line) > RECALL_MAX_CHARS:
