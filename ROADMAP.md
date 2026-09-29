@@ -50,15 +50,15 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/
 
 - [x] `sabled` daemon, natural-language cron, watchers (`E1 E2 E3`)
 - [x] Notifications and approvals from your phone (`E5 E6`)
-## v1.0: Ecosystem *(next)*
+## v1.0: Ecosystem
 
 - [x] MCP client (spec 2026-07-28) and server mode (`D1 D2 D4`)
 - [x] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
 - [x] Export / import / sync of skills and knowledge; upgrade migrations and `sable doctor` (`I8 I6`)
 - [x] Plan graphs, a reviewer agent, rehearsal on a copy, undo across sessions, sub-agent limits, step-up approval (TOTP or phone), signed skills (`A3 A4 A8 F2 F5 K5 K6 K7 K8`)
-- [ ] Eval harness, plugin system, OpenTelemetry (`H3 H2 H4`)
-- [ ] Incident → runbook drafts, nightly self-evaluation, session sharing with approve-only links (`K9 K10 K12`)
+- [x] Eval harness (mock by default), plugin system, OpenTelemetry, skill doctor and publish, multi-host (`H3 H2 H4 B4 B7 H5`)
+- [x] Incident to runbook drafts, a weekly self-check from Sable's own records, session sharing with approve-only links (`K9 K10 K12`)
 ## Later
 
 - [ ] FIDO2 step-up, public-key skill signatures
-- [ ] Skill doctor (`B4`), semantic skill search (`B6`), self-healing runbooks (`E4`), multi-host (`H5`), web companion (`G9`)
+- [ ] Semantic skill search (`B6`), self-healing runbooks that run on their own (`E4`), web companion (`G9`)
