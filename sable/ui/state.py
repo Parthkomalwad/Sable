@@ -49,7 +49,7 @@ class Agent:
 
 @dataclass(frozen=True)
 class InboxItem:
-    kind: str          # "approval" | "breaker" | "skill"
+    kind: str          # "approval" | "breaker" | "skill" | "runbook"
     id: int
     agent: str
     text: str          # the command waiting, the trip reason, or the skill name
@@ -155,6 +155,11 @@ def inbox_all(db_path=None) -> list[InboxItem]:
     items += [InboxItem("breaker", tid, job, reason, "circuit breaker", at)
               for tid, at, job, reason in _rows(
                   db_path, "SELECT id, created_at, job, reason FROM breaker_trips WHERE status = 'tripped'")]
+    items += [InboxItem("runbook", oid, f"watch:{wid}", f"run runbook {fid} for watcher #{wid}",
+                        f"fix: {'; '.join(json.loads(steps))}", at)
+              for oid, at, wid, fid, steps in _rows(
+                  db_path, "SELECT id, created_at, watcher, fact_id, steps_json FROM runbook_offers "
+                           "WHERE status = 'pending'")]
     return sorted(items + _pending_skills(), key=lambda i: i.created_at)
 
 

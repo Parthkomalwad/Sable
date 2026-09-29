@@ -175,7 +175,14 @@ def _publish(kind: str, payload: dict) -> None:
 
 
 def _fire(conn: sqlite3.Connection, w: dict, detail: str) -> None:
-    _publish("watch.fired", {"watcher": w["id"], "kind": w["kind"], "tier": w["tier"], "detail": detail})
+    from sable.memory import runbooks
+    payload = {"watcher": w["id"], "kind": w["kind"], "tier": w["tier"], "detail": detail}
+    try:  # K9: a matching runbook is offered in /inbox, never run here
+        if book := runbooks.offer(conn, w["id"], f"{w['kind']} {w['target']} {w['arg']} {detail}"):
+            payload["runbook"] = book
+    except (OSError, ValueError, sqlite3.Error):
+        pass
+    _publish("watch.fired", payload)
     agent = f"watch:{w['id']}"
     if w["tier"] == "run":
         jobs.run_plan(conn, agent, w["steps"], cwd=os.path.expanduser("~"), background=True)

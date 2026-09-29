@@ -22,7 +22,7 @@ _USAGE = "usage: /inbox [show|approve|reject KEY]   (KEY as listed: a7, b2, or a
 def key(item) -> str:
     """A stable handle: deciding one item never changes another's key, so a
     number typed from an older listing cannot land on a different item."""
-    return {"approval": f"a{item.id}", "breaker": f"b{item.id}"}.get(item.kind, item.text)
+    return {"approval": f"a{item.id}", "breaker": f"b{item.id}", "runbook": f"r{item.id}"}.get(item.kind, item.text)
 
 
 def _age(created_at: float) -> str:
@@ -61,6 +61,12 @@ def _decide(item, approve: bool, db) -> str:
 
         n = breaker.reset(db._conn)
         return f"breaker reset ({n} trip{'s' if n != 1 else ''} cleared)"
+    if item.kind == "runbook":
+        import os
+
+        from sable.memory import runbooks
+
+        return runbooks.decide(db._conn, item.id, approve, os.getcwd())
     from sable.skills.index import SkillIndex
 
     index = SkillIndex()
