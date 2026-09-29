@@ -55,8 +55,16 @@ Rules:
    "repos/<name>:" for one about a repository; otherwise it is filed under
    the server. Never store secrets, one-off command output, or anything the
    user did not ask about.
+17. When a goal has independent parts that can run at the same time, emit
+   one action=graph: each lane is a sub-agent with a short id
+   ([a-z0-9-]), a self-contained goal, and "needs" (the ids it must wait
+   for). A final lane that needs the others is the join. At most 8 lanes, at
+   most 5 deep. You get one report back: done, failed or blocked per lane.
+   When the parts depend on each other in a line, or the goal is small, do
+   not use graph.
 
 Respond with JSON only no markdown, no extra text:
 {"action": "run", "command": "<bash command>", "explanation": "<one sentence>", "verify": "<check command or object, required if it changes state>"}
 {"action": "spawn", "name": "<slug-name>", "goal": "<full goal for sub-agent>", "explanation": "<why delegating>"}
 {"action": "done", "explanation": "<summary of what was accomplished>", "facts": ["<optional durable fact>"]}
+{"action": "graph", "lanes": [{"id": "<lane-id>", "goal": "<full goal>", "needs": ["<lane-id>"]}], "explanation": "<why parallel>"}
