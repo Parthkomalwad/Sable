@@ -123,8 +123,38 @@ def run_plan(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: str,
     )
     conn.commit()
     _publish("job.started", {"job": job, "run": cur.lastrowid})
-    _call(conn, background, _continue, cur.lastrowid, job, steps, 0, cwd, run)
+    _call(conn, background, _start, cur.lastrowid, job, steps, cwd, run)
     return cur.lastrowid
+
+
+def _rehearsal_block(steps: list[str], cwd: str) -> str:
+    """Why the run must wait instead of running, or '' (F2 K5). A job with
+    no state-changing step, or one policy refuses anyway, is not rehearsed."""
+    from sable.agents import rehearse
+
+    if rehearse.mode() == "off" or not rehearse.changing(steps):
+        return ""
+    if any(decide(s).tier is Tier.DENY for s in steps):
+        return ""
+    r = rehearse.rehearse(steps, cwd)
+    if not r.available:
+        return f"rehearsal unavailable: {r.reason}"
+    failed = next((s for s in r.steps if s.status == "failed"), None)
+    if failed:
+        return f"rehearsal failed at: {failed.command} (exit {failed.exit})"
+    return ""
+
+
+def _start(conn, rid: int, job: str, steps: list[str], cwd: str, run: Run) -> str:
+    """Rehearse, then run; a failed or unavailable rehearsal waits in /inbox
+    for a human, who can approve the run anyway."""
+    reason = _rehearsal_block(steps, cwd)
+    if reason:
+        queue.enqueue(conn, _agent(job), steps[0], decide(steps[0]))
+        _set(conn, rid, status="waiting", step=0, output=reason + "\n")
+        _publish("job.queued", {"job": job, "run": rid, "command": steps[0], "reason": reason})
+        return "waiting"
+    return _continue(conn, rid, job, steps, 0, cwd, run)
 
 
 def start_waiting(conn: sqlite3.Connection, job: str, steps: list[str], *, cwd: str) -> int:

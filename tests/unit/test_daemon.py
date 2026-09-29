@@ -18,6 +18,7 @@ from sable.policy import queue
 @pytest.fixture
 def conn(tmp_path, monkeypatch):
     monkeypatch.setattr(jobs, "_audit", lambda cwd, cmd: None)
+    monkeypatch.setattr(jobs, "_rehearsal_block", lambda steps, cwd: "")  # test_rehearse covers it
     c = sqlite3.connect(tmp_path / "s.db")
     yield c
     c.close()
