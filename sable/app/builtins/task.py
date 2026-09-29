@@ -38,7 +38,7 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
     manager = TaskManager(config=config, db=db)
 
     if not parts:
-        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|replay|events|guide|checkpoint|revert>")
+        _out("usage: /task <new|list|attach|back|clean|pause|resume|kill|inspect|stats|history|replay|events|guide|diff|undo|checkpoint|revert>")
         return True
 
     sub = parts[0]
@@ -145,6 +145,9 @@ def _handle_task_builtin(parts: list[str], config, db, turns: list[dict] | None 
         elif sub == "history":
             for row in manager.history(name):
                 _out(f"  {row['timestamp']}  {row['model']}  ${row['cost_usd']:.4f}")
+        elif sub in ("diff", "undo"):
+            from sable.app.builtins import undo
+            (undo.task_diff if sub == "diff" else undo.task_undo)(name)
         elif sub == "checkpoint":
             v = manager.checkpoint(name)
             _out(f"checkpoint v{v} saved")

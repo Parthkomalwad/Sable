@@ -70,6 +70,8 @@ _HELP_TEXT = (
     "  /palace [room|find <text>|why <id>|consolidate]  What Sable has learned, and from where\n"
     "  /remember <text> [--room R]  Save a fact (room user by default)\n"
     "  /forget <id>   Remove a fact from the palace\n"
+    "  /undo [list|<id>]  Put back what the last step changed (diff first, asks)\n"
+    "  /task diff|undo <n>  What a sub-agent's last step changed, or put it back\n"
     "  /memory                  View current context\n"
     "  /memory versions         List all saved snapshots\n"
     "  /memory revert <id>      Restore a snapshot\n"
@@ -470,6 +472,10 @@ def handle_builtin(
     if cmd == "shell stats --csv":
         _show_stats_csv(db)
         return True
+
+    if cmd == "/undo" or cmd.startswith("/undo "):
+        from sable.app.builtins.undo import handle_undo
+        return handle_undo(cmd[len("/undo"):])
 
     for name in ("/palace", "/remember", "/forget"):
         if cmd == name or cmd.startswith(name + " "):

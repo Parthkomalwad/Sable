@@ -357,6 +357,10 @@ class OrchestratorAgent:
             })
             return
         self._cancels = 0
+        ok, snap = self._undo_point(confirmed_cmd, action.get("touches"))
+        if not ok:
+            self._history.append({"role": "user", "content": f"[user cancelled command: {command}]"})
+            return
 
         t0 = time.monotonic()
         output = self._run_command(confirmed_cmd)
@@ -380,7 +384,7 @@ class OrchestratorAgent:
         if taint.is_tainting(confirmed_cmd, self._cwd):
             self._tainted = True
         self._commands_run += 1
-        self._record_step(confirmed_cmd, output)
+        self._record_step(confirmed_cmd, output, snap)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         # No `or "(no output)"` fallback: `runtime.run_command` now reports
         # the exit status when a command printed nothing, so the silence a
@@ -438,6 +442,12 @@ class OrchestratorAgent:
             self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})
             return
         self._cancels = 0
+        snap = None
+        if name in ("fs.write", "fs.patch") and isinstance(args, dict) and args.get("path"):
+            ok, snap = self._undo_point(call_text, [args["path"]])
+            if not ok:
+                self._history.append({"role": "user", "content": f"[user cancelled tool call: {call_text}]"})
+                return
 
         result = registry.call(name, args, ctx, publish=lambda kind, payload: self._bus.publish("orchestrator", kind, payload))
         self._guard.ran(runtime.action_key(action))
@@ -454,7 +464,7 @@ class OrchestratorAgent:
         # The step record carries an exit marker so grading and the breaker
         # read a failed tool call as a failure, like a failed command.
         output = self._verify(action, result.output) if result.ok else f"{result.output}\n[exit 1]"
-        self._record_step(call_text, output)
+        self._record_step(call_text, output, snap)
         self._history.append({"role": "assistant", "content": json.dumps(action)})
         self._history.append({"role": "user", "content": taint.wrap_untrusted(output)})
         self._climb_ladder(output)
@@ -745,14 +755,40 @@ class OrchestratorAgent:
         """
         return any(self._FAILED_STEP.search(s.get("output", "")) for s in self._steps)
 
-    def _record_step(self, command: str, output: str = "") -> None:
+    def _undo_point(self, command: str, touches) -> tuple[bool, int | None]:
+        """Snapshot what the step will touch (A8 K6): (go ahead, snapshot id).
+
+        When no undo point can be taken (over the size limit, or an OS
+        error) the user decides whether to run without one.
+        """
+        from sable.agents.footprint import undo_point
+        from sable.core.snapshots import SnapshotError
+
+        try:
+            sid = undo_point(command, self._cwd, touches=touches,
+                             agent="orchestrator", session=str(os.getpid()))
+        except (SnapshotError, OSError) as exc:
+            _out(f"  [orchestrator] no undo point: {exc}")
+            try:
+                answer = input("  run without an undo point? [y/N] ").strip().lower()
+            except EOFError:
+                answer = ""
+            return answer == "y", None
+        if sid is not None:
+            _out(f"\033[2m  undo point s{sid}\033[0m")
+        return True, sid
+
+    def _record_step(self, command: str, output: str = "", snapshot: int | None = None) -> None:
         """Remember one executed command for B3.
 
         Output is capped: `from_run` sends these to a summariser, and a step
         that dumped a large file would otherwise spend the whole prompt on
         one command's stdout.
         """
-        self._steps.append({"command": command, "output": (output or "")[:2000]})
+        step = {"command": command, "output": (output or "")[:2000]}
+        if snapshot is not None:
+            step["snapshot"] = snapshot
+        self._steps.append(step)
 
     def _maybe_draft_skill(self) -> None:
         """Offer this run to the crystalliser (B3).
