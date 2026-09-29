@@ -43,17 +43,17 @@ def test_add_list_trust_remove_round_trip(cfg):
     assert "added mock: 3 tools" in lines
     data = json.loads(path.read_text())
     assert data["theme"] == "mono" and data["mcp"]["servers"]["mock"]["command"][-1] == "new-spec"
-    assert registry.get("mcp.mock.t0").tier is Tier.CONFIRM
-    assert set(registry.get("mcp.mock.t0").roles) == {"orchestrator", "worker"}
+    assert servers.label(registry.get("mcp.mock.t0")) == "preview"
+    assert set(registry.get("mcp.mock.t0").roles) == {"orchestrator"}
 
     _mcp(path, "trust mock.t1")
-    assert registry.get("mcp.mock.t1").tier is Tier.ALLOW
+    assert servers.label(registry.get("mcp.mock.t1")) == "trusted"
     assert json.loads(path.read_text())["mcp"]["trusted"] == ["mock.t1"]
     lines.clear()
     _mcp(path, "list")
-    assert any("mcp.mock.t1" in s and "allow" in s for s in lines)
+    assert any("mcp.mock.t1" in s and "trusted" in s for s in lines)
     _mcp(path, "untrust mock.t1")
-    assert registry.get("mcp.mock.t1").tier is Tier.CONFIRM
+    assert servers.label(registry.get("mcp.mock.t1")) == "preview"
 
     _mcp(path, "remove mock")
     assert registry.get("mcp.mock.t0") is None
@@ -72,8 +72,8 @@ def test_trusted_tool_registers_as_allow_on_load(cfg):
     servers.save_config({"servers": {"m": {"command": [sys.executable, SERVER, "new-spec"]}},
                          "trusted": ["m.t2"]}, path)
     servers.load_all(report=lambda s: None, path=path)
-    assert registry.get("mcp.m.t2").tier is Tier.ALLOW
-    assert registry.get("mcp.m.t0").tier is Tier.CONFIRM
+    assert servers.label(registry.get("mcp.m.t2")) == "trusted"
+    assert servers.label(registry.get("mcp.m.t0")) == "preview"
 
 
 def test_broken_server_is_reported_once_and_skipped(cfg):
@@ -154,3 +154,13 @@ def test_mcp_tools_are_listed_under_their_own_heading(monkeypatch):
     assert text.index("mcp.files.read") > head
     assert all(text.index(f"- {t.signature()}") < head
                for t in registry.for_role("orchestrator") if not t.name.startswith("mcp."))
+
+
+def test_untrusted_tools_are_shell_only_and_need_no_yes(cfg):
+    """A preview and Enter, not a typed YES; workers cannot call them."""
+    from sable.policy.tiers import Tier
+    path, _ = cfg
+    _mcp(path, f'add mock "{sys.executable}" "{SERVER}" new-spec')
+    t = registry.get("mcp.mock.t0")
+    assert t.tier is Tier.ALLOW and "worker" not in t.roles and "orchestrator" in t.roles
+    assert "mcp.mock.t0" not in [x.name for x in registry.for_role("worker")]
