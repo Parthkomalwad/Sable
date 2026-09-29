@@ -1,0 +1,3 @@
+goal = "Rotate logs/app.log: move it to logs/app.log.1 and leave an empty logs/app.log in its place"
+timeout_s = 60
+tags = ["logs"]

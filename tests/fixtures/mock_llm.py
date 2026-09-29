@@ -16,8 +16,11 @@ run-then-done sequence, so an unscripted goal still terminates.
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
+import tomllib
+from pathlib import Path
 
 from sable.llm.base import LLMBackend, LLMResponse
 
@@ -158,6 +161,33 @@ WORKER_SCRIPTS: dict[str, list[LLMResponse]] = {
     ],
 }
 
+# Eval tasks (Phase 9, H3): each evals/tasks/<name>/mock.json is a scripted
+# solution, keyed by the task's goal, so `sable eval` on the mock backend runs
+# the real orchestrator loop end to end. Data, not code per task.
+EVAL_TASKS_DIR = Path(__file__).resolve().parents[2] / "evals" / "tasks"
+
+
+def _eval_action(a: dict) -> LLMResponse:
+    if a.get("action") == "done":
+        return _done(a.get("explanation", ""))
+    return _run(a.get("command", ""), a.get("explanation", ""))
+
+
+@functools.lru_cache(maxsize=1)
+def eval_scripts() -> dict[str, list[LLMResponse]]:
+    """Goal (lowercased) -> scripted actions, from every task with a mock.json."""
+    scripts = {}
+    for mock in sorted(EVAL_TASKS_DIR.glob("*/mock.json")):
+        try:
+            meta = tomllib.loads((mock.parent / "task.toml").read_text(encoding="utf-8"))
+            actions = json.loads(mock.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(meta.get("goal"), str) and isinstance(actions, list) and actions:
+            scripts[meta["goal"].lower()] = [_eval_action(a) for a in actions]
+    return scripts
+
+
 DEFAULT_WORKER_SCRIPT: list[LLMResponse] = [
     _worker_step("echo working", "Do the work."),
     _done("Worker finished."),
@@ -219,6 +249,8 @@ class MockLLMBackend(LLMBackend):
             return self._script
         text = _full_text(messages)
         table = ORCHESTRATOR_SCRIPTS if self.mode == "orchestrator" else WORKER_SCRIPTS
+        if self.mode == "orchestrator":
+            table = {**eval_scripts(), **table}
         for key, script in table.items():
             if key in text:
                 return script

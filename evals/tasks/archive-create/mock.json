@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "tar czf site-backup.tar.gz site",
+    "explanation": "Archive and compress site/."
+  },
+  {
+    "action": "done",
+    "explanation": "Created site-backup.tar.gz."
+  }
+]

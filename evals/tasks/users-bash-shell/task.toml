@@ -1,0 +1,3 @@
+goal = "List the users in etc/passwd whose login shell is /bin/bash, one per line, in bash_users.txt"
+timeout_s = 60
+tags = ["users"]

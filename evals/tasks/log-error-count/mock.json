@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "grep -c ERROR logs/app.log > error_count.txt",
+    "explanation": "Count lines containing ERROR."
+  },
+  {
+    "action": "done",
+    "explanation": "Wrote the ERROR count to error_count.txt."
+  }
+]

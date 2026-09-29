@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "sort -u allowlist.txt -o allowlist.txt",
+    "explanation": "Sort and drop duplicates in place."
+  },
+  {
+    "action": "done",
+    "explanation": "allowlist.txt has no duplicates."
+  }
+]

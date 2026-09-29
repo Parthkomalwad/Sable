@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "echo 'LOG_LEVEL=info' >> app.env",
+    "explanation": "Append the new variable."
+  },
+  {
+    "action": "done",
+    "explanation": "Added LOG_LEVEL."
+  }
+]

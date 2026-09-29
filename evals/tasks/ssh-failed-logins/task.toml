@@ -1,0 +1,3 @@
+goal = "Count the failed SSH password attempts in logs/auth.log and write just the number to failed.txt"
+timeout_s = 60
+tags = ["logs", "security"]

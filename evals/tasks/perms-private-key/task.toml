@@ -1,0 +1,3 @@
+goal = "Make keys/id_app readable and writable by its owner only"
+timeout_s = 60
+tags = ["permissions"]

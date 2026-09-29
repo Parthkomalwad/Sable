@@ -1,0 +1,3 @@
+goal = "Change the port in config/app.conf from 8080 to 9090"
+timeout_s = 60
+tags = ["config"]

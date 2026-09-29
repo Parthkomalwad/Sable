@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "cp -a config config.bak",
+    "explanation": "Copy the directory recursively."
+  },
+  {
+    "action": "done",
+    "explanation": "config.bak is a copy of config."
+  }
+]

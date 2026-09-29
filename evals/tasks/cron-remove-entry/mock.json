@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "sed -i '/cleanup\\.sh/d' cron/jobs.cron",
+    "explanation": "Delete the cleanup line only."
+  },
+  {
+    "action": "done",
+    "explanation": "Removed the cleanup job."
+  }
+]

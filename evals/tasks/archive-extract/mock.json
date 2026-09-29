@@ -1,0 +1,16 @@
+[
+  {
+    "action": "run",
+    "command": "mkdir -p restore",
+    "explanation": "Create the target directory."
+  },
+  {
+    "action": "run",
+    "command": "tar xzf bundle.tar.gz -C restore",
+    "explanation": "Extract into it."
+  },
+  {
+    "action": "done",
+    "explanation": "Extracted the bundle into restore/."
+  }
+]

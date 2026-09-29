@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "grep '^log_file' services/web.conf | cut -d= -f2 | tr -d ' ' > log_path.txt",
+    "explanation": "Read log_file from the config."
+  },
+  {
+    "action": "done",
+    "explanation": "The web service logs to the path in log_path.txt."
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "du -sk data | cut -f1 > usage.txt",
+    "explanation": "Measure the directory in KB."
+  },
+  {
+    "action": "done",
+    "explanation": "Disk usage written to usage.txt."
+  }
+]

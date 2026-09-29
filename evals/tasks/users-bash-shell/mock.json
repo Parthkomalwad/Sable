@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "awk -F: '$7==\"/bin/bash\"{print $1}' etc/passwd > bash_users.txt",
+    "explanation": "Filter on the shell field."
+  },
+  {
+    "action": "done",
+    "explanation": "Listed the bash users."
+  }
+]

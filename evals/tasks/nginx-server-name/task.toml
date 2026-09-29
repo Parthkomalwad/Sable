@@ -1,0 +1,3 @@
+goal = "Change the nginx server_name in sites/default.conf from example.com to sable.example.org"
+timeout_s = 60
+tags = ["config", "services"]

@@ -1,0 +1,3 @@
+goal = "Remove the cleanup.sh job from cron/jobs.cron and keep the other jobs"
+timeout_s = 60
+tags = ["cron"]

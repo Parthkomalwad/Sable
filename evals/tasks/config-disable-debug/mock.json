@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "sed -i 's/^debug=true$/debug=false/' settings.ini",
+    "explanation": "Flip debug to false."
+  },
+  {
+    "action": "done",
+    "explanation": "Debug mode is off."
+  }
+]

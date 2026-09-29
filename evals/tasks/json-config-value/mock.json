@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "grep -o '\"workers\": *[0-9]*' config.json | grep -o '[0-9]*$' > workers.txt",
+    "explanation": "Pull the workers value out."
+  },
+  {
+    "action": "done",
+    "explanation": "workers.txt holds the worker count."
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "action": "run",
+    "command": "echo '10.0.0.5 db.internal' >> etc/hosts",
+    "explanation": "Append the mapping."
+  },
+  {
+    "action": "done",
+    "explanation": "db.internal now resolves to 10.0.0.5."
+  }
+]
