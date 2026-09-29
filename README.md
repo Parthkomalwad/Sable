@@ -14,7 +14,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-8B7CF6.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#quick-start)
-[![Status](https://img.shields.io/badge/status-v0.9%20alpha-E7B24B)](ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-v1.0-5FCB7A)](ROADMAP.md)
 
 **[Documentation](https://claude.ai/artifact/Vr4twSX8dcLQpcusj3RoyS)** ·
 [Quick start](#quick-start) ·
