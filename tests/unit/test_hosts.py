@@ -168,3 +168,11 @@ def test_config_keeps_hosts():
     from sable.core.config.schema import ShellConfig
     cfg = ShellConfig.from_dict({"backend": "ollama", "model": "m", "hosts": {"b": {"target": "u@b"}}})
     assert cfg.to_dict()["hosts"] == {"b": {"target": "u@b"}}
+
+
+def test_an_unknown_host_key_says_how_to_fix_it():
+    from sable.app.builtins import hosts
+    hint = hosts._hint(Exception("server exited (code 255): Host key verification failed."),
+                       {"target": "ops@b"})
+    assert "ssh ops@b" in hint
+    assert hosts._hint(Exception("connection refused"), {"target": "ops@b"}) == ""

@@ -109,6 +109,14 @@ def _add(args: list[str], path=None) -> None:
     _out(f"added {name}: {target} port {port}; try /host test {name}")
 
 
+def _hint(exc, spec: dict) -> str:
+    """BatchMode refuses a host key it has never seen; say how to fix it."""
+    text = str(exc).lower()
+    if "host key" in text or "authenticity" in text:
+        return f"\n  first connect once by hand to accept its key: ssh {spec.get('target', '')}"
+    return ""
+
+
 def _test(name: str, path=None) -> None:
     from sable.mcp.client import McpError
     spec = load(path).get(name)
@@ -118,7 +126,7 @@ def _test(name: str, path=None) -> None:
     try:
         client = connect(spec)
     except McpError as exc:
-        _out(f"{name}: {exc}")
+        _out(f"{name}: {exc}{_hint(exc, spec)}")
         return
     try:
         tools = client.list_tools()
@@ -174,7 +182,7 @@ def _run_one(name: str, spec: dict, command: str) -> str:
         finally:
             client.close()
     except McpError as exc:
-        _out(f"  could not reach {name}: {exc}")
+        _out(f"  could not reach {name}: {exc}{_hint(exc, spec)}")
         outcome = "unreachable"
     else:
         queued = _QUEUED.search(result.text)
