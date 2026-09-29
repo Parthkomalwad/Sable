@@ -5,6 +5,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **The memory palace store (Phase 7 Task 0, C6).** `sable/memory/palace.py` keeps what Sable learns about a server as one markdown file per fact under `~/.sable/palace/<room>/`, with an FTS5 index in the session database that `reindex()` rebuilds from the files. Rooms are `server`, `user`, `incidents` and `repos/<name>`; tiers are episodic and semantic; every fact keeps its sources. The same fact twice is one file with both sources. Secrets are redacted before storage, expired facts are skipped, bad room names are refused. 14 tests.
 - **Phase 6 gate run: all six lines pass, so the MCP part of v1.0 is done.** `scripts/gate_phase6.py` covers:
   - the filesystem server added with `/mcp add` and called from a plain-English goal;
   - `/mcp trust`;
