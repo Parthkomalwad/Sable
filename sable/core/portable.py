@@ -135,6 +135,12 @@ def _check_name(name: str) -> str | None:
     return None
 
 
+# A skills-and-notes archive is small. The limits stop a crafted archive
+# from filling the disk while it is staged.
+MAX_FILES = 20_000
+MAX_TOTAL = 200 * 2**20
+
+
 def read_archive(path: Path, say: Say) -> dict[str, bytes] | None:
     """Validate and stage an archive; the verified contents, or None."""
     try:
@@ -146,6 +152,11 @@ def read_archive(path: Path, say: Say) -> dict[str, bytes] | None:
         members = tar.getmembers()
         problems = []
         names = set()
+        if len(members) > MAX_FILES:
+            return _reject(say, [f"{len(members)} entries; the limit is {MAX_FILES}"])
+        total = sum(m.size for m in members)
+        if total > MAX_TOTAL:
+            return _reject(say, [f"{total // 2**20} MB unpacked; the limit is {MAX_TOTAL // 2**20} MB"])
         for m in members:
             if not m.isfile():
                 problems.append(f"{m.name}: not a regular file")

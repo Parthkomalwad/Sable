@@ -157,3 +157,17 @@ def test_sync_round_trip(home, tmp_path):
     assert (b / "skills" / "deploy.md").exists()
     assert (b / ".sable" / "policy.toml").read_text() == "# user policy\n"
     assert not (b / ".sable" / "state").exists()
+
+
+def test_an_oversized_archive_is_refused_before_staging(tmp_path, monkeypatch):
+    import io, tarfile
+    from sable.core import portable
+    monkeypatch.setattr(portable, "MAX_TOTAL", 10)
+    arc = tmp_path / "big.tar.gz"
+    with tarfile.open(arc, "w:gz") as tar:
+        data = b"x" * 100
+        info = tarfile.TarInfo("skills/a/SKILL.md"); info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    said = []
+    assert portable.read_archive(arc, said.append) is None
+    assert any("MB unpacked" in s for s in said)
