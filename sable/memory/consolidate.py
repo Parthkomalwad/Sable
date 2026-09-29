@@ -37,8 +37,7 @@ class Summary:
         """What `/palace consolidate` prints."""
         head = (f"consolidated: {self.merged} merged, {self.promoted} promoted, "
                 f"{self.expired} expired, {self.dropped} dropped")
-        return "
-".join([head, *(f"  {c}" for c in self.changes)])
+        return "\n".join([head, *(f"  {c}" for c in self.changes)])
 
 
 def _publish(payload: dict) -> None:

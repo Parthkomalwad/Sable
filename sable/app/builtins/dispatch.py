@@ -67,7 +67,7 @@ _HELP_TEXT = (
     "  /theme <name>  Colours: default, mono, high-contrast\n"
     "  /layout <name>  tmux panes: focus, fleet, minimal\n"
     "  /budget reset  Clear hard-stop budget flag\n"
-    "  /palace [room|find <text>|why <id>]  What Sable has learned, and from where\n"
+    "  /palace [room|find <text>|why <id>|consolidate]  What Sable has learned, and from where\n"
     "  /remember <text> [--room R]  Save a fact (room user by default)\n"
     "  /forget <id>   Remove a fact from the palace\n"
     "  /memory                  View current context\n"
