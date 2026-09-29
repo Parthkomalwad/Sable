@@ -105,6 +105,7 @@ def _conn(path):
     import sqlite3
     c = sqlite3.connect(str(path))
     c.execute("CREATE TABLE IF NOT EXISTS stepup_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)")
+    c.execute("CREATE TABLE IF NOT EXISTS stepup_failures (at REAL NOT NULL)")
     return c
 
 
@@ -268,3 +269,15 @@ def test_stepup_builtin_setup_confirms_first_code(env, monkeypatch):
     assert env["store"].get(stepup.SERVICE) == new["k"]
     b._handle_stepup_builtin("off")
     assert stepup.SERVICE not in env["store"]
+
+
+def test_three_wrong_codes_lock_step_up_for_ten_minutes(tmp_path, monkeypatch):
+    db = tmp_path / "lock.db"
+    monkeypatch.setattr(stepup, "_secret", lambda: base64.b32encode(KEY).decode())
+    for _ in range(3):
+        assert not stepup.verify("000000", now=T, db_path=db)
+    good = stepup.totp(KEY, T)
+    assert stepup.locked(now=T, db_path=db)
+    assert not stepup.verify(good, now=T, db_path=db)          # even a right code
+    assert not stepup.locked(now=T + 601, db_path=db)
+    assert stepup.verify(stepup.totp(KEY, T + 601), now=T + 601, db_path=db)

@@ -16,6 +16,7 @@ restart. Codes and the secret are never logged.
 from __future__ import annotations
 
 import base64
+import contextlib
 import getpass
 import hashlib
 import hmac
@@ -66,6 +67,17 @@ def _decode(secret_b32: str) -> bytes:
 
 # ── state ───────────────────────────────────────────────────────────────
 
+@contextlib.contextmanager
+def _db(db_path: str | Path | None):
+    """Commit on success, always close (a bare `with connect()` never closes)."""
+    conn = _connect(db_path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 def _connect(db_path: str | Path | None) -> sqlite3.Connection:
     from sable.core.db import DB_PATH
     path = Path(db_path or DB_PATH)
@@ -74,7 +86,28 @@ def _connect(db_path: str | Path | None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("CREATE TABLE IF NOT EXISTS stepup_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS stepup_failures (at REAL NOT NULL)")
     return conn
+
+
+#: Three wrong codes within ten minutes lock step-up for the rest of that
+#: window: each code is a one-in-a-million guess, and this keeps it that way.
+MAX_FAILURES = 3
+LOCK_WINDOW_S = 600
+
+
+def locked(now: float | None = None, db_path: str | Path | None = None) -> bool:
+    now = time.time() if now is None else now
+    with _db(db_path) as conn:
+        n = conn.execute("SELECT count(*) FROM stepup_failures WHERE at > ?",
+                         (now - LOCK_WINDOW_S,)).fetchone()[0]
+    return n >= MAX_FAILURES
+
+
+def _failed(now: float, db_path) -> None:
+    with _db(db_path) as conn:
+        conn.execute("INSERT INTO stepup_failures (at) VALUES (?)", (now,))
+        conn.execute("DELETE FROM stepup_failures WHERE at < ?", (now - LOCK_WINDOW_S,))
 
 
 def _secret() -> str | None:
@@ -97,7 +130,7 @@ def setup(db_path: str | Path | None = None) -> tuple[str, str]:
     from sable.core.config import keyring
     secret_b32 = base64.b32encode(secrets.token_bytes(20)).decode()
     keyring.store_api_key(SERVICE, secret_b32)
-    with _connect(db_path) as conn:  # a new secret starts with no used steps
+    with _db(db_path) as conn:  # a new secret starts with no used steps
         conn.execute("DELETE FROM stepup_state WHERE key = 'last_step'")
     try:
         who = f"{getpass.getuser()}@{socket.gethostname()}"
@@ -127,15 +160,19 @@ def verify(code: str, now: float | None = None, db_path: str | Path | None = Non
     code = (code or "").strip()
     if not secret_b32 or not _CODE.fullmatch(code):
         return False
+    now = time.time() if now is None else now
+    if locked(now, db_path):
+        return False
     key = _decode(secret_b32)
-    step = int((time.time() if now is None else now) // STEP_S)
+    step = int(now // STEP_S)
     matched = None
     for s in (step - 1, step, step + 1):  # no early exit: same work either way
         if hmac.compare_digest(hotp(key, s), code) and matched is None:
             matched = s
     if matched is None:
+        _failed(now, db_path)
         return False
-    with _connect(db_path) as conn:
+    with _db(db_path) as conn:
         conn.execute("INSERT OR IGNORE INTO stepup_state (key, value) VALUES ('last_step', -1)")
         cur = conn.execute("UPDATE stepup_state SET value = ? WHERE key = 'last_step' AND value < ?",
                            (matched, matched))
@@ -210,7 +247,7 @@ def eligible(role: str) -> bool:
             return False
     except (AttributeError, ValueError):
         return False
-    return is_set_up()
+    return is_set_up() and not locked()
 
 
 def _audit(factor: str, outcome: str, command: str) -> None:
