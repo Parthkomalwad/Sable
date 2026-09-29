@@ -212,7 +212,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - The confirm prompt names the rule that fired and its reason, not a generic "pattern matched as destructive". 9 tests.
 
 ### Changed
-- **The README is short again, and the long-form docs moved to a site.** It keeps the tagline, the hero, what Sable solves, the quick start and how to contribute, and links to the [documentation site](https://claude.ai/artifact/Vr4twSX8dcLQpcusj3RoyS) for routing, safety, sub-agents, skills, commands, configuration and architecture. Its old skills and roadmap sections still described v0.3; the site describes v0.6. The status badge now says v0.6. The problem and flow SVGs are no longer embedded but are still generated, so they can return without a template change.
+- **The README is short again, and the long-form docs moved to a site.** It keeps the tagline, the hero, what Sable solves, the quick start and how to contribute, and links to the [documentation site](https://parthkomalwad.dev/projects/sable/) for routing, safety, sub-agents, skills, commands, configuration and architecture. Its old skills and roadmap sections still described v0.3; the site describes v0.6. The status badge now says v0.6. The problem and flow SVGs are no longer embedded but are still generated, so they can return without a template change.
 
 ### Fixed
 - `scripts/build-assets.py --check` crashed in CI with `TypeError: Path.read_text() got an unexpected keyword argument 'newline'`. That argument is Python 3.13+, and the runner is older. The file is now read as bytes and decoded, which also keeps its line endings exactly as committed.

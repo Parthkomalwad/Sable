@@ -16,7 +16,7 @@
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#quick-start)
 [![Status](https://img.shields.io/badge/status-v1.0-5FCB7A)](ROADMAP.md)
 
-**[Documentation](https://claude.ai/artifact/Vr4twSX8dcLQpcusj3RoyS)** ·
+**[Documentation](https://parthkomalwad.dev/projects/sable/)** ·
 [Quick start](#quick-start) ·
 [Roadmap](ROADMAP.md) ·
 [Contributing](CONTRIBUTING.md)
@@ -71,7 +71,7 @@ cd ~/sable && bash install.sh     # log out and back in; a wizard picks the back
 
 ## Documentation
 
-The **[documentation site](https://claude.ai/artifact/Vr4twSX8dcLQpcusj3RoyS)** covers installation, routing, the safety model, sub-agents, skills, every command and key, configuration and architecture.
+The **[documentation site](https://parthkomalwad.dev/projects/sable/)** covers installation, routing, the safety model, sub-agents, skills, every command and key, configuration and architecture.
 
 In this repo: [ROADMAP.md](ROADMAP.md) and [docs/roadmap-phases.md](docs/roadmap-phases.md) for milestones and phase gates, [docs/structure.md](docs/structure.md) for the package layout, [docs/](docs/README.md) for specs and design notes, and [CHANGELOG.md](CHANGELOG.md).
 
