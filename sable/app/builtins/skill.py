@@ -21,7 +21,7 @@ from sable.ui.console import out as _out
 
 _USAGE = (
     "usage: /skill <list|show <name>|new <name>|edit <name>|"
-    "approve <name>|reject <name>|disable <name>|sign <name>|stats>"
+    "approve <name>|reject <name>|disable <name>|sign <name>|stats|doctor>"
 )
 
 
@@ -87,6 +87,9 @@ def _handle_skill_builtin(parts: list[str]) -> bool:
 
     if sub == "stats":
         return _stats()
+
+    if sub == "doctor":
+        return _doctor()
 
     if sub == "show":
         if not name:
@@ -261,4 +264,31 @@ def _stats() -> bool:
             f"  {entry.get('status', 'enabled'):<9}"
             f" {last_used[:19]}"
         )
+    return True
+
+
+_ACTION = {"repair": "/skill show {0}", "merge": "/skill show {0}",
+           "retire": "/skill disable {0}", "sign": "/skill sign {0}"}
+
+
+def _doctor() -> bool:
+    """Read only: list findings and the command to act on each. B4."""
+    from rich.table import Table
+    from rich.text import Text
+
+    from sable.skills.doctor import diagnose
+    from rich.console import Console
+
+    findings = diagnose(_index())
+    if not findings:
+        _out("all skills look healthy")
+        return True
+    table = Table(title="skill doctor")
+    for col in ("skill", "finding", "detail", "proposal", "action"):
+        table.add_column(col)
+    for f in findings:
+        # Text(), not markup: skill names and details come from files.
+        table.add_row(Text(f.skill), f.kind, Text(f.detail), f.proposal,
+                      Text(_ACTION[f.proposal].format(f.skill)))
+    Console().print(table)
     return True

@@ -5,6 +5,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **`/skill doctor` (Phase 9 Task 1, B4).** `sable/skills/doctor.py` `diagnose(index, now=None)` returns findings per skill, rules only: failing (confidence below 0.3 after 3 or more runs, since the index keeps no per-run history), stale (not used in 60 days, counted from creation if never used), duplicate (token Jaccard of 0.8 or more on name, keywords and body, reusing consolidation's helper), unsigned or tampered (from signing). Each proposes repair, merge, retire or sign. `/skill doctor` prints a table with the command to act on each (`/skill show`, `/skill disable`, `/skill sign`) and never changes anything. 8 tests.
 - **Phase 8 gate run: all six lines pass, so orchestration and safety are done.** `scripts/gate_phase8.py` covers:
   - a plan graph with a join and the reviewer's verdict;
   - a three-step config change rehearsed on a copy, then applied;
