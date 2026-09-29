@@ -41,3 +41,8 @@ def _no_real_signing_key(monkeypatch):
     from sable.skills import signing
 
     monkeypatch.setattr(signing, "_key", lambda create: None)
+def _no_real_snapshots(monkeypatch, tmp_path_factory):
+    """Undo points taken by agent tests go to a temp dir, not ~/.sable."""
+    from sable.core import snapshots
+
+    monkeypatch.setattr(snapshots, "ROOT", tmp_path_factory.mktemp("snapshots"))

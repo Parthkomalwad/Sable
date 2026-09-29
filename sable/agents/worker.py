@@ -542,6 +542,27 @@ class TaskAgent:
         return (f"Asked the user as #{qid} (/approve {qid}). Guidance arrives as [guidance]; "
                 "meanwhile try a different approach.")
 
+    def _undo_point(self, command: str, tool_call, touches) -> tuple[int | None, str]:
+        """Snapshot what this step will touch (A8 K6): (snapshot id, refusal)."""
+        from sable.agents.footprint import undo_point
+        from sable.core.snapshots import SnapshotError
+        from sable.tools import registry
+
+        try:
+            if tool_call and tool_call.get("name") in ("fs.write", "fs.patch") and isinstance(
+                    tool_call.get("args"), dict) and tool_call["args"].get("path"):
+                call = registry.as_command(tool_call["name"], tool_call["args"])
+                sid = undo_point(call, self._workspace, touches=[tool_call["args"]["path"]], agent=self._name)
+            elif command:
+                sid = undo_point(command, self._workspace, touches=touches, agent=self._name)
+            else:
+                return None, ""
+        except (SnapshotError, OSError) as exc:
+            return None, f"no undo point could be taken: {exc}"
+        if sid is not None:
+            print(f"\033[2m  undo point s{sid}\033[0m", flush=True)
+        return sid, ""
+
     def _run_command(self, command: str, timeout: int = runtime.COMMAND_TIMEOUT) -> str:
         """Run one command inside the sandbox and return its output.
 
@@ -766,6 +787,12 @@ class TaskAgent:
 
             output = ""
             tool_call = parsed.get("tool")
+            snap, refused = self._undo_point(command, tool_call, parsed.get("touches"))
+            if refused:
+                # No one can answer "run without an undo point?" here, so the
+                # step does not run and the model hears why.
+                output = f"[not run: {refused}. Touch fewer or smaller paths.]\n[exit 1]"
+                tool_call, command = None, ""
             if tool_call:
                 output = self._run_tool(tool_call)
             if command:
@@ -793,6 +820,7 @@ class TaskAgent:
             self._publish(
                 EventKind.STATUS,
                 step=_step,
+                snapshot=snap,
                 command=command,
                 explanation=parsed.get("explanation", ""),
                 # Bounded: the bus is read on every orchestrator turn, and a
