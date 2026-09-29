@@ -27,7 +27,7 @@ class _Conn(sqlite3.Connection):
 @pytest.fixture
 def conn(tmp_path, monkeypatch):
     audited, published = [], []
-    monkeypatch.setattr(approvals, "_audit", lambda reason, qid: audited.append((reason, qid)))
+    monkeypatch.setattr(approvals, "_audit", lambda reason, qid, who="": audited.append((reason, qid)))
     monkeypatch.setattr(approvals, "_publish", lambda payload: published.append(payload))
     monkeypatch.setattr(notify, "_token", lambda: None)
     c = sqlite3.connect(tmp_path / "s.db", factory=_Conn)
