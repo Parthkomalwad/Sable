@@ -124,6 +124,11 @@ class SkillIndex:
         if changed:
             self._save()
 
+    def remove(self, name: str) -> None:
+        """Drop a skill's entry (the folder is the caller's to delete)."""
+        self._data = [e for e in self._data if e["name"] != name]
+        self._save()
+
     def list_all(self) -> list[dict]:
         return list(self._data)
 
