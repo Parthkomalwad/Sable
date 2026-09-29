@@ -38,6 +38,7 @@ _CLI_USAGE = """sable - your server's AI operator
   sable daemon ...   run|install|status|stop the background daemon (sabled)
   sable doctor       check the install; --fix migrates config and repairs
   sable eval         run the eval task suite (mock backend unless --backend)
+  sable selfcheck    weekly report from logs Sable keeps (no model calls)
   sable --wrap      run inside the current bash, no chsh or /etc/shells
   sable --mcp-serve  serve Sable's tools to an MCP client over stdio
   sable export [file]          archive skills, palace, policy and hooks
@@ -85,6 +86,11 @@ def _handle_cli(argv: list[str]) -> bool:
         from sable.evals import runner
 
         sys.exit(runner.main(argv[1:]))
+
+    if command == "selfcheck":
+        from sable.daemon import selfcheck
+
+        sys.exit(selfcheck.main(argv[1:]))
 
     if command == "--mcp-serve":
         # No REPL, no tmux, no banner: stdout belongs to the protocol.

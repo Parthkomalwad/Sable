@@ -293,3 +293,15 @@ def test_handle_done_writes_result(tmp_path):
     result_path = orch._task_dir / ".agentic" / "result.md"
     assert result_path.exists()
     assert "all done" in result_path.read_text()
+
+
+def test_handle_done_publishes_goal_done(tmp_path):
+    """K10: a completed goal leaves one goal_done event for the self-check."""
+    orch = _make_orchestrator(tmp_path)
+    orch._commands_run = 1
+    orch._steps = [{"command": "ls", "output": ""}]
+    orch._skills = [{"name": "list", "content": ""}]
+    orch._spent_tokens, orch._spent_usd = 120, 0.002
+    orch._handle_done({"action": "done", "explanation": "listed"})
+    done = [e for e in orch._bus.since(0) if e.kind == "goal_done"]
+    assert [e.payload for e in done] == [{"steps": 1, "tokens": 120, "usd": 0.002, "skills": ["list"]}]

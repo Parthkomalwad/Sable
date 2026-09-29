@@ -41,6 +41,7 @@ _HELP_TEXT = (
     "  /mode          Toggle routing: auto / prefix\n"
     "  /model         Show current LLM model\n"
     "  /stats         Last 7 days token usage\n"
+    "  /selfcheck     Weekly report from logs, no model calls\n"
     "  /history       recent commands with AI costs\n"
     "  /clip           Snippet clipboard (add/run/del)\n"
     "  /task           Manage background agents\n"
@@ -368,6 +369,12 @@ def handle_builtin(
     if cmd == "/budget reset":
         budget.reset()
         _out("Budget hard-stop cleared.")
+        return True
+
+    if cmd == "/selfcheck":
+        from sable.daemon import selfcheck
+
+        selfcheck.main([])
         return True
 
     if cmd in ("/stats", "shell stats"):

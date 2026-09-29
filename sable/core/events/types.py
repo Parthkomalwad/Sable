@@ -61,6 +61,8 @@ class EventKind:
     REFLECTION = "reflection"    # after a failed step: step, rung, check, got, reflection (J5)
     TOOL = "tool"             # a tool call ran: name, args, ok, duration, size (J1)
     REVIEW = "review"         # the reviewer's verdict on a goal: verdict, why (A4)
+    GOAL_DONE = "goal_done"   # a goal completed: steps, tokens, usd, skills (K10)
+    SELFCHECK = "selfcheck"   # the weekly self-check: text, failing skills (K10)
 
     #: Kinds that mean the agent will publish nothing further.
     TERMINAL = frozenset({COMPLETED, FAILED, LOST})
