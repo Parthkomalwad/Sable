@@ -82,18 +82,37 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
     _render_plan_header(description or "multi-step plan", plan)
     sys.stdout.write("\n")
 
-    # Confirm before executing
-    try:
-        sys.stdout.write("\033[2;37m  confirm all steps? [Enter] run   q cancel:  \033[0m")
-        sys.stdout.flush()
-        answer = input("").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        _console.print(f"[{DIM}]  cancelled[/{DIM}]")
-        return 1
+    # Rehearse on a copy first (F2 K5). When bwrap is missing the reason is
+    # shown and the plain confirm follows; nothing is ever run for real here.
+    from sable.agents import rehearse
+    answer = None
+    if rehearse.wanted(plan):
+        r = rehearse.rehearse(plan, cwd)
+        if r.available:
+            if not rehearse.review(r):
+                _console.print(f"[{DIM}]  aborted after rehearsal[/{DIM}]")
+                return 1
+            answer = ""
+        else:
+            _console.print(Text(rehearse.render(r), style=DIM))
+    if answer is None:
+        answer = _confirm()
     if answer == "q":
         _console.print(f"[{DIM}]  cancelled[/{DIM}]")
         return 1
+    return _run_all(plan, cwd)
 
+
+def _confirm() -> str:
+    try:
+        sys.stdout.write("\033[2;37m  confirm all steps? [Enter] run   q cancel:  \033[0m")
+        sys.stdout.flush()
+        return input("").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return "q"
+
+
+def _run_all(plan: list[str], cwd: str) -> int:
     sys.stdout.write("\n")
     last_exit = 0
     current_cwd = cwd
@@ -150,8 +169,17 @@ def execute_plan(plan: list[str], cwd: str, description: str = "") -> int:
 
 def _run_step(cmd: str, cwd: str) -> tuple[int, str]:
     """execute_bash with `$SECRET:name` resolved (F6). A refusal is exit 1."""
+    from sable.agents.footprint import undo_point
+    from sable.core.snapshots import SnapshotError
     from sable.policy import secrets
 
+    try:
+        sid = undo_point(cmd, cwd, agent="plan", session=str(os.getpid()))
+    except (SnapshotError, OSError) as exc:
+        _console.print(Text(f"  not run: no undo point ({exc})", style=RED))
+        return 1, ""
+    if sid is not None:
+        _console.print(Text(f"  undo point s{sid}", style=DIM))
     try:
         resolved, env, _ = secrets.resolve(cmd)
     except secrets.SecretError as exc:

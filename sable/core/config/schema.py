@@ -73,6 +73,9 @@ class ShellConfig:
     limits: dict = field(default_factory=dict)
     # A4: a reviewer model checks a goal's work before done. "on" | "off".
     review: str = "on"
+    # Rehearse a plan on a copy first (Phase 8, F2 K5): auto (2+ changing
+    # steps, and every daemon job), always, or off.
+    rehearse: str = "auto"
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -198,6 +201,10 @@ class ShellConfig:
         if review not in ("on", "off"):
             raise ValueError(f"review must be on or off, got {review!r}")
 
+        rehearse = data.get("rehearse") or "auto"
+        if rehearse not in ("auto", "always", "off"):
+            raise ValueError(f"rehearse must be auto, always or off, got {rehearse!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -220,6 +227,7 @@ class ShellConfig:
             maintenance_time=maintenance_time,
             limits=dict(raw_limits),
             review=review,
+            rehearse=rehearse,
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -249,5 +257,6 @@ class ShellConfig:
             "maintenance_time": self.maintenance_time,
             "limits": dict(self.limits),
             "review": self.review,
+            "rehearse": self.rehearse,
             "api_key": getattr(self, "api_key", ""),
         }
