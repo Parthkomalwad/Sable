@@ -11,10 +11,11 @@ import subprocess
 import libtmux
 
 
-def reconcile(db_path: str) -> list[str]:
+def reconcile(db_path: str, dry_run: bool = False) -> list[str]:
     """Check all running/starting/paused tasks; mark lost if tmux window missing.
 
-    Returns list of lost task names for main.py to print.
+    Returns list of lost task names for main.py to print. With `dry_run`
+    nothing is written: `sable doctor` reports before it fixes.
     """
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
@@ -84,7 +85,8 @@ def reconcile(db_path: str) -> list[str]:
         if session:
             alive = _window_alive(session, window_id)
         if not alive:
-            conn.execute("UPDATE tasks SET status='lost' WHERE name=?", (name,))
+            if not dry_run:
+                conn.execute("UPDATE tasks SET status='lost' WHERE name=?", (name,))
             lost.append(name)
 
     conn.commit()
