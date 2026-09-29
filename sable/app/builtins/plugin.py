@@ -189,9 +189,13 @@ def _add(folder: Path, path, confirm: Callable[[str], bool]) -> None:
         if dst.exists():
             _out(f"  skill {s.name} exists already, left alone")
             continue
-        shutil.copytree(s, dst, symlinks=False)
+        # Links are skipped, never followed: a link to ~/.ssh/id_rsa in a
+        # plugin's skill folder must not copy the key into ~/skills.
+        shutil.copytree(s, dst, symlinks=True,
+                        ignore=lambda d, names: [n for n in names if os.path.islink(os.path.join(d, n))])
         index.add(s.name, str(dst / "SKILL.md"), [s.name], auto_generated=False,
-                  source=f"imported:plugin:{name}")
+                  status="pending", source=f"imported:plugin:{name}", sign=False)
+        _out(f"  skill {s.name} installed as pending: /skill show {s.name}, then /skill approve {s.name}")
         (dst / SIGNATURE_FILE).unlink(missing_ok=True)  # imported: never signed
         installed_skills.append(s.name)
 
