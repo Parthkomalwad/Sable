@@ -59,6 +59,8 @@ _HELP_TEXT = (
     "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
     "  /watch add|list|rm  Daemon watchers: disk, file, log, http\n"
     "  /mcp search <query> [--add N]  Find MCP servers in the official registry\n"
+    "  /host add|list|rm|test  Other servers, reached by SSH to their own Sable\n"
+    "  @NAME <command>, @all <command>  Run a command on a host (its policy applies)\n"
     "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
     "  /task replay <n>     Every turn of one agent, as the model saw it\n"
     "  /task events <n>     The agent's event stream\n"
@@ -443,6 +445,15 @@ def handle_builtin(
     if cmd == "/plugin" or cmd.startswith("/plugin "):
         from sable.app.builtins.plugin import handle_plugin
         return handle_plugin(cmd[len("/plugin"):])
+
+    if cmd == "/host" or cmd.startswith("/host "):
+        from sable.app.builtins.hosts import handle_host
+        return handle_host(cmd[len("/host"):])
+
+    if cmd.startswith("@"):
+        from sable.app.builtins.hosts import handle_at
+        if handle_at(cmd):
+            return True
 
     if cmd == "/mcp" or cmd.startswith("/mcp "):
         from sable.app.builtins.mcp import handle_mcp

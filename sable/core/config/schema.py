@@ -69,6 +69,9 @@ class ShellConfig:
     # MCP servers and trusted tools (Phase 6, sable/mcp/servers.py). Kept
     # here so a settings-panel save does not drop it.
     mcp: dict = field(default_factory=dict)
+    # Other hosts for `@NAME` (Phase 9, H5; sable/app/builtins/hosts.py
+    # validates them). Kept here so a settings-panel save does not drop it.
+    hosts: dict = field(default_factory=dict)
     # Local HH:MM the daemon runs palace consolidation (Phase 7, C3).
     maintenance_time: str = "02:30"
     # Sub-agent resource limits (Phase 8, F5, sable/agents/limits.py).
@@ -194,6 +197,10 @@ class ShellConfig:
         if not isinstance(mcp, dict):
             raise ValueError(f"mcp must be an object, got {mcp!r}")
 
+        hosts = data.get("hosts") or {}
+        if not isinstance(hosts, dict):
+            raise ValueError(f"hosts must be an object, got {hosts!r}")
+
         maintenance_time = data.get("maintenance_time") or "02:30"
         if not isinstance(maintenance_time, str) or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", maintenance_time):
             raise ValueError(f"maintenance_time must be HH:MM, got {maintenance_time!r}")
@@ -237,6 +244,7 @@ class ShellConfig:
                           for t, spec in tool_budgets.items()},
             notify=dict(notify),
             mcp=dict(mcp),
+            hosts=dict(hosts),
             maintenance_time=maintenance_time,
             limits=dict(raw_limits),
             review=review,
@@ -267,6 +275,7 @@ class ShellConfig:
             "tool_budgets": {t: dict(spec) for t, spec in self.tool_budgets.items()},
             "notify": dict(self.notify),
             "mcp": dict(self.mcp),
+            "hosts": dict(self.hosts),
             "schema_version": CURRENT,
             "maintenance_time": self.maintenance_time,
             "limits": dict(self.limits),
