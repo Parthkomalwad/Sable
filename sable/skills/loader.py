@@ -108,6 +108,18 @@ class TaskSkillLoader:
             "confidence": None,
         }
 
+    def _read_global(self, path: Path, name: str) -> dict | None:
+        """`_read` plus the K8 signature check. A tampered skill is dropped."""
+        from sable.skills import signing
+
+        trust = signing.trust_of(path)
+        if trust == "tampered":
+            return None
+        skill = self._read(path, name, "global")
+        if skill is not None:
+            skill["trust"] = trust
+        return skill
+
     def _candidate_paths(self, directory: Path) -> list[tuple[str, Path]]:
         """Every skill file in a directory, as (name, path), folders first.
 
@@ -206,7 +218,7 @@ class TaskSkillLoader:
             # order so the result is at least deterministic.
             out = []
             for name, path in sorted(files.items()):
-                skill = self._read(path, name, "global")
+                skill = self._read_global(path, name)
                 if skill is not None and self._matches(skill, keywords):
                     out.append((name, skill))
             return out
@@ -219,7 +231,7 @@ class TaskSkillLoader:
                 # Indexed but not on disk. Index and files drift apart, and
                 # the file is what can actually be injected.
                 continue
-            skill = self._read(path, name, "global")
+            skill = self._read_global(path, name)
             if skill is not None:
                 # The ranking path is the only place the index entry is in
                 # hand, so it is where the score gets attached. The

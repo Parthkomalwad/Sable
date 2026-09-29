@@ -5,6 +5,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 ## [Unreleased]
 
 ### Added
+- **Signed skills and source trust (Phase 8 Task 6, K8).** `sable/skills/signing.py` signs a skill folder with HMAC-SHA256 under a local key in the keyring (`skill-signing`, made on first use) and stores it in `.sable-signature`. Skills created in Sable or approved are signed; each index entry records its `source` (`user`, `crystallised`, `imported:<origin>`), and `sable import` / `sync` drop incoming signatures so imported skills arrive unsigned. While an agent follows an unsigned skill its commands get a `confirm` floor; a tampered skill is not injected. `/skill list` shows trust and source and warns on tampering; `/skill sign <name>` lists the files and asks before signing. No keyring means unsigned, never a crash.
 - **Phase 7 gate run: all seven lines pass, so memory and portability are done.** `scripts/gate_phase7.py` covers:
   - a fact learned in one session and answered from memory in the next, with no commands;
   - `/palace why`;

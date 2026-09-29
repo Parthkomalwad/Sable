@@ -169,6 +169,11 @@ When the goal discovered a durable fact about this server (a path, a port, a ser
 
 
 class TaskAgent:
+    #: K8: the policy floor while an unsigned skill is in context; set each
+    #: turn from `runtime.skill_floor`. A class default so a bare instance
+    #: (tests build one with `__new__`) still gates.
+    _skill_floor = None
+
     def __init__(self, task_name: str, goal: str, config, db_path: str,
                  shared_read_dir: str | None = None,
                  memory=None, skill_loader=None) -> None:
@@ -478,7 +483,8 @@ class TaskAgent:
         from sable.policy.engine import gate
 
         if not gate(command, role="worker", tainted=self._tainted, agent=self._name,
-                    goal=self._goal, model=self._config.model_for("worker")):
+                    goal=self._goal, model=self._config.model_for("worker"),
+                    floor=self._skill_floor):
             return "[blocked: verify command refused by policy]"
         output = self._run_command(command)
         audit.finish(runtime.exit_code_of(output))
@@ -606,6 +612,7 @@ class TaskAgent:
 
             guidance = self._drain_guidance()
             skills = self._skill_loader.load_relevant(self._goal)
+            self._skill_floor = runtime.skill_floor(skills)
             messages = self._memory.build_context()
             if recall:
                 messages.insert(1, recall)
@@ -722,8 +729,9 @@ class TaskAgent:
                     approved = policy_queue.take_approved(conn, self._name, command)
                     if not gate(command, role="worker", approved=approved,
                                 tainted=self._tainted, agent=self._name, goal=self._goal,
-                                model=self._config.model_for("worker")):
-                        d = decide(command, tainted=self._tainted)
+                                model=self._config.model_for("worker"),
+                                floor=self._skill_floor):
+                        d = decide(command, tainted=self._tainted, floor=self._skill_floor)
                         if d.tier is Tier.CONFIRM and not approved:
                             # Nobody can type YES in this window: ask the user
                             # through the queue instead of refusing outright.

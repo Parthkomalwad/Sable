@@ -218,9 +218,26 @@ def _dest(name: str) -> Path | None:
     return target
 
 
+#: A skill's signature file (K8, `sable/skills/signing.py`). Only valid
+#: under the key of the machine that wrote it, so it is never imported.
+SIGNATURE_FILE = ".sable-signature"
+
+SkillsHook = Callable[[set[str], str], None]
+
+
 def apply(files: dict[str, bytes], say: Say, confirm: Confirm, yes: bool,
-          on_write: Callable[[], None] = lambda: None) -> int:
-    """Show the plan, ask, back up what gets overwritten, then write."""
+          on_write: Callable[[], None] = lambda: None,
+          origin: str = "unknown",
+          on_skills: SkillsHook = lambda names, origin: None) -> int:
+    """Show the plan, ask, back up what gets overwritten, then write.
+
+    Skills that arrive are unsigned here whatever they were at home: an
+    incoming signature is dropped, a local one on a folder being written is
+    removed, and `on_skills(slugs, origin)` lets the caller label them
+    `imported:<origin>` (the index sits above core).
+    """
+    files = {n: d for n, d in files.items()
+             if not (n.startswith("skills/") and PurePosixPath(n).name == SIGNATURE_FILE)}
     add, overwrite, same = [], [], 0
     targets = {}
     for name, data in sorted(files.items()):
@@ -258,17 +275,34 @@ def apply(files: dict[str, bytes], say: Say, confirm: Confirm, yes: bool,
         target.write_bytes(files[name])
         if name.startswith("hooks/"):
             target.chmod(0o755)
+    slugs = {PurePosixPath(n).parts[1] for n in add + overwrite
+             if n.startswith("skills/") and len(PurePosixPath(n).parts) >= 3}
+    for slug in slugs:
+        (roots()["skills"] / slug / SIGNATURE_FILE).unlink(missing_ok=True)
+    if slugs:
+        on_skills(slugs, origin)
     on_write()  # the caller reindexes the palace (memory sits above core)
     say(f"wrote {len(add) + len(overwrite)} files")
     return 0
 
 
 def import_archive(path: Path, say: Say, confirm: Confirm, yes: bool,
-                   on_write: Callable[[], None] = lambda: None) -> int:
+                   on_write: Callable[[], None] = lambda: None,
+                   on_skills: SkillsHook = lambda names, origin: None) -> int:
     files = read_archive(path, say)
     if files is None:
         return 1
-    return apply(files, say, confirm, yes, on_write)
+    return apply(files, say, confirm, yes, on_write, _archive_host(path), on_skills)
+
+
+def _archive_host(path: Path) -> str:
+    """The exporting host from an archive `read_archive` already accepted."""
+    try:
+        with tarfile.open(path, "r:gz") as tar:
+            host = json.loads(tar.extractfile(MANIFEST).read()).get("host")
+    except (OSError, tarfile.TarError, ValueError, AttributeError):
+        return "unknown"
+    return host if isinstance(host, str) and host else "unknown"
 
 
 # --- sync -----------------------------------------------------------------
@@ -280,7 +314,8 @@ def _git(tree: Path, *args: str) -> subprocess.CompletedProcess:
 
 def sync(remote: str, say: Say, confirm: Confirm, yes: bool,
          secret_check: SecretCheck,
-         on_write: Callable[[], None] = lambda: None) -> int:
+         on_write: Callable[[], None] = lambda: None,
+         on_skills: SkillsHook = lambda names, origin: None) -> int:
     if shutil.which("git") is None:
         say("sync needs git on PATH")
         return 1
@@ -361,4 +396,4 @@ def sync(remote: str, say: Say, confirm: Confirm, yes: bool,
     if problems:
         return _reject(say, problems) or 1
     say("pushed; applying what came from the remote")
-    return apply(pulled, say, confirm, yes, on_write)
+    return apply(pulled, say, confirm, yes, on_write, remote, on_skills)

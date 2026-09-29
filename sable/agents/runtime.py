@@ -97,6 +97,21 @@ def exit_code_of(output: str) -> int | None:
     return 0
 
 
+def skill_floor(skills: list[dict]):
+    """K8: the policy floor while following these skills.
+
+    A global skill that is not signed (imported, or edited outside Sable)
+    makes every command the agent runs one tier stricter: `allow` becomes
+    `confirm`. A tampered skill never gets here; the loader drops it. Task
+    local skills carry no trust key and add no floor.
+    """
+    from sable.policy.tiers import Tier
+
+    if any(s.get("trust") == "unsigned" for s in skills):
+        return Tier.CONFIRM
+    return None
+
+
 def run_command(
     command: str,
     cwd: str,
