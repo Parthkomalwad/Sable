@@ -142,7 +142,8 @@ def _push_events(conn) -> None:
         if e.kind == "job.finished":
             notify.send(f"job {p.get('job')} {p.get('status')}", f"run #{p.get('run')}: {p.get('status')}")
         elif e.kind == "watch.fired":
-            notify.send("watch fired", json.dumps(p))
+            extra = "\na runbook exists: run it from /inbox" if p.get("runbook") else ""
+            notify.send("watch fired", json.dumps(p) + extra)
 
 
 def _push_approvals(conn, s: dict) -> None:

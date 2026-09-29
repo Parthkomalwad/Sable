@@ -250,6 +250,8 @@ class OrchestratorAgent:
         #: A4: plan graph reports for the reviewer, and its `fail` count.
         self._graph_reports: list[str] = []
         self._review_fails = 0
+        #: K9: verifies that passed, for a runbook drafted at `done`.
+        self._verified: list = []
 
     # ------------------------------------------------------------------
     # Public
@@ -529,6 +531,7 @@ class OrchestratorAgent:
         failure = runtime.run_verify(verify, output=output, cwd=self._cwd, run=self._run_command)
         if failure is None:
             _out("  [verify] passed")
+            self._verified.append(verify)
             return output
         _out(f"  [verify] failed: {json.dumps(failure)[:300]}")
         return f"{output.rstrip()}\n{json.dumps(failure)}\n[exit 1]"
@@ -861,6 +864,19 @@ class OrchestratorAgent:
         _out(f"\n  [skill] draft saved: {name} "
              f"(/skill list to review, /skill approve {name} to enable)")
 
+    def _maybe_draft_runbook(self) -> None:
+        """K9: a failure-signal goal fixed and verified becomes a runbook."""
+        from sable.memory import runbooks
+
+        source = {"session": self._session_id, "goal": self._goal[:300], "agent": "orchestrator"}
+        try:
+            fact_id = runbooks.draft(self._goal, self._steps, self._verified, source,
+                                     untrusted=self._tainted)
+        except (OSError, ValueError, sqlite3.Error):
+            return  # drafting must not turn a finished goal into a failed one
+        if fact_id:
+            _out(f"  runbook drafted: {fact_id}")
+
     def _review(self, action: dict) -> str:
         """A4: the reviewer's say before `done`. Returns done, retry or failed.
 
@@ -929,6 +945,7 @@ class OrchestratorAgent:
             _out(f"  read {len(self._pages_read)} page(s): {', '.join(self._pages_read)}\n")
         self._grade_skills()
         self._maybe_draft_skill()
+        self._maybe_draft_runbook()
         if self._task_dir:
             try:
                 result_path = self._task_dir / ".agentic" / "result.md"
