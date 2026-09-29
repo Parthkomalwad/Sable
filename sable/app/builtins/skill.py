@@ -21,7 +21,8 @@ from sable.ui.console import out as _out
 
 _USAGE = (
     "usage: /skill <list|show <name>|new <name>|edit <name>|"
-    "approve <name>|reject <name>|disable <name>|sign <name>|stats|doctor>"
+    "approve <name>|reject <name>|disable <name>|sign <name>|stats|doctor|"
+    "publish <name> [file]|install <file|https-url> [--yes] [--replace]>"
 )
 
 
@@ -109,6 +110,16 @@ def _handle_skill_builtin(parts: list[str]) -> bool:
             return True
         return _sign(name)
 
+    if sub == "publish" and name:
+        from pathlib import Path
+
+        from sable.skills import share
+        share.publish(name, Path(parts[2]) if len(parts) >= 3 else None, _out)
+        return True
+
+    if sub == "install" and name:
+        return _install(parts[1:])
+
     if sub == "new" and name:
         path = _flat_dir() / f"{name}.md"
         path.write_text(f"# {name}\n\n<!-- describe when to use this skill -->\n")
@@ -122,6 +133,26 @@ def _handle_skill_builtin(parts: list[str]) -> bool:
         return True
 
     _out(_USAGE)
+    return True
+
+
+def _install(args: list[str]) -> bool:
+    """B7: validate, show every file and SKILL.md, ask, install unsigned."""
+    from sable.skills import share
+
+    flags = {a for a in args if a.startswith("--")}
+    rest = [a for a in args if not a.startswith("--")]
+    if len(rest) != 1 or flags - {"--yes", "--replace"}:
+        _out(_USAGE)
+        return True
+
+    def confirm(question: str) -> bool:
+        try:
+            return input(question).strip().lower() in ("y", "yes")
+        except EOFError:
+            return False
+
+    share.install(rest[0], _out, confirm, "--yes" in flags, "--replace" in flags)
     return True
 
 
