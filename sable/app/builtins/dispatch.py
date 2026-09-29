@@ -450,6 +450,10 @@ def handle_builtin(
         from sable.app.builtins.notify import _handle_notify_builtin
         return _handle_notify_builtin(cmd[len("/notify"):])
 
+    if cmd == "/stepup" or cmd.startswith("/stepup "):
+        from sable.app.builtins.stepup import _handle_stepup_builtin
+        return _handle_stepup_builtin(cmd[len("/stepup"):])
+
     if cmd == "/breaker" or cmd.startswith("/breaker "):
         return _handle_breaker_builtin(cmd[len("/breaker"):].strip(), db)
 

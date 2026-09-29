@@ -266,6 +266,7 @@ def handle_line(line: str, ctx: Context) -> dict | None:
 
 
 def main() -> int:
+    os.environ["SABLE_NO_STEPUP"] = "1"  # K7: an MCP client never gets step-up
     # Take the protocol pipes, then point fds 0 and 1 elsewhere so no child
     # process or stray write can read the protocol or corrupt it.
     proto_in = os.fdopen(os.dup(0), "r", encoding="utf-8", errors="replace")

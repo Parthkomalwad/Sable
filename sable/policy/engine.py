@@ -112,7 +112,8 @@ def gate(
     forever. It runs `allow` and refuses everything else.
 
     `approved` is a `/approve` from the queue: it stands in for the YES a
-    `confirm` would ask for, and never lifts a `deny`.
+    `confirm` would ask for, and never lifts a `deny`. Only step-up (K7,
+    `stepup.py`) lifts a `deny`, once, for a user or orchestrator at a tty.
 
     The `pre_command` hook runs last, only for a command policy would run,
     so a hook can block and never unblock.
@@ -133,11 +134,17 @@ def gate(
             why=d.why if d.rule else None, outcome=outcome, redact=redact_text,
         )
 
+    stepped_up = False
     if d.tier is Tier.DENY:
         if role != "worker":
             _warn(f"refused by policy: {d.rule.name}", command, d.why)
-        _record("refused")
-        return False
+        # K7: only a person at a tty, only with step-up set up; the grant is
+        # for this exact string and is consumed right here.
+        from sable.policy import stepup
+        stepped_up = stepup.eligible(role) and stepup.offer(command) and stepup.take(command)
+        if not stepped_up:
+            _record("refused")
+            return False
     if d.tier is Tier.CONFIRM and not approved and (role == "worker" or not _confirm(command, d)):
         _record("unconfirmed")
         return False
@@ -157,7 +164,9 @@ def gate(
         return False
     if role != "worker":
         hooks.show("pre_command", result)
-    if d.tier is Tier.CONFIRM:
+    if stepped_up:
+        _record("stepped_up")
+    elif d.tier is Tier.CONFIRM:
         _record("approved" if approved else "confirmed")
     else:
         _record("allowed")

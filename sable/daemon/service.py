@@ -78,6 +78,7 @@ def _load_handlers() -> None:
 
 
 def run() -> int:
+    os.environ["SABLE_NO_STEPUP"] = "1"  # K7: nothing the daemon starts may step up
     from sable.core.db import DB_PATH
     from sable.daemon import jobs
 
