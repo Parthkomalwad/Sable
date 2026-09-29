@@ -67,7 +67,7 @@ class _RecordingTaskManager:
         self._db_path = db_path
 
     def spawn(self, name: str, goal: str, context: str = "",
-              task_base_dir: str | None = None) -> None:
+              task_base_dir: str | None = None, limits: dict | None = None) -> None:
         self.spawned.append(
             {"name": name, "goal": goal, "context": context,
              "task_base_dir": task_base_dir}
