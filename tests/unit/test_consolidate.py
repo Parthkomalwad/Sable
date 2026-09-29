@@ -107,3 +107,9 @@ def test_maintenance_time_is_validated():
     assert ShellConfig.from_dict({**base, "maintenance_time": "23:05"}).to_dict()["maintenance_time"] == "23:05"
     with pytest.raises(ValueError):
         ShellConfig.from_dict({**base, "maintenance_time": "24:00"})
+
+
+def test_the_summary_reads_as_a_sentence():
+    from sable.memory.consolidate import Summary
+    text = str(Summary(merged=1, changes=["merged f1 into f2"]))
+    assert text.startswith("consolidated: 1 merged, 0 promoted") and "merged f1 into f2" in text

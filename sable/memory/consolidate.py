@@ -33,6 +33,13 @@ class Summary:
     promoted: int = 0
     changes: list = field(default_factory=list)
 
+    def __str__(self) -> str:
+        """What `/palace consolidate` prints."""
+        head = (f"consolidated: {self.merged} merged, {self.promoted} promoted, "
+                f"{self.expired} expired, {self.dropped} dropped")
+        return "
+".join([head, *(f"  {c}" for c in self.changes)])
+
 
 def _publish(payload: dict) -> None:
     from sable.core.events.bus import EventBus
