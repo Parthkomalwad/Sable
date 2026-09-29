@@ -6,6 +6,8 @@ API keys are stored in the Linux keyring (Phase 2); in Phase 1 they go in config
 from __future__ import annotations
 from dataclasses import dataclass, field
 
+from sable.core.config.migrate import CURRENT
+
 
 VALID_BACKENDS = {"ollama", "openai", "anthropic", "custom"}
 VALID_ROUTING_MODES = {"auto", "prefix"}
@@ -216,5 +218,6 @@ class ShellConfig:
             "tool_budgets": {t: dict(spec) for t, spec in self.tool_budgets.items()},
             "notify": dict(self.notify),
             "mcp": dict(self.mcp),
+            "schema_version": CURRENT,
             "api_key": getattr(self, "api_key", ""),
         }

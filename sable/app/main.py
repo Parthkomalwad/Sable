@@ -36,7 +36,8 @@ _CLI_USAGE = """sable - an agentic shell layer
   sable off          disable it; logins go straight to bash
   sable status       report which mode is active
   sable daemon ...   run|install|status|stop the background daemon (sabled)
-  sable --wrap       run inside the current bash, no chsh or /etc/shells
+  sable doctor       check the install; --fix migrates config and repairs
+  sable --wrap      run inside the current bash, no chsh or /etc/shells
   sable --mcp-serve  serve Sable's tools to an MCP client over stdio
   sable export [file]          archive skills, palace, policy and hooks
   sable import <file> [--yes]  restore such an archive (backs up overwrites)
@@ -69,6 +70,11 @@ def _handle_cli(argv: list[str]) -> bool:
         from sable.daemon import service
 
         sys.exit(service.main(argv[1:]))
+
+    if command == "doctor":
+        from sable.app import doctor
+
+        sys.exit(doctor.main(argv[1:]))
 
     if command == "--mcp-serve":
         # No REPL, no tmux, no banner: stdout belongs to the protocol.
