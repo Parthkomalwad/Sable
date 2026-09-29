@@ -69,7 +69,7 @@ def _load_handlers() -> None:
     """Import the modules that register handlers. Each is optional so the
     foundation runs before later tasks land."""
     import importlib
-    for name in ("schedule", "watchers", "approvals"):
+    for name in ("schedule", "watchers", "approvals", "maintenance"):
         try:
             importlib.import_module(f"sable.daemon.{name}")
         except ModuleNotFoundError as exc:

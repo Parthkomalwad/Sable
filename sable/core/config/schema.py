@@ -4,6 +4,7 @@ Config is stored at ~/.config/agentic-shell/config.json with 600 permissions.
 API keys are stored in the Linux keyring (Phase 2); in Phase 1 they go in config.
 """
 from __future__ import annotations
+import re
 from dataclasses import dataclass, field
 
 from sable.core.config.migrate import CURRENT
@@ -65,6 +66,8 @@ class ShellConfig:
     # MCP servers and trusted tools (Phase 6, sable/mcp/servers.py). Kept
     # here so a settings-panel save does not drop it.
     mcp: dict = field(default_factory=dict)
+    # Local HH:MM the daemon runs palace consolidation (Phase 7, C3).
+    maintenance_time: str = "02:30"
 
     def model_for(self, role: str) -> str:
         """The model this role should use, falling back to `model`.
@@ -174,6 +177,10 @@ class ShellConfig:
         if not isinstance(mcp, dict):
             raise ValueError(f"mcp must be an object, got {mcp!r}")
 
+        maintenance_time = data.get("maintenance_time") or "02:30"
+        if not isinstance(maintenance_time, str) or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", maintenance_time):
+            raise ValueError(f"maintenance_time must be HH:MM, got {maintenance_time!r}")
+
         cfg = ShellConfig(
             backend=backend,
             model=model,
@@ -193,6 +200,7 @@ class ShellConfig:
                           for t, spec in tool_budgets.items()},
             notify=dict(notify),
             mcp=dict(mcp),
+            maintenance_time=maintenance_time,
         )
         if data.get("api_key"):
             cfg.api_key = data["api_key"]  # type: ignore[attr-defined]
@@ -219,5 +227,6 @@ class ShellConfig:
             "notify": dict(self.notify),
             "mcp": dict(self.mcp),
             "schema_version": CURRENT,
+            "maintenance_time": self.maintenance_time,
             "api_key": getattr(self, "api_key", ""),
         }
