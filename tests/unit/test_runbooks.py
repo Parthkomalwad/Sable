@@ -58,8 +58,12 @@ def test_offer_shows_in_inbox_and_runs_only_on_approve(tmp_path, conn, monkeypat
     from sable.ui import state
 
     ran = []  # planner stubbed: the real one needs ptyprocess and a tty
-    monkeypatch.setitem(sys.modules, "sable.agents.planner",
-                        SimpleNamespace(execute_plan=lambda plan, cwd, d="": ran.append(plan) or 0))
+    stub = SimpleNamespace(execute_plan=lambda plan, cwd, d="": ran.append(plan) or 0)
+    import sable.agents
+    # Both: `from sable.agents import planner` reads the package attribute
+    # once another test has imported the real planner.
+    monkeypatch.setitem(sys.modules, "sable.agents.planner", stub)
+    monkeypatch.setattr(sable.agents, "planner", stub, raising=False)
     fid = runbooks.draft("watcher #4 is down", STEPS, ["curl -f localhost"], SRC)
     assert runbooks.offer(conn, 4, "http localhost 502") == fid
     assert ran == []  # filing an offer runs nothing
