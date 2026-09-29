@@ -67,6 +67,9 @@ _HELP_TEXT = (
     "  /theme <name>  Colours: default, mono, high-contrast\n"
     "  /layout <name>  tmux panes: focus, fleet, minimal\n"
     "  /budget reset  Clear hard-stop budget flag\n"
+    "  /palace [room|find <text>|why <id>]  What Sable has learned, and from where\n"
+    "  /remember <text> [--room R]  Save a fact (room user by default)\n"
+    "  /forget <id>   Remove a fact from the palace\n"
     "  /memory                  View current context\n"
     "  /memory versions         List all saved snapshots\n"
     "  /memory revert <id>      Restore a snapshot\n"
@@ -467,6 +470,12 @@ def handle_builtin(
     if cmd == "shell stats --csv":
         _show_stats_csv(db)
         return True
+
+    for name in ("/palace", "/remember", "/forget"):
+        if cmd == name or cmd.startswith(name + " "):
+            from sable.app.builtins import palace as palace_cmds
+            handler = getattr(palace_cmds, "handle_" + name[1:])
+            return handler(cmd[len(name):])
 
     if cmd in ("/memory", "shell memory") or cmd.startswith("/memory "):
         subcmd = cmd[len("/memory"):].strip()
