@@ -43,6 +43,10 @@ _CLI_USAGE = """sable - your server's AI operator
   sable export [file]          archive skills, palace, policy and hooks
   sable import <file> [--yes]  restore such an archive (backs up overwrites)
   sable sync <remote> [--yes]  the same set through a git remote
+  sable share --approve-only [--ttl 1h] [--name N] [--topic T]
+                     a teammate approves inbox items from ntfy
+  sable share --read-only [--ttl 1h] [--topic T]   a /dash snapshot every 5 min
+  sable share --list | --stop [ID]
   sable --version    print the version
 """
 
@@ -97,6 +101,9 @@ def _handle_cli(argv: list[str]) -> bool:
     if command in ("export", "import", "sync"):
         sys.exit(_portable(command, argv[1:]))
 
+    if command == "share":
+        sys.exit(_share(argv[1:]))
+
     if command in ("on", "off", "status"):
         from sable.app import mode
 
@@ -148,6 +155,68 @@ def _portable(command: str, args: list[str]) -> int:
         return portable.import_archive(_Path(rest[0]), out, confirm, yes, reindex,
                                        mark_imported)
     return portable.sync(rest[0], out, confirm, yes, match_secret, reindex, mark_imported)
+
+
+def _share(args: list[str]) -> int:
+    """`sable share` (K12); the daemon handler in daemon/share.py does the pushing."""
+    import argparse
+    import time
+
+    from sable.core.db import DB_PATH
+    from sable.daemon import notify, share
+    from sable.ui.console import out
+
+    p = argparse.ArgumentParser(prog="sable share")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--approve-only", action="store_true")
+    g.add_argument("--read-only", action="store_true")
+    g.add_argument("--list", action="store_true")
+    g.add_argument("--stop", nargs="?", const="", metavar="ID")
+    p.add_argument("--ttl", default="1h")
+    p.add_argument("--name")
+    p.add_argument("--topic")
+    try:
+        a = p.parse_args(args)
+        ttl = share.parse_ttl(a.ttl)
+    except ValueError as exc:
+        out(f"sable share: {exc}")
+        return 2
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    try:
+        if a.list:
+            rows = share.list_active(conn)
+            for r in rows:
+                left = int((r["expires_at"] - time.time()) // 60)
+                out(f"{r['id']}  {r['mode']}  {r['name'] or '-'}  topic {r['topic']}  {left} min left")
+            if not rows:
+                out("no active shares")
+            return 0
+        if a.stop is not None:
+            n = share.stop(conn, a.stop or None)
+            out(f"stopped {n} share(s)")
+            return 0 if n else 1
+        if a.approve_only and not a.name:
+            out("sable share --approve-only needs --name, it goes in the audit")
+            return 2
+        try:
+            sh = share.create(conn, "approve" if a.approve_only else "read", ttl, a.name, a.topic)
+        except ValueError as exc:
+            out(f"sable share: {exc}")
+            return 2
+    finally:
+        conn.close()
+    server = notify.settings()["server"]
+    out(f"share {sh['id']} ({sh['mode']}) for {a.ttl}")
+    out(f"  topic: {server}/{sh['topic']}")
+    out("  the teammate subscribes to that topic in the ntfy app (or opens the URL);")
+    if sh["reply_topic"]:
+        out(f"  replies arrive on {sh['reply_topic']}; each Approve / Reject works once, for 1 h,")
+        out("  and only while this share is active. deny-tier commands are never offered.")
+    out(f"  the daemon does the pushing (sable daemon status); stop with: sable share --stop {sh['id']}")
+    return 0
 
 
 def _report_degradations() -> None:

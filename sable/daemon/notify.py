@@ -50,11 +50,13 @@ def auth_headers() -> dict:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
-def send(title: str, body: str, actions=()) -> bool:
+def send(title: str, body: str, actions=(), topic: str | None = None) -> bool:
+    """Publish to `topic`, or the configured one; False when neither is set."""
     s = settings()
-    if not s.get("topic"):
+    topic = topic or s.get("topic")
+    if not topic:
         return False
-    payload = {"topic": s["topic"], "title": redact_text(title),
+    payload = {"topic": topic, "title": redact_text(title),
                "message": redact_text(body), "actions": list(actions)}
     try:
         r = _client().post(s["server"], json=payload, headers=auth_headers(), timeout=TIMEOUT)
