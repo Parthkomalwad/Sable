@@ -29,7 +29,7 @@ if _bypass_cmd:
 # -----------------------------------------------------------------------------
 
 
-_CLI_USAGE = """sable - an agentic shell layer
+_CLI_USAGE = """sable - your server's AI operator
 
   sable              start the shell, or re-attach a running session
   sable on           enable the agentic layer for new logins
