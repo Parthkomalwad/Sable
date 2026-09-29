@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sable-shell"
-version = "0.9.0"
+version = "1.0.0"
 description = "A Linux login shell that understands plain English, runs sandboxed agents, and learns your server."
 readme = "README.md"
 license = { file = "LICENSE" }

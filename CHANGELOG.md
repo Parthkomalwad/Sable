@@ -4,6 +4,8 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-29 (v0.4 to v1.0: autonomy, MCP, memory, safety, ecosystem)
+
 ### Added
 - **Phase 9 gate run: all seven lines pass, so v1.0 is complete.** `scripts/gate_phase9.py` covers:
   - `sable eval`, 25/25 on the mock backend with no API key in reach;
