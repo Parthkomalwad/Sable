@@ -52,12 +52,25 @@ def _walk(top: str):
             yield os.path.relpath(full, top).replace(os.sep, "/"), full
 
 
-def _size(path: str) -> int:
+MAX_ENTRIES = 20_000
+
+
+def _size(path: str, budget: int = MAX_BYTES) -> int:
+    """Bytes under `path`, but stop as soon as `budget` is passed: a command
+    like `rm -rf /` must not make Sable walk the whole disk before refusing."""
     if os.path.islink(path):
         return 0
     if not os.path.isdir(path):
         return os.path.getsize(path)
-    return sum(os.lstat(f).st_size for _, f in _walk(path) if os.path.isfile(f) and not os.path.islink(f))
+    total = 0
+    for n, (_, f) in enumerate(_walk(path)):
+        if n > MAX_ENTRIES:
+            return budget + 1
+        if os.path.isfile(f) and not os.path.islink(f):
+            total += os.lstat(f).st_size
+            if total > budget:
+                return total
+    return total
 
 
 def _ids() -> list[int]:
@@ -69,10 +82,23 @@ def _ids() -> list[int]:
 def take(paths_: set[str] | list[str], label: str = "", *, agent: str = "", session: str = "") -> int:
     """Copy every path; returns the snapshot id. Raises SnapshotError over 50 MB."""
     wanted = sorted({os.path.normpath(os.path.abspath(p)) for p in paths_})
-    total = sum(_size(p) for p in wanted if os.path.lexists(p))
-    if total > MAX_BYTES:
-        raise SnapshotError(
-            f"these paths hold {total / 1e6:.1f} MB, over the 50 MB snapshot limit; no undo point taken")
+    store = os.path.normpath(os.path.abspath(ROOT))
+    for p in wanted:
+        # A path holding the store (`rm -rf ~`) would copy the store into
+        # itself forever; one inside it is Sable's own history.
+        try:
+            nested = os.path.commonpath([p, store]) in (p, store)
+        except ValueError:   # different drives on Windows
+            nested = False
+        if nested:
+            raise SnapshotError(f"{p} contains Sable's own snapshots; no undo point taken")
+    total = 0
+    for p in wanted:
+        if os.path.lexists(p):
+            total += _size(p, MAX_BYTES - total)
+        if total > MAX_BYTES:
+            raise SnapshotError("these paths hold more than the 50 MB snapshot limit (or over "
+                                f"{MAX_ENTRIES} files); no undo point taken")
     ROOT.mkdir(parents=True, exist_ok=True)
     while True:   # mkdir is the lock: a worker and the shell may race here
         sid = (_ids() or [0])[-1] + 1

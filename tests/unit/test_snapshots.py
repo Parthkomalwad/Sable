@@ -136,3 +136,30 @@ def test_latest_filters_by_agent(tmp_path):
     a = snapshots.take([str(f)], agent="orchestrator", session="1")
     snapshots.take([str(f)], agent="w1")
     assert snapshots.latest(agent="orchestrator", session="1")["id"] == a
+
+
+def test_a_huge_tree_is_refused_without_walking_all_of_it(tmp_path, monkeypatch):
+    from sable.core import snapshots
+    monkeypatch.setattr(snapshots, "MAX_ENTRIES", 50)
+    big = tmp_path / "big"
+    big.mkdir()
+    for i in range(200):
+        (big / f"f{i}").write_text("x")
+    seen = []
+    real = snapshots._walk
+    monkeypatch.setattr(snapshots, "_walk", lambda top: (seen.append(1) or e for e in real(top)))
+    import pytest
+    with pytest.raises(snapshots.SnapshotError):
+        snapshots.take([str(big)])
+    assert len(seen) <= 52
+
+
+def test_a_path_holding_the_snapshot_store_is_refused(tmp_path, monkeypatch):
+    import pytest
+    from sable.core import snapshots
+    monkeypatch.setattr(snapshots, "ROOT", tmp_path / "home" / ".sable" / "snapshots")
+    (tmp_path / "home" / "notes.txt").parent.mkdir(parents=True)
+    (tmp_path / "home" / "notes.txt").write_text("x")
+    for p in (tmp_path / "home", tmp_path / "home" / ".sable" / "snapshots" / "1"):
+        with pytest.raises(snapshots.SnapshotError, match="own snapshots"):
+            snapshots.take([str(p)])
