@@ -1231,7 +1231,8 @@ class OrchestratorAgent:
         # A matched `confirm` rule asks for YES here, as the docs always said;
         # it used to refuse outright, which no rule could express.
         if not gate(command, role="orchestrator", tainted=self._tainted, goal=self._goal,
-                    model=self._config.model_for("orchestrator")):
+                    model=self._config.model_for("orchestrator"),
+                    floor=runtime.skill_floor(self._skills)):
             _out(f"[orchestrator] not run: {command}")
             return "[blocked: refused by policy or not confirmed by the user]"
 

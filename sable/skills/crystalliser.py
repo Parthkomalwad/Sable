@@ -93,6 +93,7 @@ class SkillCrystalliser:
             keywords=keywords,
             auto_generated=True,
             status=status,
+            source="crystallised",
         )
 
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
@@ -178,6 +179,7 @@ class SkillCrystalliser:
             keywords=self._keywords(goal, skill.triggers),
             auto_generated=True,
             status="pending",
+            source="crystallised",
         )
         return out_path
 

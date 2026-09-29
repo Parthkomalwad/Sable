@@ -75,7 +75,8 @@ class SkillIndex:
         return None
 
     def add(self, name: str, file: str, keywords: list[str],
-            auto_generated: bool, status: str = _DEFAULT_STATUS) -> None:
+            auto_generated: bool, status: str = _DEFAULT_STATUS,
+            source: str = "user") -> None:
         if status not in STATUSES:
             raise ValueError(
                 f"unknown status {status!r}; expected one of {sorted(STATUSES)}"
@@ -92,8 +93,12 @@ class SkillIndex:
             "last_used": None,
             "needs_update": False,
             "status": status,
+            "source": source,
             "created_at": now,
         }
+        # K8: a skill made in Sable is signed. An imported one never comes
+        # through here (`mark_imported` below), so it stays unsigned.
+        _sign_file(file)
         for i, e in enumerate(self._data):
             if e["name"] == name:
                 self._data[i] = entry
@@ -101,6 +106,21 @@ class SkillIndex:
                 return
         self._data.append(entry)
         self._save()
+
+    def sign(self, name: str) -> bool:
+        """`/skill sign`: sign a skill folder. False if unknown or not signable."""
+        entry = self._find(name)
+        return entry is not None and _sign_file(entry.get("file", ""))
+
+    def mark_imported(self, names: set[str], origin: str) -> None:
+        """Label skills that arrived through `sable import` or `sync`."""
+        changed = False
+        for entry in self._data:
+            if entry["name"] in names:
+                entry["source"] = f"imported:{origin}"
+                changed = True
+        if changed:
+            self._save()
 
     def list_all(self) -> list[dict]:
         return list(self._data)
@@ -151,7 +171,16 @@ class SkillIndex:
         # which is the safe direction to fail. The reverse order would leave
         # a skill enabled in the index that the loader still refuses,
         # unreachable with no way to clear it.
-        self._write_status_to_file(entry.get("file", ""), status)
+        file = entry.get("file", "")
+        # Rewriting the frontmatter changes the file, so a signature has to
+        # be renewed. Approval signs (a human vouched for it); any other
+        # change keeps a signed skill signed and never launders an unsigned
+        # or tampered one.
+        from sable.skills import signing
+        was_signed = signing.trust_of(file) == "signed" if file else False
+        self._write_status_to_file(file, status)
+        if status == "enabled" or was_signed:
+            _sign_file(file)
         entry["status"] = status
         self._save()
         return True
@@ -307,3 +336,11 @@ class SkillIndex:
         # announcement name a different skill each run for no visible reason.
         scored.sort(key=lambda t: (-t[0], t[1]))
         return [entry for _, _, entry in scored]
+
+
+def _sign_file(file: str) -> bool:
+    """Sign the folder of a `<slug>/SKILL.md`. A flat file has no folder to sign."""
+    if not file or Path(file).name != "SKILL.md":
+        return False
+    from sable.skills import signing
+    return signing.sign(Path(file).parent) is not None

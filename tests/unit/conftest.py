@@ -33,3 +33,11 @@ def _no_real_audit_ledger(monkeypatch, tmp_path_factory):
     import sable.core.db as db
 
     monkeypatch.setattr(db, "DB_PATH", tmp_path_factory.mktemp("db") / "sessions.db")
+
+
+@pytest.fixture(autouse=True)
+def _no_real_signing_key(monkeypatch):
+    """Skill signing (K8) must never read or create a key in the real keyring."""
+    from sable.skills import signing
+
+    monkeypatch.setattr(signing, "_key", lambda create: None)

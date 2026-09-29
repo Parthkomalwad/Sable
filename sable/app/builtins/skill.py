@@ -21,7 +21,7 @@ from sable.ui.console import out as _out
 
 _USAGE = (
     "usage: /skill <list|show <name>|new <name>|edit <name>|"
-    "approve <name>|reject <name>|disable <name>|stats>"
+    "approve <name>|reject <name>|disable <name>|sign <name>|stats>"
 )
 
 
@@ -100,6 +100,12 @@ def _handle_skill_builtin(parts: list[str]) -> bool:
             return True
         return _set_state(sub, name)
 
+    if sub == "sign":
+        if not name:
+            _out(_USAGE)
+            return True
+        return _sign(name)
+
     if sub == "new" and name:
         path = _flat_dir() / f"{name}.md"
         path.write_text(f"# {name}\n\n<!-- describe when to use this skill -->\n")
@@ -134,13 +140,18 @@ def _list() -> bool:
 
         status = entry.get("status", "enabled")
         confidence = entry.get("confidence", 0.0)
+        trust = _trust(skill_name)
+        tag = f"  [{trust}, {entry.get('source', 'user')}]"
         if status == "pending":
             _out(f"  {skill_name}  draft, pending approval "
-                 f"(/skill approve {skill_name})")
+                 f"(/skill approve {skill_name}){tag}")
         elif status == "disabled":
-            _out(f"  {skill_name}  {confidence:.2f}  disabled")
+            _out(f"  {skill_name}  {confidence:.2f}  disabled{tag}")
         else:
-            _out(f"  {skill_name}  {confidence:.2f}")
+            _out(f"  {skill_name}  {confidence:.2f}{tag}")
+        if trust == "tampered":
+            _out(f"    warning: {skill_name} changed since it was signed and is not "
+                 f"injected; read it, then /skill sign {skill_name}")
     return True
 
 
@@ -197,6 +208,41 @@ def _set_state(action: str, name: str) -> bool:
         _out(f"enabled {name} (confidence {entry.get('confidence', 0.0):.2f})")
     else:
         _out(f"disabled {name}; /skill approve {name} re-enables it")
+    return True
+
+
+def _trust(name: str) -> str:
+    from sable.skills import signing
+
+    path = _skill_path(name)
+    return signing.trust_of(path) if path is not None else "unsigned"
+
+
+def _sign(name: str) -> bool:
+    """Show every file the signature will cover, then ask. K8."""
+    from sable.skills import signing
+
+    path = _skill_path(name)
+    if path is None or path.name != "SKILL.md":
+        _out(f"no skill folder named '{name}' (flat skills cannot be signed)")
+        return True
+    folder = path.parent
+    files = sorted(p for p in folder.rglob("*")
+                   if p.is_file() and p.name != signing.SIGNATURE_FILE)
+    _out(f"signing {name} vouches for these files; read them first:")
+    for f in files:
+        _out(f"  {f.relative_to(folder).as_posix()}  ({f.stat().st_size} bytes)")
+    try:
+        answer = input("  type YES to sign: ").strip()
+    except EOFError:
+        answer = ""
+    if answer != "YES":
+        _out("not signed")
+        return True
+    if signing.sign(folder) is None:
+        _out("could not sign: no keyring available; the skill stays unsigned")
+    else:
+        _out(f"signed {name}")
     return True
 
 

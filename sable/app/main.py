@@ -127,6 +127,11 @@ def _portable(command: str, args: list[str]) -> int:
         if hasattr(palace, "reindex"):
             palace.reindex()
 
+    def mark_imported(names: set[str], origin: str) -> None:
+        from sable.skills.index import SkillIndex
+
+        SkillIndex().mark_imported(names, origin)
+
     if command == "export":
         dest = _Path(rest[0]) if rest else None
         return portable.export(dest, out, match_secret)
@@ -134,8 +139,9 @@ def _portable(command: str, args: list[str]) -> int:
         out(f"usage: sable {command} <{'file' if command == 'import' else 'git-remote'}> [--yes]")
         return 2
     if command == "import":
-        return portable.import_archive(_Path(rest[0]), out, confirm, yes, reindex)
-    return portable.sync(rest[0], out, confirm, yes, match_secret, reindex)
+        return portable.import_archive(_Path(rest[0]), out, confirm, yes, reindex,
+                                       mark_imported)
+    return portable.sync(rest[0], out, confirm, yes, match_secret, reindex, mark_imported)
 
 
 def _report_degradations() -> None:
