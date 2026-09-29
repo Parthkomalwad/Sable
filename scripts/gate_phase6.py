@@ -48,7 +48,7 @@ def _answer(r, line: str, until: str, reply: str, *, timeout: float = 150) -> st
             r.sendline("")
             continue
         if "type YES" in tail and tail.rstrip().endswith(":"):
-            r.sendline("YES")  # MCP tools are confirm tier: preview, then a typed YES
+            r.sendline("YES")  # taint or a policy rule can still ask for YES
             continue
         if time.monotonic() - quiet > 15:
             break
@@ -68,7 +68,7 @@ def g_fs(work):
            f"tools listed={listed} tool called={called}\n--- add ---\n{added}\n--- goal ---\n{goal}")
 
 
-@gate("/mcp trust files.list_directory -> /mcp list shows it allow, the rest confirm")
+@gate("/mcp trust files.list_directory -> /mcp list shows it trusted, the rest preview")
 def g_trust(work):
     r = start(work)
     drive(r, "/mcp add files mcp-server-filesystem /app", quiet_s=6, timeout=60)
@@ -77,8 +77,8 @@ def g_trust(work):
     r.close()
     row = next((ln for ln in listing.splitlines()
                 if "list_directory" in ln and "list_directory_" not in ln), "")
-    ok = "allow" in row and "confirm" in listing
-    result("/mcp trust files.list_directory -> /mcp list shows it allow, the rest confirm",
+    ok = "trusted" in row and "preview" in listing
+    result("/mcp trust files.list_directory -> /mcp list shows it trusted, the rest preview",
            "PASS" if ok else "FAIL", f"row: {row}\n--- trust ---\n{trusted}\n--- list ---\n{listing}")
 
 

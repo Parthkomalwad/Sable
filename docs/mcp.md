@@ -27,9 +27,11 @@ server through Sable instead of raw SSH.
 
 Each tool becomes `mcp.<server>.<tool>`, called like any Sable tool. Every
 call is previewed, checked by policy, audited and counted against the budget.
-Tools start at `confirm` (a preview, then a typed `YES`). `/mcp trust
-files.list_directory` lowers one tool to `allow`; `/mcp untrust` puts it back.
-Policy rules can still raise a trusted tool.
+A new tool is `preview`: only the interactive shell may call it, and it runs
+after you see the call and press Enter. `/mcp trust files.list_directory`
+makes it `trusted`, so sub-agents may call it too; `/mcp untrust` puts it
+back. A policy rule, or taint from earlier untrusted output, can still ask
+for a typed `YES`.
 
 MCP output is untrusted: after any MCP result, the rest of the goal runs one
 tier stricter.

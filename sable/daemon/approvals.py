@@ -25,6 +25,10 @@ from sable.policy.engine import decide
 from sable.policy.tiers import Tier
 
 TOKEN_TTL_S = 3600
+#: Reply polls are every 30 s, not every 5 s tick, to stay inside public
+#: ntfy.sh rate limits; an approval tap lands within half a minute.
+POLL_EVERY_S = 30.0
+_last_poll = 0.0
 _REPLY = re.compile(r"(yes|no) ([0-9]{1,18}) ([A-Za-z0-9_-]{1,64})")
 _CREATE = (
     """CREATE TABLE IF NOT EXISTS approval_tokens (
@@ -146,21 +150,20 @@ def _push_approvals(conn, s: dict) -> None:
     for item in queue.pending(conn):
         if item["id"] <= last:
             continue
-        _put(conn, "queue_id", item["id"])
-        actions, headers = [], notify.auth_headers()
+        actions = []
         if s.get("reply_topic"):
             token = issue(conn, item["id"])
             url = f"{s['server']}/{s['reply_topic']}"
             for word, label in (("yes", "Approve"), ("no", "Reject")):
-                action = {"action": "http", "label": label, "url": url, "method": "POST",
-                          "body": f"{word} {item['id']} {token}", "clear": True}
-                if headers:
-                    # ntfy runs the button from the phone, so a protected
-                    # reply topic needs the header in the action itself.
-                    action["headers"] = headers
-                actions.append(action)
-        notify.send(f"Approve #{item['id']}? ({item['agent']})",
-                    f"$ {item['command']}\n{item['rule']}: {item['why']}", actions)
+                # No access token in the button: anyone who can read the push
+                # would get it. The reply topic takes anonymous writes; the
+                # single-use token in the body is what authorises a reply.
+                actions.append({"action": "http", "label": label, "url": url, "method": "POST",
+                                "body": f"{word} {item['id']} {token}", "clear": True})
+        if not notify.send(f"Approve #{item['id']}? ({item['agent']})",
+                           f"$ {item['command']}\n{item['rule']}: {item['why']}", actions):
+            return  # not marked sent: the next tick tries again, in order
+        _put(conn, "queue_id", item["id"])
 
 
 def _poll(conn, s: dict) -> None:
@@ -192,7 +195,9 @@ def tick(conn: sqlite3.Connection) -> None:
     ensure_tables(conn)
     _push_events(conn)
     _push_approvals(conn, s)
-    if s.get("reply_topic"):
+    global _last_poll
+    if s.get("reply_topic") and time.monotonic() - _last_poll >= POLL_EVERY_S:
+        _last_poll = time.monotonic()
         try:
             _poll(conn, s)
         except httpx.HTTPError as exc:

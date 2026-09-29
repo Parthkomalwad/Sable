@@ -166,6 +166,22 @@ def _runner(client: Client, mcp_name: str, server: str):
     return run
 
 
+#: Untrusted tools: the interactive shell only, previewed, Enter runs them.
+#: Trusted tools (`/mcp trust`): workers may call them too. Policy rules and
+#: taint can still raise any call to a typed YES.
+_SHELL_ONLY = frozenset({"orchestrator"})
+
+
+def _access(trusted: bool) -> dict:
+    from sable.tools.base import ROLES
+    return {"tier": Tier.ALLOW, "roles": ROLES if trusted else _SHELL_ONLY}
+
+
+def label(tool: Tool) -> str:
+    """How `/mcp list` names a tool's access."""
+    return "trusted" if tool.roles != _SHELL_ONLY else "preview"
+
+
 def make_tools(server: str, client: Client, trusted) -> list[Tool]:
     tools = []
     for t in client.list_tools():
@@ -174,7 +190,7 @@ def make_tools(server: str, client: Client, trusted) -> list[Tool]:
             name="mcp." + key,
             description=_clean(t.get("description"), _DESC_CAP) or f"MCP tool from {server}",
             schema=_schema(t.get("inputSchema")),
-            tier=Tier.ALLOW if key in trusted else Tier.CONFIRM,
+            **_access(key in trusted),
             run=_runner(client, str(t.get("name", "")), server),
         ))
     return tools
@@ -200,12 +216,12 @@ def unregister_server(name: str, close: bool = True) -> None:
         client.close()
 
 
-def set_tier(key: str, tier: Tier) -> bool:
-    """Change a registered tool's tier in place; False if it is not loaded."""
+def set_trust(key: str, trusted: bool) -> bool:
+    """Change a registered tool's access in place; False if it is not loaded."""
     import dataclasses
     tool = registry._TOOLS.get("mcp." + key)
     if tool is not None:
-        registry.register(dataclasses.replace(tool, tier=tier))
+        registry.register(dataclasses.replace(tool, **_access(trusted)))
     return tool is not None
 
 

@@ -151,6 +151,7 @@ class TestTick:
         monkeypatch.setattr(notify, "settings", lambda: SETTINGS)
         monkeypatch.setattr(notify, "_client", lambda: client)
         monkeypatch.setattr(approvals, "_events", lambda cursor: ([], 0))
+        monkeypatch.setattr(approvals, "POLL_EVERY_S", 0)
         qid = queue.enqueue(conn, "daemon:prune", "rm -rf /tmp/x", decide("rm -rf /tmp/x"))
         approvals.tick(conn)
         approvals.tick(conn)
@@ -158,6 +159,7 @@ class TestTick:
         assert len(pushes) == 1
         yes = pushes[0]["actions"][0]
         assert yes["url"] == "https://ntfy.example/r" and yes["body"].startswith(f"yes {qid} ")
+        assert "headers" not in yes   # the access token never rides in a button
         replies.append([{"id": "m1", "event": "message", "message": yes["body"]}])
         approvals.tick(conn)
         assert _status(conn, qid) == "approved"
@@ -182,3 +184,17 @@ class TestBuiltin:
         assert data["theme"] == "mono"
         assert data["notify"] == {"server": "https://ntfy.example", "topic": "t", "reply_topic": "r"}
         assert "tk_x" not in cfg.read_text() and stored == {"ntfy": "tk_x"}
+
+
+def test_a_failed_approval_push_is_retried(conn, monkeypatch):
+    sent = []
+    monkeypatch.setattr(notify, "settings", lambda: SETTINGS)
+    monkeypatch.setattr(approvals, "_events", lambda cursor: ([], 0))
+    monkeypatch.setattr(approvals, "POLL_EVERY_S", 10**9)
+    results = iter([False, True])
+    monkeypatch.setattr(notify, "send", lambda *a, **k: sent.append(a[0]) or next(results))
+    queue.enqueue(conn, "daemon:prune", "rm -rf /tmp/x", decide("rm -rf /tmp/x"))
+    approvals.tick(conn)
+    approvals.tick(conn)
+    approvals.tick(conn)
+    assert len(sent) == 2   # failed, retried and sent, then nothing more

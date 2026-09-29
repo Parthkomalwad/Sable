@@ -48,10 +48,12 @@ a replayed, expired, mismatched or malformed reply is refused and recorded
 in `/audit` as `approval.remote`. Only `confirm`-tier items can be approved
 this way.
 
-On public ntfy.sh, the topic name is the only secret unless you set an access
-token (stored in the keyring, never in config). With a token, the buttons
-carry it, so anyone who can read your push topic can also reply: keep both
-topics private.
+An access token (stored in the keyring, never in config) protects reading
+your push topic. It is never put in the buttons. The reply topic must accept
+writes without it; that is safe because a reply only counts with its
+single-use token, which only the matching push carries. The daemon checks the
+reply topic every 30 seconds, so a tap lands within half a minute. A push that
+fails to send is retried on the next tick.
 
 ## `/inbox`
 

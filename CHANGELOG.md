@@ -31,6 +31,11 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - **Phase 4 gate run: all six lines pass, so v0.8 is complete.** `scripts/gate_phase4.py` checks blocks and `/block N rerun`, ghost text (52 ms), `? explain` and `! fix`, approving from `/dash`, the sidebar showing at 120 columns and hiding at 80, and cold start (median 100 ms). A sub-agent resuming after a `/dash` approval and the sidebar's colours were not checked by the harness. Transcripts in `docs/history/phase-4-gate-2026-09-28.md`. `ROADMAP.md` ticks v0.8; v0.9 is next. One finding is recorded, not yet fixed: after `q` cancels a proposal the orchestrator proposes the same command again.
 
 ### Fixed
+- **`sable --version` said 0.3.0.** `sable/__init__.py` and `pyproject.toml` now say 0.9.0.
+- **Phone approvals polish.**
+  - A push that fails to send is retried on the next tick. Before, it was marked sent and lost.
+  - The daemon checks the reply topic every 30 seconds instead of every 5, which stays inside public ntfy.sh rate limits.
+  - The ntfy access token is no longer copied into the Approve and Reject buttons, where anyone who could read the push could take it. The single-use reply token is what authorises a tap. 2 tests.
 - **A tool written as a call reached bash.** `mcp.mock.t0()` as a shell command slipped past the tool-as-command check, which cut the name at a space only; it now also cuts at `(`. Found by the Phase 6 gate. 1 test.
 - **The model picked a builtin over the MCP server the user named.** MCP tools were one flat list with the builtins, so "use the files MCP server" got the builtin `fs.tree`. The tool prompt now lists them under their own heading, with a note to use a named server's tools. 1 test.
 - **One long daemon job stalled everything else.** Scheduled and watcher jobs ran inline in the daemon tick, so a long job held up other schedules, watchers and phone pushes (found by the Phase 5 gate). They now run in their own thread on their own connection; the run row is written first, so a job is still never started twice. 1 test.
@@ -56,6 +61,7 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 - **Reading a credential file always needs `YES`.** A model that reads a private key has sent it to its provider, which is the leak. Any command or tool call that names one (`~/.ssh` private keys and `authorized_keys`, `~/.aws/credentials`, `~/.gnupg/`, `.netrc`, `.pgpass`, `.git-credentials`, docker and kube configs, Sable's own config file, `/etc/shadow`, `/etc/sudoers`) is at least `confirm`, from a built-in floor in `policy/privilege.py` beside the `sudo` one, so no policy file can relax it and a sub-agent is refused. `cat` and `fs.read` are covered by the same rule. Public keys and `known_hosts` are not affected. 24 tests.
 
 ### Changed
+- **MCP tools no longer ask for a typed `YES` by default.** A new tool is `preview`: the interactive shell shows the call and Enter runs it, and sub-agents cannot call it. `/mcp trust` makes it `trusted`, so sub-agents may use it too. Policy rules and taint can still require `YES`. 1 test.
 - **Research no longer asks for `YES` on every page.** After a search the agent is tainted, and taint made each later `web.fetch` need `YES`. Two calls are now exempt from the taint bump, and only these: `web.search`, whose query goes to the search provider, and `web.fetch` of a URL this goal's search returned, exactly. A hostile page cannot choose an arbitrary URL, so the data-out path through a fetch stays closed: a URL the model made up or copied from a page, or a search result with anything appended, still needs `YES` (and a sub-agent is refused). Commands and writes are bumped as before. A live run with `gpt-4o-mini` answering "no" to every prompt searched, read a result and finished with no prompt at all. 6 tests.
 
 ### Fixed
