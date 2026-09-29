@@ -53,8 +53,8 @@ Progress is tracked in [GitHub Projects](https://github.com/Parthkomalwad/sable/
 ## v1.0: Ecosystem *(next)*
 
 - [x] MCP client (spec 2026-07-28) and server mode (`D1 D2 D4`)
-- [ ] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
-- [ ] Export / import / sync of skills and knowledge; upgrade migrations and `sable doctor` (`I8 I6`)
+- [x] Memory Palace: rooms and tiers of memory shared by every agent, full-text recall, provenance, nightly consolidation (`C6`, subsumes `C1 C2 C3 C5`)
+- [x] Export / import / sync of skills and knowledge; upgrade migrations and `sable doctor` (`I8 I6`)
 - [ ] Eval harness, plugin system, OpenTelemetry (`H3 H2 H4`)
 - [ ] Incident → runbook drafts, nightly self-evaluation, session sharing with approve-only links (`K9 K10 K12`)
 ## Later
