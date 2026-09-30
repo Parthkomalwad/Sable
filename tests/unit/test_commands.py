@@ -154,6 +154,44 @@ class TestABrokenCommandKeepsTheShell:
         assert repl._handle_builtin is handle_builtin_safely
 
 
+class TestToggleSidebar:
+    """/bash and Ctrl+T crashed: libtmux's removed find_where raised
+    DeprecatedError, and a local `import subprocess` broke the handler."""
+
+    def _run(self, monkeypatch, listing, raises=None):
+        import subprocess as sp
+        from sable.ui.tmux import layout
+        calls = []
+
+        def fake(cmd, **kw):
+            if raises:
+                raise raises
+            calls.append(cmd)
+            return sp.CompletedProcess(cmd, 0, stdout=listing, stderr="")
+        monkeypatch.setenv("TMUX", "/tmp/tmux-0/default,1,0")
+        monkeypatch.setenv("TMUX_PANE", "%0")
+        monkeypatch.setattr(layout.subprocess, "run", fake)
+        layout.toggle_sidebar()
+        return calls
+
+    def test_hides_the_right_edge_pane(self, monkeypatch):
+        calls = self._run(monkeypatch, "%0 0 1 121\n%2 0 1 121\n%1 1 0 48\n")
+        assert calls[-1] == ["tmux", "resize-pane", "-t", "%1", "-x", "1"]
+
+    def test_shows_it_again_at_full_width(self, monkeypatch):
+        calls = self._run(monkeypatch, "%0 0 1 168\n%1 1 0 1\n")
+        assert calls[-1][-1] == "48"
+
+    def test_a_tmux_failure_is_quiet(self, monkeypatch):
+        import subprocess as sp
+        assert self._run(monkeypatch, "", raises=sp.TimeoutExpired("tmux", 2)) == []
+
+    def test_no_libtmux_needed(self):
+        import inspect
+        from sable.ui.tmux import layout
+        assert "libtmux" not in inspect.getsource(layout.toggle_sidebar).split('"""')[2]
+
+
 class TestUnknownCommands:
     def test_a_mistyped_builtin_is_answered_not_sent_to_bash(self, capsys):
         from unittest.mock import MagicMock

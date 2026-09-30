@@ -490,6 +490,15 @@ BUILTIN_FAILURES = (
     AssertionError, RuntimeError, ImportError, OSError, sqlite3.Error,
 )
 
+try:
+    # libtmux raises its own family (DeprecatedError took /bash down once).
+    # Imported defensively: tests that swap libtmux for a mock make this
+    # submodule unimportable, and the net must still load.
+    from libtmux.exc import LibTmuxException
+    BUILTIN_FAILURES += (LibTmuxException,)
+except ImportError:
+    pass
+
 ERROR_LOG = os.path.join(os.path.expanduser("~"), ".sable", "errors.log")
 
 
