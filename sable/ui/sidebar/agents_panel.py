@@ -53,21 +53,32 @@ def _fetch(conn: sqlite3.Connection) -> list[tuple]:
         return []
 
 
+#: Left inset, matching the sidebar's padding so the two panes line up.
+PAD = "  "
+
+
 def render(rows: list[tuple], width: int) -> Text:
-    """The whole panel as one Text: a header line, then one line per task."""
+    """The whole panel as one Text: a blank line, a header, then the body.
+
+    Empty, the body is a short explanation of what shows up here and how to
+    start something, so the pane reads as a place rather than a leftover line.
+    """
     t = Text(no_wrap=True, overflow="ellipsis")
+    t.append(f"\n{PAD}")
     t.append("TASKS", style=f"bold {DIM}")
     if not rows:
-        t.append("   none · ", style=FAINT)
+        t.append("   none running", style=FAINT)
+        t.append(f"\n\n{PAD}")
         t.append("/task new <name> <goal>", style=PURPLE)
+        t.append("   start one yourself; long goals are handed here on their own", style=FAINT)
         return t
 
     live = sum(1 for r in rows if _STATUS.get(r[1], (None, None, False))[2])
     t.append(f"   {len(rows)} shown · {live} running", style=FAINT)
-    goal_width = max(10, width - 2 - 22 - 10 - 9 - 10)
+    goal_width = max(10, width - 2 * len(PAD) - 2 - 22 - 10 - 9 - 10)
     for name, status, steps, goal, cost in rows:
         colour, label, is_live = _STATUS.get(status, (DIM, status or "?", False))
-        t.append("\n")
+        t.append(f"\n{PAD}")
         t.append("● ", style=colour)
         t.append(f"{name[:20]:<22}", style=f"bold {TEXT}" if is_live else DIM)
         t.append(f"{label:<10}", style=colour if is_live else FAINT)
@@ -79,9 +90,13 @@ def render(rows: list[tuple], width: int) -> Text:
     return t
 
 
+#: Never shorter than this, so the pane keeps some presence when idle.
+MIN_HEIGHT = 6
+
+
 def pane_height(rows: list[tuple]) -> int:
-    """One line for the hint when empty; header, rows and a spare line otherwise."""
-    return 2 if not rows else min(len(rows), MAX_ROWS) + 2
+    """Top space, header, one line per task, and a spare line; at least MIN_HEIGHT."""
+    return max(MIN_HEIGHT, min(len(rows), MAX_ROWS) + 3)
 
 
 def _fit_pane(height: int) -> None:

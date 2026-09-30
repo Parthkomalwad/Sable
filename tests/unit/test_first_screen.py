@@ -67,29 +67,33 @@ class TestWelcome:
 
 
 class TestTasksPane:
-    def test_empty_is_one_hint_line(self):
-        out = agents_panel.render([], 100).plain
-        assert out == "TASKS   none · /task new <name> <goal>"
-        assert agents_panel.pane_height([]) == 2
+    def test_empty_explains_what_goes_here(self):
+        lines = agents_panel.render([], 100).plain.splitlines()
+        assert lines[0] == ""                                   # breathing room under the border
+        assert lines[1] == "  TASKS   none running"
+        assert lines[3].startswith("  /task new <name> <goal>")
+        assert agents_panel.pane_height([]) == agents_panel.MIN_HEIGHT
+        assert len(lines) < agents_panel.MIN_HEIGHT
 
     def test_rows_show_state_step_goal_and_cost(self):
         rows = [("smoke-suite", "running", 2, "run the smoke tests", 0.0142),
                 ("migrate-db", "completed", 4, "migrate", 0.0)]
-        lines = agents_panel.render(rows, 100).plain.splitlines()
-        assert lines[0].startswith("TASKS") and "1 running" in lines[0]
+        lines = agents_panel.render(rows, 100).plain.splitlines()[1:]
+        assert lines[0].startswith("  TASKS") and "1 running" in lines[0]
         assert "smoke-suite" in lines[1] and "running" in lines[1] and "step 2" in lines[1]
         assert lines[1].rstrip().endswith("$0.0142")
         assert "done" in lines[2]
-        assert agents_panel.pane_height(rows) == 4
 
     def test_long_goals_are_cut_to_the_width(self):
         rows = [("t", "running", 1, "x" * 500, 0.0)]
-        line = agents_panel.render(rows, 90).plain.splitlines()[1]
+        line = agents_panel.render(rows, 90).plain.splitlines()[2]
         assert len(line) <= 90 and "…" in line
 
-    def test_height_is_capped(self):
-        rows = [(f"t{i}", "running", 1, "g", 0.0) for i in range(20)]
-        assert agents_panel.pane_height(rows) == agents_panel.MAX_ROWS + 2
+    def test_height_grows_with_tasks_and_is_capped(self):
+        many = [(f"t{i}", "running", 1, "g", 0.0) for i in range(20)]
+        assert agents_panel.pane_height(many[:1]) == agents_panel.MIN_HEIGHT
+        assert agents_panel.pane_height(many[:5]) == 8
+        assert agents_panel.pane_height(many) == agents_panel.MAX_ROWS + 3
 
 
 def test_tmux_theme_is_shared_by_install_and_playground():
