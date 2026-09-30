@@ -293,8 +293,7 @@ const S = [
  {t:"Risky scheduled job waits for approval",w:"Confirm-tier jobs go to the inbox instead of running.",c:"/schedule \"nightly prune docker images\"\n/inbox",e:"Contains docker image prune; sits in /inbox, not run.",at:"sable",real:1},
  {t:"Watchers",w:"Watch disk, files, logs or URLs and react.",c:"/watch add file /tmp/w.txt\necho hi >> /tmp/w.txt\n/watch list\n/watch rm 1",e:"Watcher fires an event or inbox item.",at:"sable"},
  {t:"Crash recovery",w:"After a kill, reconcile marks orphaned tasks lost and restarts schedules.",c:"docker kill $(docker ps -q --filter name=sable)\n.\\scripts\\playground.ps1\n/task list",e:"Interrupted task marked lost; schedules resume.",at:"ps"},
- {t:"Push notifications",w:"ntfy pushes task results to your phone.",c:"/notify setup\n/notify test\n/notify status",e:"Test push arrives in the ntfy app.",at:"sable"},
- {t:"Environment fingerprint",w:"Sable records OS, services and tools at login.",c:"/env",e:"Detected environment facts listed.",at:"sable"}]},
+ {t:"Push notifications",w:"ntfy pushes task results to your phone.",c:"/notify setup\n/notify test\n/notify status",e:"Test push arrives in the ntfy app.",at:"sable"}]},
 {id:"p6",n:"Phase 6 · MCP",e:"D1–D4",d:"Sable as an MCP client (use other tools) and server (other agents use Sable, under its policy).",t:[
  {t:"Add an MCP server",w:"Connect a stdio or HTTP MCP server.",c:"/mcp add fs npx @modelcontextprotocol/server-filesystem /app\n/mcp list",e:"Server listed with its tools.",at:"sable"},
  {t:"Use an MCP tool",w:"The model calls the MCP tool as an action, never as a shell command.",c:"use the filesystem tool to count markdown files",e:"mcp action block with the result.",at:"sable",real:1},
@@ -358,6 +357,7 @@ const S = [
  {t:"One slow daemon job doesn't stall others",w:"Each job now runs in its own thread.",c:"/schedule \"every minute sleep 600\"\n/schedule \"every minute date >> ~/tick.log\"",e:"tick.log keeps growing.",at:"sable",real:1},
  {t:"Double cancel ends the goal",w:"Pressing q twice used to re-propose the same command.",c:"(propose something, press q, press q again)",e:"Goal ends.",at:"sable",real:1}]},
 {id:"unk",n:"Unconfirmed features",e:"Check they exist first",d:"In the vision catalog but with no shipped evidence in the changelog. Mark Pass if found and working, Skip if not built.",t:[
+ {t:"C4 Environment fingerprint",w:"Sable records OS, services and tools at login. There is no /env command, and no fingerprint code was found in sable/.",c:"grep -rni fingerprint sable/",e:"Code present and used at login. Mark Skip if nothing is found.",at:"bash"},
  {t:"B6 Semantic skill retrieval",w:"Embedding-based skill matching.",c:"grep -rni embed sable/skills/",e:"Code present and used by the index.",at:"bash"},
  {t:"B8 Model-aware skill variants",w:"Different skill bodies per model.",c:"grep -rn variant sable/skills/",e:"Variant selection by model.",at:"bash"},
  {t:"G7 Runbook view",w:"Dedicated notebooks/runbooks UI.",c:"grep -rni runbook sable/ui/",e:"A view exists.",at:"bash"},
