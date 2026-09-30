@@ -481,6 +481,50 @@ def handle_builtin(
     return False
 
 
+#: What a bug inside a builtin raises. Named rather than `Exception` (CI bans
+#: that, structure.md 4.7), and between them these cover a programming error
+#: in any handler. KeyboardInterrupt and SystemExit are not here on purpose:
+#: Ctrl+C and /exit must still do what they say.
+BUILTIN_FAILURES = (
+    NameError, AttributeError, TypeError, ValueError, LookupError, ArithmeticError,
+    AssertionError, RuntimeError, ImportError, OSError, sqlite3.Error,
+)
+
+ERROR_LOG = os.path.join(os.path.expanduser("~"), ".sable", "errors.log")
+
+
+def handle_builtin_safely(line: str, db, session_id: str, config: ShellConfig,
+                          turns: list[dict] | None = None) -> bool:
+    """`handle_builtin`, but a crash in one command never ends the login shell.
+
+    `/memory` once raised NameError and took the whole session with it. Now
+    the failure is one red line, the traceback goes to ~/.sable/errors.log,
+    and the prompt comes back.
+    """
+    try:
+        return handle_builtin(line, db, session_id, config, turns=turns)
+    except BUILTIN_FAILURES as exc:
+        _report_failure(line, exc)
+        return True
+
+
+def _report_failure(line: str, exc: BaseException) -> None:
+    import time
+    import traceback
+    logged = True
+    try:
+        os.makedirs(os.path.dirname(ERROR_LOG), exist_ok=True)
+        with open(ERROR_LOG, "a", encoding="utf-8") as f:
+            f.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')}  {line}\n")
+            f.write("".join(traceback.format_exception(exc)))
+    except OSError:
+        logged = False
+    name = line.split()[0] if line.split() else line
+    _out(f"\033[38;5;203m✗ {name} failed\033[0m  \033[38;5;245m{type(exc).__name__}: {exc}\033[0m")
+    where = "full traceback in ~/.sable/errors.log · " if logged else ""
+    _out(f"\033[38;5;240m  {where}the shell is still running\033[0m")
+
+
 def _looks_like_a_command(cmd: str) -> bool:
     """`/word` that is not a real path: a builtin the user mistyped.
 

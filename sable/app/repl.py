@@ -19,7 +19,7 @@ from sable.core.config.schema import ShellConfig
 
 from sable.app import budget
 from sable.app import explain
-from sable.app.builtins.dispatch import handle_builtin as _handle_builtin
+from sable.app.builtins.dispatch import handle_builtin_safely as _handle_builtin
 
 # Still used directly by the loop: Ctrl+B records a router correction.
 from sable.app.builtins.route import _record_router_correction

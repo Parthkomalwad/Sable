@@ -127,6 +127,33 @@ class TestFormsFoundByTheLiveSmokeRun:
         csv.assert_called_once()
 
 
+class TestABrokenCommandKeepsTheShell:
+    def _safe(self, tmp_path, monkeypatch, raises):
+        from unittest.mock import MagicMock, patch
+        from sable.app.builtins import dispatch
+        monkeypatch.setattr(dispatch, "ERROR_LOG", str(tmp_path / "errors.log"))
+        with patch.object(dispatch, "handle_builtin", side_effect=raises):
+            return dispatch.handle_builtin_safely("/memory", MagicMock(), "s", MagicMock())
+
+    def test_a_bug_is_one_line_and_a_log_entry(self, tmp_path, monkeypatch, capsys):
+        assert self._safe(tmp_path, monkeypatch, NameError("name 'os' is not defined")) is True
+        out = capsys.readouterr().out
+        assert "/memory failed" in out and "NameError" in out and "still running" in out
+        log = (tmp_path / "errors.log").read_text()
+        assert "/memory" in log and "NameError" in log and "Traceback" in log
+
+    def test_exit_and_ctrl_c_are_not_swallowed(self, tmp_path, monkeypatch):
+        import pytest
+        for exc in (SystemExit(0), KeyboardInterrupt()):
+            with pytest.raises(type(exc)):
+                self._safe(tmp_path, monkeypatch, exc)
+
+    def test_the_repl_uses_the_safe_dispatcher(self):
+        from sable.app import repl
+        from sable.app.builtins.dispatch import handle_builtin_safely
+        assert repl._handle_builtin is handle_builtin_safely
+
+
 class TestUnknownCommands:
     def test_a_mistyped_builtin_is_answered_not_sent_to_bash(self, capsys):
         from unittest.mock import MagicMock
