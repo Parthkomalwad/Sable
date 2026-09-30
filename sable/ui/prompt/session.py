@@ -48,6 +48,10 @@ class _ShellCompleter(Completer):
         text = document.text_before_cursor
         words = text.split()
 
+        if text.lstrip().startswith("/"):
+            yield from _slash_completions(text)
+            return
+
         # If no words typed yet, or only one word being typed → complete command name
         if not words or (len(words) == 1 and not text.endswith(" ")):
             self._load_bins()
@@ -59,6 +63,51 @@ class _ShellCompleter(Completer):
 
         # Otherwise complete the current argument as a filesystem path
         yield from self._path_completer.get_completions(document, complete_event)
+
+
+def _slash_completions(text: str):
+    """Builtin names with their summaries, then the chosen command's subcommands.
+
+    Both come from the command catalog (ui/commands.py), the list /help reads.
+    """
+    from sable.ui.commands import COMMANDS, find, subcommands
+
+    words = text.split()
+    if len(words) == 1 and not text.endswith(" "):
+        prefix = words[0]
+        for c in COMMANDS:
+            if c.name.startswith(prefix):
+                yield Completion(c.name, start_position=-len(prefix),
+                                 display=c.name, display_meta=c.summary)
+        return
+    cmd = find(words[0])
+    if cmd is None:
+        return
+    typed = "" if text.endswith(" ") else words[-1]
+    if len(words) - (0 if text.endswith(" ") else 1) != 1:
+        return   # only the word straight after the command is a subcommand
+    for word, what in subcommands(cmd):
+        if word.startswith(typed):
+            yield Completion(word, start_position=-len(typed), display=word, display_meta=what)
+
+
+#: Completion menu colours, in the prompt's palette.
+COMPLETION_STYLE = {
+    "completion-menu": "bg:#1c2129 #c9d1d9",
+    "completion-menu.completion": "bg:#1c2129 #b4a9ff",
+    "completion-menu.completion.current": "bg:#3b3470 #ffffff bold",
+    "completion-menu.meta.completion": "bg:#1c2129 #7d8794",
+    "completion-menu.meta.completion.current": "bg:#3b3470 #d0cce8",
+    "scrollbar.background": "bg:#1c2129",
+    "scrollbar.button": "bg:#4d4690",
+}
+
+
+def slash_line_filter():
+    """True while the line being typed starts with `/`: the menu opens as you type."""
+    from prompt_toolkit.application.current import get_app
+    from prompt_toolkit.filters import Condition
+    return Condition(lambda: get_app().current_buffer.text.lstrip().startswith("/"))
 
 
 def _render_prompt(cwd: str, last_exit: int) -> str:

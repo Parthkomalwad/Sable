@@ -28,66 +28,13 @@ from sable.app.builtins.skill import _handle_skill_builtin
 from sable.app.builtins.stats import _show_stats, _show_stats_csv
 from sable.app.builtins.task import _handle_task_builtin
 from sable.core.config.schema import ShellConfig
+from sable.ui.commands import plain_help, show_help
 from sable.ui.console import out as _out
 
 
-_HELP_TEXT = (
-    "\nSable - Built-in Commands\n"
-    "----------------------------------\n"
-    "  /new           Start a fresh tmux session\n"
-    "  /clear         Clear the terminal screen\n"
-    "  /exit          Exit the shell\n"
-    "  /config        Open settings panel (Ctrl+X)\n"
-    "  /mode          Toggle routing: auto / prefix\n"
-    "  /model         Show current LLM model\n"
-    "  /stats         Last 7 days token usage\n"
-    "  /selfcheck     Weekly report from logs, no model calls\n"
-    "  /history       recent commands with AI costs\n"
-    "  /clip           Snippet clipboard (add/run/del)\n"
-    "  /task           Manage background agents\n"
-    "  /skill          Manage skill files\n"
-    "  /corrections   Commands you corrected (list, delete <id>)\n"
-    "  /alias \"phrase\" = <command>   Name a command in your own words\n"
-    "  /route why \"<line>\"  Explain how a line would be routed\n"
-    "  /why [agent]   What the model saw when it last decided\n"
-    "  /inbox [show|approve|reject K]  Everything waiting on you, in one list\n"
-    "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
-    "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
-    "  /mcp add|list|remove|trust|untrust  MCP servers and their tools\n"
-    "  /plugin add <folder>|list|remove <name>  Plugins: an MCP server plus skills and hooks\n"
-    "  /tools      Tools each agent role may call, and at which tier\n"
-    "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
-    "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
-    "  /watch add|list|rm  Daemon watchers: disk, file, log, http\n"
-    "  /mcp search <query> [--add N]  Find MCP servers in the official registry\n"
-    "  /host add|list|rm|test  Other servers, reached by SSH to their own Sable\n"
-    "  @NAME <command>, @all <command>  Run a command on a host (its policy applies)\n"
-    "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
-    "  /task replay <n>     Every turn of one agent, as the model saw it\n"
-    "  /task events <n>     The agent's event stream\n"
-    "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
-    "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
-    "  /tour           Guided walkthrough of what Sable does\n"
-    "  /theme <name>  Colours: default, mono, high-contrast\n"
-    "  /layout <name>  tmux panes: focus, fleet, minimal\n"
-    "  /budget reset  Clear hard-stop budget flag\n"
-    "  /palace [room|find <text>|why <id>|consolidate]  What Sable has learned, and from where\n"
-    "  /remember <text> [--room R]  Save a fact (room user by default)\n"
-    "  /forget <id>   Remove a fact from the palace\n"
-    "  /undo [list|<id>]  Put back what the last step changed (diff first, asks)\n"
-    "  /task diff|undo <n>  What a sub-agent's last step changed, or put it back\n"
-    "  /memory                  View current context\n"
-    "  /memory versions         List all saved snapshots\n"
-    "  /memory revert <id>      Restore a snapshot\n"
-    "  /memory clear            Clear active context\n"
-    "\n"
-    "  >> text        Force agentic (prefix mode)\n"
-    "  Ctrl+B         Next command runs as raw bash\n"
-    "  Ctrl+G         Steer a running agent\n"
-    "  Ctrl+P         Palette: builtins, skills, snippets, tasks\n"
-    "  ?  /  !        After a failed command: explain it / propose a fix\n"
-    "  Ctrl+T         Toggle telemetry sidebar\n"
-)
+#: Flat help text for the Ctrl+P palette, generated from the command catalog
+#: (ui/commands.py) so the palette, /help and Tab completion share one list.
+_HELP_TEXT = plain_help()
 
 
 _ALIAS_USAGE = 'usage: /alias "<phrase>" = <command>  |  /alias delete "<phrase>"'
@@ -293,9 +240,8 @@ def handle_builtin(
     turns = turns if turns is not None else []
     cmd = line.strip()
 
-    if cmd in ("/help", "/?"):
-        sys.stdout.write(_HELP_TEXT + "\n")
-        sys.stdout.flush()
+    if cmd in ("/help", "/?") or cmd.startswith(("/help ", "/? ")):
+        show_help(cmd.partition(" ")[2])
         return True
 
     if cmd == "/clear":
