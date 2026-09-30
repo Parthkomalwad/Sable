@@ -105,6 +105,43 @@ class TestHelpViews:
         assert any(l.startswith("/task new") for l in labels)
 
 
+class TestFormsFoundByTheLiveSmokeRun:
+    """Forms /help advertises that were broken when typed at a real prompt."""
+
+    def test_memory_does_not_crash_the_shell(self, capsys, monkeypatch):
+        """memory.py used `os` without importing it; the NameError ended Sable."""
+        from unittest.mock import MagicMock, patch
+        from sable.app.builtins.dispatch import handle_builtin
+        with patch("sable.memory.session.load_session_context", return_value=""), \
+             patch("sable.memory.session.list_versions", return_value=[]):
+            assert handle_builtin("/memory", MagicMock(), "s", MagicMock())
+            assert handle_builtin("/memory versions", MagicMock(), "s", MagicMock())
+        assert "No saved memory versions." in capsys.readouterr().out
+
+    def test_stats_csv_is_a_builtin(self):
+        """Only `shell stats --csv` was handled; `/stats --csv` went to bash."""
+        from unittest.mock import MagicMock, patch
+        from sable.app.builtins.dispatch import handle_builtin
+        with patch("sable.app.builtins.dispatch._show_stats_csv") as csv:
+            assert handle_builtin("/stats --csv", MagicMock(), "s", MagicMock())
+        csv.assert_called_once()
+
+
+class TestUnknownCommands:
+    def test_a_mistyped_builtin_is_answered_not_sent_to_bash(self, capsys):
+        from unittest.mock import MagicMock
+        from sable.app.builtins.dispatch import handle_builtin
+        assert handle_builtin("/tsk list", MagicMock(), "s", MagicMock())
+        out = capsys.readouterr().out
+        assert "no command /tsk" in out and "/task" in out
+
+    def test_real_paths_still_go_to_bash(self, tmp_path):
+        from unittest.mock import MagicMock
+        from sable.app.builtins.dispatch import handle_builtin
+        for line in ("/bin/ls -la", "/usr/bin/env python3", "/tmp", "/Upper"):
+            assert handle_builtin(line, MagicMock(), "s", MagicMock()) is False, line
+
+
 class TestCompletion:
     def test_slash_lists_commands_with_summaries(self):
         got = dict(_complete("/ta"))

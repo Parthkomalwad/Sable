@@ -453,7 +453,7 @@ def handle_builtin(
             run_clip_command(remainder, db)
         return True
 
-    if cmd == "shell stats --csv":
+    if cmd in ("/stats --csv", "shell stats --csv"):
         _show_stats_csv(db)
         return True
 
@@ -472,4 +472,21 @@ def handle_builtin(
         _handle_memory_builtin(subcmd, session_id, turns)
         return True
 
+    if _looks_like_a_command(cmd):
+        # A mistyped builtin used to fall through to bash, which answered
+        # "/bin/bash: /nope: No such file or directory".
+        show_help(cmd.split()[0])
+        return True
+
     return False
+
+
+def _looks_like_a_command(cmd: str) -> bool:
+    """`/word` that is not a real path: a builtin the user mistyped.
+
+    `/bin/ls`, `/usr/bin/env python3` and `/opt/app` (when it exists) stay
+    bash's: only a single-segment name with nothing on disk is claimed.
+    """
+    import re
+    word = cmd.split()[0] if cmd.split() else ""
+    return bool(re.fullmatch(r"/[a-z][a-z0-9-]*", word)) and not os.path.exists(word)
