@@ -1,100 +1,120 @@
 """Tasks panel runs in the bottom tmux pane.
 
-Polls the tasks table every 3 seconds and renders a live Rich table.
+Polls the tasks table every 3 seconds and renders a short list in the
+sidebar's style: a quiet TASKS label, one line per task with a status dot,
+and no box. With nothing running it is a single hint line, and the pane
+shrinks to fit it; it grows back as tasks appear, up to MAX_ROWS.
 """
 from __future__ import annotations
 
 import os
 import sqlite3
+import subprocess
 import time
 
 os.environ["PROMPT_TOOLKIT_NO_CPR"] = "1"
 
 from rich.console import Console
-from rich.table import Table
 from rich.live import Live
-from rich.panel import Panel
-from rich import box as rich_box
 from rich.text import Text
 
 from sable.core.db import DB_PATH
 
 console = Console()
 
+MAX_ROWS = 8
+
+GREEN, PURPLE, AMBER, RED = "color(114)", "color(141)", "color(179)", "color(203)"
+TEXT, DIM, FAINT = "color(252)", "color(245)", "color(240)"
+
+#: tasks.status -> (dot colour, what a human reads, still live)
 _STATUS = {
-    "running":   ("●", "bright_green"),
-    "done":      ("✓", "green"),
-    "completed": ("✓", "green"),
-    "paused":    ("⏸", "yellow"),
-    "lost":      ("✗", "bright_red"),
-    "starting":  ("◌", "cyan"),
+    "starting":  (PURPLE, "thinking", True),
+    "running":   (GREEN, "running", True),
+    "paused":    (AMBER, "paused", True),
+    "completed": (DIM, "done", False),
+    "done":      (DIM, "done", False),
+    "failed":    (RED, "failed", False),
+    "lost":      (RED, "lost", False),
 }
 
 
-def _build(conn: sqlite3.Connection) -> Panel:
-    table = Table(
-        box=rich_box.SIMPLE,
-        show_header=True,
-        header_style="bold color(245)",
-        padding=(0, 2),
-        expand=True,
-        show_edge=False,
-    )
-    table.add_column("",      width=2,  no_wrap=True)
-    table.add_column("TASK",  min_width=10, no_wrap=True)
-    table.add_column("ST",    width=4,  no_wrap=True, justify="right")
-    table.add_column("GOAL",  min_width=20, no_wrap=True)
-    table.add_column("COST",  width=9,  no_wrap=True, justify="right")
-
+def _fetch(conn: sqlite3.Connection) -> list[tuple]:
     try:
-        rows = conn.execute(
+        return conn.execute(
             """SELECT t.name, t.status, t.step_count, t.goal,
                       COALESCE(SUM(e.cost_usd), 0.0)
                FROM tasks t
                LEFT JOIN task_events e ON e.task_name = t.name
                GROUP BY t.name
-               ORDER BY t.id DESC LIMIT 8"""
+               ORDER BY t.id DESC LIMIT ?""", (MAX_ROWS,)
         ).fetchall()
     except sqlite3.OperationalError:
-        rows = []
+        return []
 
+
+def render(rows: list[tuple], width: int) -> Text:
+    """The whole panel as one Text: a header line, then one line per task."""
+    t = Text(no_wrap=True, overflow="ellipsis")
+    t.append("TASKS", style=f"bold {DIM}")
     if not rows:
-        table.add_row("", Text("no tasks yet", style="dim"), "", "", "")
-    else:
-        for i, (name, status, steps, goal, cost) in enumerate(rows):
-            sym, col = _STATUS.get(status, ("?", "white"))
-            goal_str = f'"{(goal or "")[:55]}"'
-            cost_str = f"${cost:.4f}"
+        t.append("   none · ", style=FAINT)
+        t.append("/task new <name> <goal>", style=PURPLE)
+        return t
 
-            # Alternate row shading
-            row_style = "on color(234)" if i % 2 == 0 else "on color(236)"
+    live = sum(1 for r in rows if _STATUS.get(r[1], (None, None, False))[2])
+    t.append(f"   {len(rows)} shown · {live} running", style=FAINT)
+    goal_width = max(10, width - 2 - 22 - 10 - 9 - 10)
+    for name, status, steps, goal, cost in rows:
+        colour, label, is_live = _STATUS.get(status, (DIM, status or "?", False))
+        t.append("\n")
+        t.append("● ", style=colour)
+        t.append(f"{name[:20]:<22}", style=f"bold {TEXT}" if is_live else DIM)
+        t.append(f"{label:<10}", style=colour if is_live else FAINT)
+        t.append(f"step {steps or 0:<4}", style=FAINT)
+        g = (goal or "").replace("\n", " ")
+        g = g if len(g) <= goal_width else g[:goal_width - 1] + "…"
+        t.append(f"{g:<{goal_width}}", style=DIM)
+        t.append(f"{'$%.4f' % cost:>10}", style=PURPLE if cost else FAINT)
+    return t
 
-            table.add_row(
-                Text(sym, style=col),
-                Text(name, style=f"bold color(75)"),
-                Text(str(steps or 0), style="color(220)"),
-                Text(goal_str, style="color(252)"),
-                Text(cost_str, style="color(141)"),
-                style=row_style,
-            )
 
-    return Panel(
-        table,
-        title="[bold color(75)] ◈ TASKS [/bold color(75)]",
-        border_style="color(27)",
-        padding=(0, 0),
-    )
+def pane_height(rows: list[tuple]) -> int:
+    """One line for the hint when empty; header, rows and a spare line otherwise."""
+    return 2 if not rows else min(len(rows), MAX_ROWS) + 2
+
+
+def _fit_pane(height: int) -> None:
+    """Resize this tmux pane to `height` if it is not already. Outside tmux, nothing.
+
+    Reads the real height each time rather than remembering the last one: a
+    client resize makes tmux re-split the window, and a remembered height
+    would then never be put back.
+    """
+    pane = os.environ.get("TMUX_PANE")
+    if not pane:
+        return
+    try:
+        now = subprocess.run(["tmux", "display-message", "-p", "-t", pane, "#{pane_height}"],
+                             capture_output=True, text=True, timeout=1).stdout.strip()
+        if now != str(height):
+            subprocess.run(["tmux", "resize-pane", "-t", pane, "-y", str(height)],
+                           capture_output=True, timeout=1)
+    except (OSError, subprocess.SubprocessError):
+        pass
 
 
 def main() -> None:
     # Clear the pane before starting so the startup command isn't visible
-    os.system("clear")
+    console.clear()
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
 
     with Live(console=console, refresh_per_second=1, screen=False) as live:
         while True:
-            live.update(_build(conn))
+            rows = _fetch(conn)
+            _fit_pane(pane_height(rows))
+            live.update(render(rows, console.width))
             time.sleep(3)
 
 

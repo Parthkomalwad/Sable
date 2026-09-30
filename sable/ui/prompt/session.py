@@ -62,17 +62,16 @@ class _ShellCompleter(Completer):
 
 
 def _render_prompt(cwd: str, last_exit: int) -> str:
-    """Return a Powerline-style prompt string for prompt_toolkit HTML().
+    """The prompt: `~/api main ✓ ❯`, as in the README.
 
-    Segments: [path block] [git branch block] [time block] ❯
-    Uses ANSI 256-color codes via HTML() spans.
-    Falls back gracefully if git is unavailable.
+    Path, then branch when there is one, then the last exit: a check, or a
+    cross with the code. The cursor is the accent colour. The time used to
+    sit here too; the tmux status bar carries it now.
     """
     import subprocess
-    import time as _time
 
     home = str(Path.home())
-    display_cwd = cwd.replace(home, "~") if cwd.startswith(home) else cwd
+    display_cwd = cwd.replace(home, "~", 1) if cwd.startswith(home) else cwd
 
     # Git branch (silent fail)
     branch = ""
@@ -86,21 +85,18 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
         # No git, or not a repo. The prompt simply loses its branch segment.
         pass
 
-    hhmm = _time.strftime("%H:%M")
-
     from sable.ui.theme import sgr
 
     # Colours come from the active G6 theme (ui/theme.py).
-    reset = '\033[0m'
-    path_seg = f"{sgr('path')} {display_cwd} {reset}{sgr('path_arrow')}\ue0b0{reset}"
-    git_seg = ""
+    reset = "\033[0m"
+    parts = [f"{sgr('path')}{display_cwd}{reset}"]
     if branch:
-        git_seg = f"{sgr('git')}  {branch} {reset}{sgr('git_arrow')}\ue0b0{reset}"
-    time_seg = f"{sgr('time')} {hhmm} {reset} "
-    # The cursor takes the theme's error colour after a non-zero exit
-    cursor = f"{sgr('err' if last_exit != 0 else 'ok')}\u276f{reset}"
-
-    return path_seg + git_seg + time_seg + cursor + ' '
+        parts.append(f"{sgr('git')}{branch}{reset}")
+    if last_exit == 0:
+        parts.append(f"{sgr('ok')}✓{reset}")
+    else:
+        parts.append(f"{sgr('err')}✗ {last_exit}{reset}")
+    return " ".join(parts) + f" {sgr('accent')}❯{reset} "
 
 
 #: Ctrl+B's request, taken by the REPL before it routes the next line. It

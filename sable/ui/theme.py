@@ -11,20 +11,21 @@ import os
 import stat
 
 THEMES: dict[str, dict[str, str]] = {
+    # Roles: path (cwd), git (branch), ok (the check after a clean exit),
+    # err (the cross and exit code after a failure), dim (hints), accent
+    # (the cursor and Sable's own marks). Foreground only: the prompt is plain
+    # text on the terminal's background, like the README mockup.
     "default": {
-        "path": "48;5;24;97", "git": "48;5;55;97", "time": "48;5;236;2;37",
-        "path_arrow": "38;5;24;48;5;55", "git_arrow": "38;5;55;48;5;236",
-        "ok": "0;37", "err": "38;5;203", "dim": "2;37", "accent": "38;5;141",
+        "path": "1;38;5;153", "git": "38;5;114",
+        "ok": "38;5;114", "err": "38;5;203", "dim": "2;37", "accent": "38;5;141",
     },
     "mono": {
-        "path": "48;5;238;97", "git": "48;5;240;97", "time": "48;5;236;37",
-        "path_arrow": "38;5;238;48;5;240", "git_arrow": "38;5;240;48;5;236",
-        "ok": "0;37", "err": "1;37", "dim": "2;37", "accent": "1;37",
+        "path": "1;37", "git": "37",
+        "ok": "37", "err": "1;37", "dim": "2;37", "accent": "1;37",
     },
     "high-contrast": {
-        "path": "48;5;21;1;97", "git": "48;5;90;1;97", "time": "48;5;16;1;97",
-        "path_arrow": "38;5;21;48;5;90", "git_arrow": "38;5;90;48;5;16",
-        "ok": "1;97", "err": "1;91", "dim": "0;97", "accent": "1;93",
+        "path": "1;97", "git": "1;93",
+        "ok": "1;92", "err": "1;91", "dim": "0;97", "accent": "1;93",
     },
 }
 

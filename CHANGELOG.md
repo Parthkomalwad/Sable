@@ -4,6 +4,18 @@ All notable changes are recorded here. Format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Changed
+- **Sidebar matches the README telemetry mockup.** Quiet uppercase section labels with no boxes; SESSION shows today's cost, tokens in and out, the model, and a budget bar when `daily_token_budget` is set; AGENTS shows a status dot, the name, and a second line with state and step; SYSTEM has thin cpu / mem / disk line meters that turn red past 90%; 7-DAY TOKENS is a three-row bar chart with weekday initials. The inbox and snippets sections appear only when they have something in them. The shortcut hint fits on one line. 9 new tests.
+
+- **First screen polish.** The welcome is now the name and version, the backend and directory, and three starter hints (`try`, `/tour`, `/help`); it says "mock responses" when `SABLE_MOCK_LLM` is set. The prompt follows the README, `~/api main ✓ ❯`: path, branch, a check or a red cross with the exit code, and an accent cursor; the time moved to the status bar. The tasks pane dropped its box for the sidebar's style and sizes its own pane: one hint line when empty, a line per task otherwise. The tmux look (dark status bar with `◆ sable`, host and time; thin grey borders with a purple active edge) lives in `sable/data/tmux-theme.conf`, used by the playground and sourced by `install.sh`. The sidebar uses the terminal's background so the panes read as one surface. 12 new tests.
+
+### Fixed
+- **`playground.ps1 tests` and `playground.ps1 bash` did nothing useful.** The image ran its entry script as `CMD`, which the mode argument replaced. It is now an `ENTRYPOINT` that also prefers the repo's copy of `playground-entry.sh`, so editing that script needs a relaunch rather than a rebuild.
+- **`test_dash` failed now and then.** The `/dash` refresh timer looked for its panels on whichever screen was active, and while a confirm dialog was up that was the dialog. The refresh now waits for the dialog to close.
+- **The sidebar said "not a git repo" in the Windows playground.** `git status` on the bind-mounted repo takes over two seconds and the sidebar allowed one, so the timeout read as no repo at all. Git now runs in its own worker every five seconds, the branch lookup and the status scan have separate timeouts, and a slow status still shows the branch.
+- **Playground panes started inside Sable, so `/exit` looked broken.** Root's login shell in the playground image is Sable, and tmux opens panes with it, so the commands `playground-entry.sh` typed into each pane went through the router. The main pane ran a second Sable nested in the first (`/exit` left only the inner one and dropped back to the outer prompt), and the sidebar and tasks loops drew over each other. The entry script now sets `SHELL=/bin/bash` before starting tmux, and `/exit` in the playground drops to bash with `sable` to return, as on a real install. The playground also calls `sable.*` modules directly instead of the deprecated `shell.*` names.
+- **A bare `exit` or `logout` now leaves Sable.** The router sent it to bash as a builtin, which ran `bash -c exit` and closed only a child process. It is now handled like `/exit`, the same way `cd` is intercepted. `exit N` works too; lines such as `echo exit` or `exit && ls` are unchanged. 9 tests.
+
 ## [1.0.0] - 2026-09-29 (v0.4 to v1.0: autonomy, MCP, memory, safety, ecosystem)
 
 ### Added

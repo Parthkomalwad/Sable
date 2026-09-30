@@ -119,26 +119,9 @@ unbind C-b
 set -g prefix C-a
 bind C-a send-prefix
 
-# ── Status bar at TOP ─────────────────────────────────────────────────────────
-set -g status-position top
-set -g status-style          "bg=colour234,fg=colour250"
-set -g status-left-length    30
-set -g status-right-length   40
-
-# Left: session name in a bold cyan pill
-set -g status-left  "#[bg=colour27,fg=colour255,bold] ◈ #S #[bg=colour234,fg=colour27]▶ "
-
-# Right: user@host + time
-set -g status-right "#[fg=colour244] #H #[fg=colour240]│#[fg=colour250,bold] %H:%M "
-
-# Inactive windows: dimmed, padded
-set -g window-status-format         "#[bg=colour236,fg=colour244] #I  #W #[bg=colour234,fg=colour236]▎"
-set -g window-status-current-format "#[bg=colour27,fg=colour255,bold] #I  #W #[bg=colour234,fg=colour27]▶"
-set -g window-status-separator      ""
-
-# Pane borders
-set -g pane-border-style        "fg=colour238"
-set -g pane-active-border-style "fg=colour27"
+# ── Status bar and pane borders ───────────────────────────────────────────────
+# The look lives in sable/data/tmux-theme.conf, shared with the playground;
+# the source-file line pointing at it is appended below this file.
 
 # ── Window switching: Alt+Number jumps directly (0-indexed) ──────────────────
 # Alt+1 = main shell (window 0), Alt+2 = first task (window 1), etc.
@@ -159,6 +142,7 @@ bind -n M-t last-window
 bind -n WheelUpPane   if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" "send-keys -M" "copy-mode -e; send-keys -M"
 bind -n WheelDownPane if-shell -F "#{?pane_in_mode,1,#{?alternate_screen,1,0}}" "send-keys -M" "send-keys -M"
 TMUX_EOF
+echo "source-file $INSTALL_DIR/sable/data/tmux-theme.conf" | sudo -u "$REAL_USER" tee -a "$REAL_HOME/.tmux.conf" >/dev/null
 
 echo "==> Enabling unprivileged user namespaces (required for bwrap sandbox)"
 SYSCTL_CONF="/etc/sysctl.d/99-sable.conf"

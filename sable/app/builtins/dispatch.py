@@ -273,6 +273,14 @@ def _handle_corrections_builtin(argument: str, db) -> bool:
     return True
 
 
+def _is_exit_word(cmd: str) -> bool:
+    """`exit`, `logout`, or `exit N` on its own, and nothing longer."""
+    parts = cmd.split()
+    if not parts or parts[0] not in ("exit", "logout"):
+        return False
+    return len(parts) == 1 or (len(parts) == 2 and parts[1].isdigit())
+
+
 def handle_builtin(
     line: str, db, session_id: str, config: ShellConfig,
     turns: list[dict] | None = None,
@@ -294,7 +302,10 @@ def handle_builtin(
         os.system("clear")
         return True
 
-    if cmd in ("/exit", "/quit"):
+    # A bare `exit` or `logout` means the same thing. Routed to bash it ran
+    # `bash -c exit`, which closed a child and left the user in Sable: the
+    # trap `cd` is intercepted for.
+    if cmd in ("/exit", "/quit") or _is_exit_word(cmd):
         import pathlib
         pathlib.Path.home().joinpath(".local", "share", "agentic-shell", "exit_requested").touch()
         # Detect repeated command patterns and draft them as skills.

@@ -60,6 +60,11 @@ class DashApp(App):
         self.set_interval(1.0, self.refresh_data)
 
     def refresh_data(self) -> None:
+        # query_one looks on the active screen. While a confirm dialog is up
+        # that is the dialog, and #lanes is not there: the 1 s timer then
+        # raised NoMatches, which made test_dash fail now and then.
+        if isinstance(self.screen, ModalScreen):
+            return
         agents = state.agents(self.db_path)
         graph = state.lanes(self.db_path)
         lanes = ["[b]plan graph[/b]  " + "  ".join(f"{escape(i)} ({s})" for i, s in graph), ""] if graph else []

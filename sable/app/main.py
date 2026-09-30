@@ -225,6 +225,36 @@ def _share(args: list[str]) -> int:
     return 0
 
 
+#: Starter lines under the banner: one thing to say, two commands to know.
+WELCOME_HINTS = [
+    ("try", "show me the biggest files here", None),
+    ("", "/tour", "2-minute walkthrough"),
+    ("", "/help", "every command"),
+]
+
+
+def _welcome(config) -> str:
+    """The first thing a login shows: name, what it talks to, where you are."""
+    from sable import __version__
+
+    accent, bold, dim, faint, reset = ("\033[38;5;141m", "\033[1;38;5;255m",
+                                       "\033[38;5;245m", "\033[38;5;240m", "\033[0m")
+    home, cwd = os.path.expanduser("~"), os.getcwd()
+    where = "~" + cwd[len(home):] if cwd.startswith(home) else cwd
+    backend = "mock responses" if os.environ.get("SABLE_MOCK_LLM") else f"{config.backend} · {config.model}"
+    lines = [
+        "",
+        f"  {accent}◆{reset} {bold}sable{reset} {faint}{__version__}{reset}",
+        f"  {dim}{backend} · {where}{reset}",
+        "",
+    ]
+    for label, text, note in WELCOME_HINTS:
+        cmd = f"{accent}{text}{reset}" if text.startswith("/") else f"\033[38;5;252m{text}{reset}"
+        tail = f"   {dim}{note}{reset}" if note else ""
+        lines.append(f"  {faint}{label:<4}{reset} {cmd}{tail}")
+    return "\n".join(lines) + "\n"
+
+
 def _report_degradations() -> None:
     """Print one line per degraded capability, with what to do about it (I7).
 
@@ -366,8 +396,7 @@ def main(argv: list[str] | None = None) -> None:
     from sable.app import repl as loop# lazy import to avoid circular imports
 
     # Welcome banner (screen already cleared by wrapper before Python starts)
-    sys.stdout.write("\n\033[38;5;141m  ✦ Sable\033[0m\n")
-    sys.stdout.write(f"\033[2;37m  {config.backend} · {config.model}  |  type naturally or use bash directly\033[0m\n")
+    sys.stdout.write(_welcome(config))
 
     # I7: anything running in a reduced capability says so here, once, with
     # what still works. A silent fallback is the failure this prevents.
