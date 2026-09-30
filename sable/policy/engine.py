@@ -184,13 +184,21 @@ def _warn(label: str, command: str, why: str) -> None:
 
 def _confirm(command: str, d: Decision) -> bool:
     """Show which rule fired and why, and require the literal word YES."""
-    _warn(f"{d.tier.value.upper()}  {d.rule.name}", command, d.why)
     from sable.policy import blast
-    sys.stdout.write(f"  {blast.tag(command)}  \033[2;37mtier {d.tier.value}\033[0m\n")
+    from sable.policy import approval
+    level = blast.classify(command)
+    colour = blast.COLOURS[level]
+    label = f"{d.tier.value.upper()} · {d.rule.name}" if d.rule else d.tier.value.upper()
+    sys.stdout.write("\n" + approval.yes_card(label, command, d.why, colour, level.value) + "\n")
+    sys.stdout.flush()
     try:
-        answer = input("  type YES to confirm: ").strip()
+        answer = input(f"    {approval.TEXT}type {approval.KEY}YES{approval.RESET}"
+                       f"{approval.TEXT} to run, anything else cancels{approval.RESET} "
+                       f"{approval.FAINT}›{approval.RESET} ").strip()
     except (EOFError, KeyboardInterrupt):
+        sys.stdout.write(approval.outcome(False) + "\n")
         return False
+    sys.stdout.write(approval.outcome(answer == "YES") + "\n")
     return answer == "YES"
 
 
