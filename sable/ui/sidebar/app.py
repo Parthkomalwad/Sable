@@ -108,7 +108,10 @@ def _git() -> str:
     cwd = watch._current_dir().replace("~", os.path.expanduser("~"))
 
     def git(*args, timeout):
-        return subprocess.run(["git", "-C", cwd, *args], capture_output=True,
+        # --no-optional-locks: `status` otherwise takes index.lock to refresh
+        # the index, and a sidebar polling every few seconds then collides
+        # with the user's own commits ("index.lock: File exists").
+        return subprocess.run(["git", "--no-optional-locks", "-C", cwd, *args], capture_output=True,
                               text=True, timeout=timeout).stdout.strip()
     try:
         branch = git("branch", "--show-current", timeout=2)

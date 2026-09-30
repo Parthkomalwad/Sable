@@ -171,3 +171,19 @@ def test_git_reports_dirty_count(monkeypatch):
     monkeypatch.setattr(watch, "_current_dir", lambda: "/app")
     monkeypatch.setattr(sidebar.subprocess, "run", fake_run)
     assert sidebar._git() == "main  2 dirty  ↑2"
+
+
+def test_git_never_takes_the_index_lock(monkeypatch):
+    """A polling `git status` that refreshes the index holds index.lock, and
+    the user's own commit then fails with "File exists"."""
+    import subprocess as sp
+    from sable.ui.sidebar import watch
+    seen = []
+
+    def fake_run(cmd, **kw):
+        seen.append(cmd)
+        return sp.CompletedProcess(cmd, 0, stdout="main" if "branch" in cmd else "", stderr="")
+    monkeypatch.setattr(watch, "_current_dir", lambda: "/app")
+    monkeypatch.setattr(sidebar.subprocess, "run", fake_run)
+    sidebar._git()
+    assert seen and all("--no-optional-locks" in cmd for cmd in seen)
