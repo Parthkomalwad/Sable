@@ -138,7 +138,7 @@ jobs:
       # so a run whose Dockerfiles and dependencies are unchanged reuses the
       # apt and pip layers instead of rebuilding them. `load: true` puts the
       # result in the local daemon, where the `docker run` steps expect it.
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build playground image
         uses: docker/build-push-action@v6
