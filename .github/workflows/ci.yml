@@ -141,7 +141,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build playground image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile.playground
@@ -156,7 +156,7 @@ jobs:
       # built it, so nothing noticed. Building it here is cheap and catches the
       # next drift; the run asserts it can actually start.
       - name: Build production image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
