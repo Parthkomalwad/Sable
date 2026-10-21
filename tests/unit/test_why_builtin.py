@@ -56,9 +56,15 @@ class TestWhyRouting:
     def test_why_with_an_agent_is_handled(self, replay_db, capsys):
         assert _dispatch("/why some-agent") is True
 
-    def test_an_unrelated_line_is_not_claimed(self, replay_db):
-        """`/whydoesthis` must not be swallowed by a prefix match."""
-        assert _dispatch("/whydoesthis") is False
+    def test_an_unrelated_line_is_not_claimed(self, replay_db, capsys):
+        """`/whydoesthis` must not be swallowed by a prefix match of /why.
+
+        It is answered as an unknown command rather than falling to bash.
+        """
+        assert _dispatch("/whydoesthis") is True
+        out = capsys.readouterr().out
+        assert "no command /whydoesthis" in out
+        assert "nothing recorded yet" not in out
 
     def test_why_appears_in_the_help_text(self, capsys):
         _dispatch("/help")

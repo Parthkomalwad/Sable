@@ -48,6 +48,10 @@ class _ShellCompleter(Completer):
         text = document.text_before_cursor
         words = text.split()
 
+        if text.lstrip().startswith("/"):
+            yield from _slash_completions(text)
+            return
+
         # If no words typed yet, or only one word being typed → complete command name
         if not words or (len(words) == 1 and not text.endswith(" ")):
             self._load_bins()
@@ -61,18 +65,62 @@ class _ShellCompleter(Completer):
         yield from self._path_completer.get_completions(document, complete_event)
 
 
-def _render_prompt(cwd: str, last_exit: int) -> str:
-    """Return a Powerline-style prompt string for prompt_toolkit HTML().
+def _slash_completions(text: str):
+    """Builtin names with their summaries, then the chosen command's subcommands.
 
-    Segments: [path block] [git branch block] [time block] ❯
-    Uses ANSI 256-color codes via HTML() spans.
-    Falls back gracefully if git is unavailable.
+    Both come from the command catalog (ui/commands.py), the list /help reads.
+    """
+    from sable.ui.commands import COMMANDS, find, subcommands
+
+    words = text.split()
+    if len(words) == 1 and not text.endswith(" "):
+        prefix = words[0]
+        for c in COMMANDS:
+            if c.name.startswith(prefix):
+                yield Completion(c.name, start_position=-len(prefix),
+                                 display=c.name, display_meta=c.summary)
+        return
+    cmd = find(words[0])
+    if cmd is None:
+        return
+    typed = "" if text.endswith(" ") else words[-1]
+    if len(words) - (0 if text.endswith(" ") else 1) != 1:
+        return   # only the word straight after the command is a subcommand
+    for word, what in subcommands(cmd):
+        if word.startswith(typed):
+            yield Completion(word, start_position=-len(typed), display=word, display_meta=what)
+
+
+#: Completion menu colours, in the prompt's palette.
+COMPLETION_STYLE = {
+    "completion-menu": "bg:#1c2129 #c9d1d9",
+    "completion-menu.completion": "bg:#1c2129 #b4a9ff",
+    "completion-menu.completion.current": "bg:#3b3470 #ffffff bold",
+    "completion-menu.meta.completion": "bg:#1c2129 #7d8794",
+    "completion-menu.meta.completion.current": "bg:#3b3470 #d0cce8",
+    "scrollbar.background": "bg:#1c2129",
+    "scrollbar.button": "bg:#4d4690",
+}
+
+
+def slash_line_filter():
+    """True while the line being typed starts with `/`: the menu opens as you type."""
+    from prompt_toolkit.application.current import get_app
+    from prompt_toolkit.filters import Condition
+    return Condition(lambda: get_app().current_buffer.text.lstrip().startswith("/"))
+
+
+def _render_prompt(cwd: str, last_exit: int) -> str:
+    """The prompt: `~/api main ✓ ❯`, as in the README.
+
+    Path, then branch when there is one, then the last exit: a check, or a
+    cross with the code. The cursor is the accent colour. The time used to
+    sit here too; the tmux status bar carries it now.
     """
     import subprocess
-    import time as _time
 
     home = str(Path.home())
-    display_cwd = cwd.replace(home, "~") if cwd.startswith(home) else cwd
+    display_cwd = cwd.replace(home, "~", 1) if cwd.startswith(home) else cwd
 
     # Git branch (silent fail)
     branch = ""
@@ -86,21 +134,18 @@ def _render_prompt(cwd: str, last_exit: int) -> str:
         # No git, or not a repo. The prompt simply loses its branch segment.
         pass
 
-    hhmm = _time.strftime("%H:%M")
-
     from sable.ui.theme import sgr
 
     # Colours come from the active G6 theme (ui/theme.py).
-    reset = '\033[0m'
-    path_seg = f"{sgr('path')} {display_cwd} {reset}{sgr('path_arrow')}\ue0b0{reset}"
-    git_seg = ""
+    reset = "\033[0m"
+    parts = [f"{sgr('path')}{display_cwd}{reset}"]
     if branch:
-        git_seg = f"{sgr('git')}  {branch} {reset}{sgr('git_arrow')}\ue0b0{reset}"
-    time_seg = f"{sgr('time')} {hhmm} {reset} "
-    # The cursor takes the theme's error colour after a non-zero exit
-    cursor = f"{sgr('err' if last_exit != 0 else 'ok')}\u276f{reset}"
-
-    return path_seg + git_seg + time_seg + cursor + ' '
+        parts.append(f"{sgr('git')}{branch}{reset}")
+    if last_exit == 0:
+        parts.append(f"{sgr('ok')}✓{reset}")
+    else:
+        parts.append(f"{sgr('err')}✗ {last_exit}{reset}")
+    return " ".join(parts) + f" {sgr('accent')}❯{reset} "
 
 
 #: Ctrl+B's request, taken by the REPL before it routes the next line. It

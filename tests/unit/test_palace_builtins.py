@@ -120,4 +120,7 @@ def test_dispatch_routes(capsys):
     assert handle_builtin("/remember hi there", None, "s", None)
     assert handle_builtin("/palace", None, "s", None)
     assert "user" in capsys.readouterr().out
-    assert not handle_builtin("/palaces", None, "s", None)
+    # Not a prefix match for /palace: answered as an unknown command instead.
+    assert handle_builtin("/palaces", None, "s", None)
+    out = capsys.readouterr().out
+    assert "no command /palaces" in out and "did you mean /palace" in out

@@ -191,3 +191,21 @@ class TestThePendingCountAtStartup:
 
         assert "1 draft skill" in line
         assert "skills pending" not in line
+
+
+class TestBareExitLeavesSable:
+    """`exit` typed at the Sable prompt used to go to the router, which
+    listed it as a bash builtin and ran `bash -c exit`. That closed a child
+    bash and nothing else, so the user stayed in Sable. `cd` has the same
+    trap and is intercepted for the same reason."""
+
+    @pytest.mark.parametrize("line", ["exit", "logout", "  exit  ", "exit 0", "exit 1"])
+    def test_exit_words_leave_like_slash_exit(self, home, config, line):
+        with patch("sable.skills.watcher.PatternWatcher") as watcher_cls:
+            watcher_cls.return_value.observe.return_value = []
+            with pytest.raises(SystemExit):
+                handle_builtin(line, db=MagicMock(), session_id="s", config=config)
+
+    @pytest.mark.parametrize("line", ["exit_code=3", "exits", "echo exit", "exit && ls"])
+    def test_lines_that_only_contain_exit_are_not_builtins(self, home, config, line):
+        assert handle_builtin(line, db=MagicMock(), session_id="s", config=config) is False

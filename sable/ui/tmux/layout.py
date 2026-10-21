@@ -48,7 +48,8 @@ def create_session(username: str) -> None:
         session_name = f"sable-{username}"
 
         # If session already exists, attach and return
-        existing = server.find_where({"session_name": session_name})
+        # find_where() was removed in libtmux 0.17; sessions.get() replaces it.
+        existing = server.sessions.get(session_name=session_name, default=None)
         if existing:
             os.execvp("tmux", ["tmux", "attach-session", "-t", session_name])
             return
@@ -104,60 +105,35 @@ def create_session(username: str) -> None:
         return
 
 
+#: Width the sidebar is restored to; the playground and install.sh split it at 48.
+SIDEBAR_WIDTH = 48
+
+
 def toggle_sidebar() -> None:
-    """Toggle visibility of the telemetry sidebar pane."""
+    """Show or hide the telemetry sidebar (Ctrl+T, and /bash hides it).
+
+    The sidebar is the pane on the window's right edge that is not this one.
+    Plain tmux rather than libtmux: the libtmux version here removed the
+    `find_where` this used, and the DeprecatedError it raised ended the shell.
+    Hidden means one column wide; shown means SIDEBAR_WIDTH.
+    """
     if not os.environ.get("TMUX"):
         return
-
+    me = os.environ.get("TMUX_PANE", "")
     try:
-        import libtmux
-
-        server = libtmux.Server()
-        session = server.find_where({"session_name": os.environ.get("TMUX_SESSION", "")})
-        if not session:
-            # Try to find current session from TMUX env
-            tmux_env = os.environ.get("TMUX", "")
-            # TMUX=socket,pid,session_id use list-panes approach
-            import subprocess
-            result = subprocess.run(
-                ["tmux", "display-message", "-p", "#{session_name}"],
-                capture_output=True, text=True,
-            )
-            session_name = result.stdout.strip()
-            session = server.find_where({"session_name": session_name})
-
-        if not session:
+        listing = subprocess.run(
+            ["tmux", "list-panes", "-F", "#{pane_id} #{pane_at_right} #{pane_at_left} #{pane_width}"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout
+        right = [row.split() for row in listing.splitlines() if row.strip()]
+        right = [p for p in right if p[1] == "1" and p[2] == "0" and p[0] != me]
+        if not right:
             return
-
-        window = session.active_window
-        panes = window.panes
-
-        if len(panes) < 2:
-            return
-
-        # Toggle: hide if visible (more than 1 pane), show if hidden
-        sidebar_pane = panes[-1]
-        # libtmux doesn't have a direct hide API; resize to 0 width to "hide"
-        # Instead, use resize-pane -x to collapse/restore
-        import subprocess
-        # Check current width
-        result = subprocess.run(
-            ["tmux", "display-message", "-p", "-t", sidebar_pane.id, "#{pane_width}"],
-            capture_output=True, text=True,
-        )
-        current_width = int(result.stdout.strip() or "0")
-
-        if current_width > 2:
-            # Collapse to 1 column (effectively hidden)
-            subprocess.run(["tmux", "resize-pane", "-t", sidebar_pane.id, "-x", "1"])
-        else:
-            # Restore to 20% of terminal width
-            term_width = _get_terminal_width()
-            sidebar_width = max(20, term_width // 5)
-            subprocess.run(["tmux", "resize-pane", "-t", sidebar_pane.id, "-x", str(sidebar_width)])
-
-    except (ImportError, OSError, subprocess.SubprocessError, AttributeError,
-            IndexError, ValueError):
+        pane, width = right[0][0], int(right[0][3])
+        target = "1" if width > 2 else str(SIDEBAR_WIDTH)
+        subprocess.run(["tmux", "resize-pane", "-t", pane, "-x", target],
+                       capture_output=True, timeout=2)
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
         return
 
 

@@ -13,12 +13,13 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.formatted_text import HTML, ANSI
 from prompt_toolkit.key_binding import merge_key_bindings
 from prompt_toolkit.key_binding.bindings.emacs import load_emacs_bindings
+from prompt_toolkit.styles import Style
 
 from sable.core.config.schema import ShellConfig
 
 from sable.app import budget
 from sable.app import explain
-from sable.app.builtins.dispatch import handle_builtin as _handle_builtin
+from sable.app.builtins.dispatch import handle_builtin_safely as _handle_builtin
 
 # Still used directly by the loop: Ctrl+B records a router correction.
 from sable.app.builtins.route import _record_router_correction
@@ -31,9 +32,11 @@ from sable.core.audit import write_command as _write_audit_log
 from sable.ui.console import out as _out
 from sable.ui.prompt.ghost import CwdHistorySuggest
 from sable.ui.prompt.session import (
+    COMPLETION_STYLE,
     _ShellCompleter,
     _make_key_bindings,
     _render_prompt,
+    slash_line_filter,
     take_bypass,
 )
 
@@ -291,7 +294,10 @@ def start(config: ShellConfig, session_id: str, session_context: str = "") -> No
         history=FileHistory(str(history_file)),
         key_bindings=merge_key_bindings([load_emacs_bindings(), kb]),
         completer=_ShellCompleter(),
-        complete_while_typing=False,
+        # Tab completes anything; a line starting with `/` opens the command
+        # menu as you type, since that is where people go looking.
+        complete_while_typing=slash_line_filter(),
+        style=Style.from_dict(COMPLETION_STYLE),
         auto_suggest=ghost,
     )
     from sable.ui.theme import set_theme

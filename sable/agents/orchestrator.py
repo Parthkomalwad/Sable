@@ -592,8 +592,9 @@ class OrchestratorAgent:
         from sable.tools import registry
         from sable.tools.base import ToolError
 
-        DIM, BRIGHT, RESET = '\033[2;37m', '\033[1;37m', '\033[0m'
-        sys.stdout.write(f'\n  ⚙ {explanation}\n\n')
+        from sable.policy import blast
+        from sable.policy import approval
+
         tool = registry.get(name)
         preview = None
         if tool is not None and tool.preview is not None and ctx is not None and tool.validate(args) is None:
@@ -601,21 +602,30 @@ class OrchestratorAgent:
                 preview = tool.preview(args, ctx)
             except ToolError as exc:
                 preview = f'(no preview: {exc})'
+        lines = [(approval.TEXT, explanation), ("", "")]
         if preview is None:
-            sys.stdout.write(f'  {BRIGHT}{name}{RESET} {DIM}{json.dumps(args)}{RESET}\n\n')
+            lines.append((approval.CMD, f'⚙ {name}  {json.dumps(args)}'))
         else:
-            sys.stdout.write(f'  {BRIGHT}{name}{RESET} {DIM}{args.get("path", "")}{RESET}\n\n')
-            sys.stdout.write('\n'.join(f'    {ln}' for ln in preview.splitlines()) + '\n\n')
-        sys.stdout.write(f'  {DIM}↵ run   q cancel  ›{RESET}\n')
+            lines.append((approval.CMD, f'⚙ {name}  {args.get("path", "")}'))
+            lines.append(("", ""))
+            for ln in preview.splitlines():
+                style = (approval.OK if ln.startswith('+') and not ln.startswith('+++')
+                         else approval.NO if ln.startswith('-') and not ln.startswith('---')
+                         else approval.DIM)
+                lines.append((style, ln))
+        colour = blast.COLOURS[blast.Level.WRITES]
+        sys.stdout.write('\n' + approval.card('◆ WAITING FOR YOU', colour, lines, tag='tool') + '\n')
         sys.stdout.flush()
         try:
-            answer = input('').strip().lower()
+            answer = input(approval.keys(('↵', 'run'), ('q', 'cancel'))).strip().lower()
         except (EOFError, KeyboardInterrupt):
+            sys.stdout.write(approval.outcome(False) + '\n')
             return False
         if answer == 'q':
-            sys.stdout.write(f'  {DIM}cancelled{RESET}\n')
+            sys.stdout.write(approval.outcome(False) + '\n')
             sys.stdout.flush()
             return False
+        sys.stdout.write(approval.outcome(True) + '\n')
         return True
 
     def _handle_spawn(self, action: dict) -> None:
@@ -1385,38 +1395,35 @@ class OrchestratorAgent:
     def _confirm_command(self, command: str, explanation: str) -> str | None:
         """Show ↵ run  e edit  q cancel prompt. Returns confirmed command or None."""
         from sable.policy import blast
-        BRIGHT_WHITE = '\033[1;37m'
-        DIM = '\033[2;37m'
-        RESET = '\033[0m'
+        from sable.policy import approval
         level = blast.classify(command)
         colour = blast.COLOURS[level]
 
-        sys.stdout.write('\n')
-        sys.stdout.write(f'{colour}  \u2726{RESET} {explanation}  {colour}{level.value}{RESET}\n\n')
-        sys.stdout.write(f'  {BRIGHT_WHITE}$ {command}{RESET}\n\n')
-        sys.stdout.write(f'  {DIM}\u21b5 run   e edit   q cancel  \u203a{RESET}\n')
+        sys.stdout.write('\n' + approval.command_card(explanation, command, colour, level.value) + '\n')
         sys.stdout.flush()
         try:
-            answer = input('').strip()
+            answer = input(approval.keys(('\u21b5', 'run'), ('e', 'edit'), ('q', 'cancel'))).strip()
         except (EOFError, KeyboardInterrupt):
+            sys.stdout.write(approval.outcome(False) + '\n')
             return None
         if answer.lower() == 'q':
-            sys.stdout.write(f'  {DIM}cancelled{RESET}\n')
+            sys.stdout.write(approval.outcome(False) + '\n')
             sys.stdout.flush()
             return None
         if answer.lower() == 'e':
-            sys.stdout.write('  edit> ')
-            sys.stdout.flush()
             try:
-                edited = input('').strip()
+                edited = input(f'    {approval.KEY}edit{approval.RESET} {approval.FAINT}\u203a{approval.RESET} ').strip()
             except (EOFError, KeyboardInterrupt):
+                sys.stdout.write(approval.outcome(False) + '\n')
                 return None
             self._record_edit(command, edited)
             if edited and edited != command:
                 # The skill's procedure fell short of what the job needed.
                 # `_grade_skills` withholds credit for the run because of it.
                 self._command_was_edited = True
+            sys.stdout.write(approval.outcome(True, 'edited') + '\n')
             return edited or command
+        sys.stdout.write(approval.outcome(True) + '\n')
         return command
 
     def _record_edit(self, proposed: str, corrected: str) -> None:

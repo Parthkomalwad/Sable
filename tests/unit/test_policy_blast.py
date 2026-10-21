@@ -121,7 +121,7 @@ def test_tainted_bumped_ls_is_still_read_only(monkeypatch, capsys):
     assert engine._confirm("ls -la", d) is False
     out = capsys.readouterr().out
     assert blast.COLOURS[Level.READ_ONLY] in out and "read-only" in out
-    assert "CONFIRM  tainted-context" in out and "DESTRUCTIVE" not in out
+    assert "CONFIRM · tainted-context" in out and "DESTRUCTIVE" not in out
 
 
 @pytest.mark.parametrize("command,level", [

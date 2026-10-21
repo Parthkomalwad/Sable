@@ -38,7 +38,7 @@ RUN mkdir -p /root/.config/agentic-shell /root/.local/share/agentic-shell /var/l
     && touch /var/log/agentic-shell/audit.log && chmod 0666 /var/log/agentic-shell/audit.log
 
 # Login-shell wrapper (source is bind-mounted at /app at run time)
-RUN printf '#!/bin/bash\nexport PYTHONPATH=/app\nexec python3 -m shell.main "$@"\n' > /usr/local/bin/sable \
+RUN printf '#!/bin/bash\nexport PYTHONPATH=/app\nexec python3 -m sable.app.main "$@"\n' > /usr/local/bin/sable \
     && chmod +x /usr/local/bin/sable \
     && echo "/usr/local/bin/sable" >> /etc/shells
 
@@ -56,8 +56,14 @@ RUN ssh-keygen -A \
 # /etc/environment covers SSH logins, which start with a clean environment.
 ENV SABLE_ALLOW_ROOT=1
 
-# Config is written at container start by scripts/playground-entry.sh from env vars
+# Config is written at container start by docker/playground-entry.sh from env vars.
+# The launcher runs the repo's copy when /app is mounted, so editing the entry
+# script needs a relaunch, not a rebuild; the baked copy covers a run without
+# the mount. ENTRYPOINT, not CMD: `playground.ps1 tests` passes `tests` as an
+# argument, and under CMD that argument replaced the entry script outright.
 COPY docker/playground-entry.sh /usr/local/bin/playground-entry.sh
-RUN chmod +x /usr/local/bin/playground-entry.sh
+RUN chmod +x /usr/local/bin/playground-entry.sh \
+    && printf '#!/bin/bash\nif [ -f /app/docker/playground-entry.sh ]; then exec bash /app/docker/playground-entry.sh "$@"; fi\nexec /usr/local/bin/playground-entry.sh "$@"\n' > /usr/local/bin/playground-launch \
+    && chmod +x /usr/local/bin/playground-launch
 
-CMD ["/usr/local/bin/playground-entry.sh"]
+ENTRYPOINT ["/usr/local/bin/playground-launch"]

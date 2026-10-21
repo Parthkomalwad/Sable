@@ -109,7 +109,7 @@ def _git_status():
         if not branch:
             return None
         status = subprocess.run(
-            ["git", "-C", cwd, "status", "--porcelain"],
+            ["git", "--no-optional-locks", "-C", cwd, "status", "--porcelain"],
             capture_output=True, text=True, timeout=1
         ).stdout.strip()
         modified  = sum(1 for l in status.splitlines() if l and l[1] in "MD ")

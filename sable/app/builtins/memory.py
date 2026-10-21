@@ -4,6 +4,8 @@ Extracted from `app/repl.py` in Phase 0.5 step 3. Pure move, no logic change.
 """
 from __future__ import annotations
 
+import os
+
 from sable.ui.console import out as _out
 
 

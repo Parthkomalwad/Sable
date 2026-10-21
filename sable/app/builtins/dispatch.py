@@ -28,66 +28,13 @@ from sable.app.builtins.skill import _handle_skill_builtin
 from sable.app.builtins.stats import _show_stats, _show_stats_csv
 from sable.app.builtins.task import _handle_task_builtin
 from sable.core.config.schema import ShellConfig
+from sable.ui.commands import plain_help, show_help
 from sable.ui.console import out as _out
 
 
-_HELP_TEXT = (
-    "\nSable - Built-in Commands\n"
-    "----------------------------------\n"
-    "  /new           Start a fresh tmux session\n"
-    "  /clear         Clear the terminal screen\n"
-    "  /exit          Exit the shell\n"
-    "  /config        Open settings panel (Ctrl+X)\n"
-    "  /mode          Toggle routing: auto / prefix\n"
-    "  /model         Show current LLM model\n"
-    "  /stats         Last 7 days token usage\n"
-    "  /selfcheck     Weekly report from logs, no model calls\n"
-    "  /history       recent commands with AI costs\n"
-    "  /clip           Snippet clipboard (add/run/del)\n"
-    "  /task           Manage background agents\n"
-    "  /skill          Manage skill files\n"
-    "  /corrections   Commands you corrected (list, delete <id>)\n"
-    "  /alias \"phrase\" = <command>   Name a command in your own words\n"
-    "  /route why \"<line>\"  Explain how a line would be routed\n"
-    "  /why [agent]   What the model saw when it last decided\n"
-    "  /inbox [show|approve|reject K]  Everything waiting on you, in one list\n"
-    "  /approve [id]  Commands sub-agents are waiting on you to allow\n"
-    "  /dash          Full-screen command center: lanes, approvals, breaker (q quits)\n"
-    "  /mcp add|list|remove|trust|untrust  MCP servers and their tools\n"
-    "  /plugin add <folder>|list|remove <name>  Plugins: an MCP server plus skills and hooks\n"
-    "  /tools      Tools each agent role may call, and at which tier\n"
-    "  /audit [--since 1h] [--agent NAME] [--export jsonl]  Who ran what, why, outcome\n"
-    "  /schedule \"<sentence>\"  Recurring job (list, pause|resume|run-now|rm N)\n"
-    "  /watch add|list|rm  Daemon watchers: disk, file, log, http\n"
-    "  /mcp search <query> [--add N]  Find MCP servers in the official registry\n"
-    "  /host add|list|rm|test  Other servers, reached by SSH to their own Sable\n"
-    "  @NAME <command>, @all <command>  Run a command on a host (its policy applies)\n"
-    "  /secret add|list|rm <name>  Keyring secrets, used as $SECRET:name\n"
-    "  /task replay <n>     Every turn of one agent, as the model saw it\n"
-    "  /task events <n>     The agent's event stream\n"
-    "  /task guide <n> <text>  Steer a running agent (also Ctrl+G)\n"
-    "  /bash           Plain bash subshell, exit returns here (also /plain, Ctrl+\\)\n"
-    "  /tour           Guided walkthrough of what Sable does\n"
-    "  /theme <name>  Colours: default, mono, high-contrast\n"
-    "  /layout <name>  tmux panes: focus, fleet, minimal\n"
-    "  /budget reset  Clear hard-stop budget flag\n"
-    "  /palace [room|find <text>|why <id>|consolidate]  What Sable has learned, and from where\n"
-    "  /remember <text> [--room R]  Save a fact (room user by default)\n"
-    "  /forget <id>   Remove a fact from the palace\n"
-    "  /undo [list|<id>]  Put back what the last step changed (diff first, asks)\n"
-    "  /task diff|undo <n>  What a sub-agent's last step changed, or put it back\n"
-    "  /memory                  View current context\n"
-    "  /memory versions         List all saved snapshots\n"
-    "  /memory revert <id>      Restore a snapshot\n"
-    "  /memory clear            Clear active context\n"
-    "\n"
-    "  >> text        Force agentic (prefix mode)\n"
-    "  Ctrl+B         Next command runs as raw bash\n"
-    "  Ctrl+G         Steer a running agent\n"
-    "  Ctrl+P         Palette: builtins, skills, snippets, tasks\n"
-    "  ?  /  !        After a failed command: explain it / propose a fix\n"
-    "  Ctrl+T         Toggle telemetry sidebar\n"
-)
+#: Flat help text for the Ctrl+P palette, generated from the command catalog
+#: (ui/commands.py) so the palette, /help and Tab completion share one list.
+_HELP_TEXT = plain_help()
 
 
 _ALIAS_USAGE = 'usage: /alias "<phrase>" = <command>  |  /alias delete "<phrase>"'
@@ -273,6 +220,14 @@ def _handle_corrections_builtin(argument: str, db) -> bool:
     return True
 
 
+def _is_exit_word(cmd: str) -> bool:
+    """`exit`, `logout`, or `exit N` on its own, and nothing longer."""
+    parts = cmd.split()
+    if not parts or parts[0] not in ("exit", "logout"):
+        return False
+    return len(parts) == 1 or (len(parts) == 2 and parts[1].isdigit())
+
+
 def handle_builtin(
     line: str, db, session_id: str, config: ShellConfig,
     turns: list[dict] | None = None,
@@ -285,16 +240,18 @@ def handle_builtin(
     turns = turns if turns is not None else []
     cmd = line.strip()
 
-    if cmd in ("/help", "/?"):
-        sys.stdout.write(_HELP_TEXT + "\n")
-        sys.stdout.flush()
+    if cmd in ("/help", "/?") or cmd.startswith(("/help ", "/? ")):
+        show_help(cmd.partition(" ")[2])
         return True
 
     if cmd == "/clear":
         os.system("clear")
         return True
 
-    if cmd in ("/exit", "/quit"):
+    # A bare `exit` or `logout` means the same thing. Routed to bash it ran
+    # `bash -c exit`, which closed a child and left the user in Sable: the
+    # trap `cd` is intercepted for.
+    if cmd in ("/exit", "/quit") or _is_exit_word(cmd):
         import pathlib
         pathlib.Path.home().joinpath(".local", "share", "agentic-shell", "exit_requested").touch()
         # Detect repeated command patterns and draft them as skills.
@@ -496,7 +453,7 @@ def handle_builtin(
             run_clip_command(remainder, db)
         return True
 
-    if cmd == "shell stats --csv":
+    if cmd in ("/stats --csv", "shell stats --csv"):
         _show_stats_csv(db)
         return True
 
@@ -515,4 +472,74 @@ def handle_builtin(
         _handle_memory_builtin(subcmd, session_id, turns)
         return True
 
+    if _looks_like_a_command(cmd):
+        # A mistyped builtin used to fall through to bash, which answered
+        # "/bin/bash: /nope: No such file or directory".
+        show_help(cmd.split()[0])
+        return True
+
     return False
+
+
+#: What a bug inside a builtin raises. Named rather than `Exception` (CI bans
+#: that, structure.md 4.7), and between them these cover a programming error
+#: in any handler. KeyboardInterrupt and SystemExit are not here on purpose:
+#: Ctrl+C and /exit must still do what they say.
+BUILTIN_FAILURES = (
+    NameError, AttributeError, TypeError, ValueError, LookupError, ArithmeticError,
+    AssertionError, RuntimeError, ImportError, OSError, sqlite3.Error,
+)
+
+try:
+    # libtmux raises its own family (DeprecatedError took /bash down once).
+    # Imported defensively: tests that swap libtmux for a mock make this
+    # submodule unimportable, and the net must still load.
+    from libtmux.exc import LibTmuxException
+    BUILTIN_FAILURES += (LibTmuxException,)
+except ImportError:
+    pass
+
+ERROR_LOG = os.path.join(os.path.expanduser("~"), ".sable", "errors.log")
+
+
+def handle_builtin_safely(line: str, db, session_id: str, config: ShellConfig,
+                          turns: list[dict] | None = None) -> bool:
+    """`handle_builtin`, but a crash in one command never ends the login shell.
+
+    `/memory` once raised NameError and took the whole session with it. Now
+    the failure is one red line, the traceback goes to ~/.sable/errors.log,
+    and the prompt comes back.
+    """
+    try:
+        return handle_builtin(line, db, session_id, config, turns=turns)
+    except BUILTIN_FAILURES as exc:
+        _report_failure(line, exc)
+        return True
+
+
+def _report_failure(line: str, exc: BaseException) -> None:
+    import time
+    import traceback
+    logged = True
+    try:
+        os.makedirs(os.path.dirname(ERROR_LOG), exist_ok=True)
+        with open(ERROR_LOG, "a", encoding="utf-8") as f:
+            f.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')}  {line}\n")
+            f.write("".join(traceback.format_exception(exc)))
+    except OSError:
+        logged = False
+    name = line.split()[0] if line.split() else line
+    _out(f"\033[38;5;203m✗ {name} failed\033[0m  \033[38;5;245m{type(exc).__name__}: {exc}\033[0m")
+    where = "full traceback in ~/.sable/errors.log · " if logged else ""
+    _out(f"\033[38;5;240m  {where}the shell is still running\033[0m")
+
+
+def _looks_like_a_command(cmd: str) -> bool:
+    """`/word` that is not a real path: a builtin the user mistyped.
+
+    `/bin/ls`, `/usr/bin/env python3` and `/opt/app` (when it exists) stay
+    bash's: only a single-segment name with nothing on disk is claimed.
+    """
+    import re
+    word = cmd.split()[0] if cmd.split() else ""
+    return bool(re.fullmatch(r"/[a-z][a-z0-9-]*", word)) and not os.path.exists(word)
